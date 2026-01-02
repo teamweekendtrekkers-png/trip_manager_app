@@ -34,11 +34,12 @@ class _TripEditScreenState extends State<TripEditScreen> {
     super.initState();
     _tripData = Map<String, dynamic>.from(widget.trip ?? _getDefaultTrip());
     
-    _nameController = TextEditingController(text: _tripData['name'] ?? '');
-    _destinationController = TextEditingController(text: _tripData['destination'] ?? '');
-    _descriptionController = TextEditingController(text: _tripData['description'] ?? '');
+    // Handle field name variations from parser (title/name, location/destination, about/description)
+    _nameController = TextEditingController(text: _tripData['title'] ?? _tripData['name'] ?? '');
+    _destinationController = TextEditingController(text: _tripData['location'] ?? _tripData['destination'] ?? '');
+    _descriptionController = TextEditingController(text: _tripData['about'] ?? _tripData['description'] ?? '');
     _dateController = TextEditingController(text: _tripData['date'] ?? '');
-    _priceController = TextEditingController(text: _tripData['price']?.toString() ?? '');
+    _priceController = TextEditingController(text: _tripData['price']?.toString() ?? '₹0');
     _discountedPriceController = TextEditingController(
       text: _tripData['discountedPrice']?.toString() ?? '',
     );
@@ -58,9 +59,9 @@ class _TripEditScreenState extends State<TripEditScreen> {
       'description': '',
       'date': '',
       'image': 'images/trips/default.jpg',
-      'price': 0,
+      'price': '₹0',
       'difficulty': 'Moderate',
-      'groupSize': 20,
+      'groupSize': '',
       'pickupPoint': 'Bangalore',
       'featured': false,
       'highlights': <String>[],
@@ -572,9 +573,10 @@ class _TripEditScreenState extends State<TripEditScreen> {
 
   void _addItineraryDay() async {
     final itinerary = List<Map<String, dynamic>>.from(_tripData['itinerary'] ?? []);
-    final dayNumber = itinerary.length + 1;
+    final dayNumber = itinerary.length;
+    final dayLabel = 'Day $dayNumber';
     
-    final result = await _showItineraryDialog(dayNumber, '', '');
+    final result = await _showItineraryDialog(dayLabel, '', []);
     if (result != null) {
       setState(() {
         itinerary.add(result);
@@ -587,10 +589,18 @@ class _TripEditScreenState extends State<TripEditScreen> {
     final itinerary = List<Map<String, dynamic>>.from(_tripData['itinerary'] ?? []);
     final day = itinerary[index];
     
+    // Handle activities as list or description as string
+    List<String> activities = [];
+    if (day['activities'] != null) {
+      activities = List<String>.from(day['activities']);
+    } else if (day['description'] != null) {
+      activities = day['description'].toString().split('\n');
+    }
+    
     final result = await _showItineraryDialog(
-      day['day'] ?? index + 1,
-      day['title'] ?? '',
-      day['description'] ?? '',
+      day['day']?.toString() ?? 'Day ${index + 1}',
+      day['title']?.toString() ?? '',
+      activities,
     );
     
     if (result != null) {
@@ -602,38 +612,53 @@ class _TripEditScreenState extends State<TripEditScreen> {
   }
 
   Future<Map<String, dynamic>?> _showItineraryDialog(
-    int dayNumber,
+    String dayLabel,
     String title,
-    String description,
+    List<String> activities,
   ) async {
+    final dayController = TextEditingController(text: dayLabel);
     final titleController = TextEditingController(text: title);
-    final descController = TextEditingController(text: description);
+    final activitiesController = TextEditingController(text: activities.join('\n'));
     
     return showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Day $dayNumber'),
+        title: const Text('Edit Day'),
         content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Title',
-                  border: OutlineInputBorder(),
+          child: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: dayController,
+                  decoration: const InputDecoration(
+                    labelText: 'Day Label',
+                    hintText: 'e.g., Day 0, Day 1',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: descController,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Title',
+                    hintText: 'e.g., Trek to Summit',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-                maxLines: 3,
-              ),
-            ],
+                const SizedBox(height: 16),
+                TextField(
+                  controller: activitiesController,
+                  decoration: const InputDecoration(
+                    labelText: 'Activities (one per line)',
+                    hintText: '6:00 AM - Wake up\n7:00 AM - Breakfast\n8:00 AM - Start trek',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 8,
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
@@ -642,18 +667,25 @@ class _TripEditScreenState extends State<TripEditScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, {
-              'day': dayNumber,
-              'title': titleController.text,
-              'description': descController.text,
-            }),
+            onPressed: () {
+              final actList = activitiesController.text
+                  .split('\n')
+                  .map((s) => s.trim())
+                  .where((s) => s.isNotEmpty)
+                  .toList();
+              Navigator.pop(context, {
+                'day': dayController.text,
+                'title': titleController.text,
+                'activities': actList,
+                'description': actList.join('\n'),
+              });
+            },
             child: const Text('Save'),
           ),
         ],
       ),
     );
   }
-
   String _getImageUrl(String image) {
     if (image.startsWith('http')) {
       return image;
@@ -669,14 +701,19 @@ class _TripEditScreenState extends State<TripEditScreen> {
       return;
     }
 
-    // Update trip data from controllers
+    // Update trip data from controllers - use both field name variations for compatibility
+    _tripData['title'] = _nameController.text;
     _tripData['name'] = _nameController.text;
+    _tripData['location'] = _destinationController.text;
     _tripData['destination'] = _destinationController.text;
+    _tripData['about'] = _descriptionController.text;
     _tripData['description'] = _descriptionController.text;
     _tripData['date'] = _dateController.text;
-    _tripData['price'] = double.tryParse(_priceController.text) ?? 0;
+    // Keep price as string (e.g., "₹4,000")
+    final priceText = _priceController.text.trim();
+    _tripData['price'] = priceText.startsWith('₹') ? priceText : '₹$priceText';
     _tripData['image'] = _imageController.text;
-    _tripData['groupSize'] = int.tryParse(_groupSizeController.text) ?? 20;
+    _tripData['groupSize'] = _groupSizeController.text;
     _tripData['pickupPoint'] = _pickupPointController.text;
     
     if (_discountedPriceController.text.isNotEmpty) {

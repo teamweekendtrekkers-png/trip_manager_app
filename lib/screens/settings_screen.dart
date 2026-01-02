@@ -22,6 +22,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   
   bool _isVerifying = false;
   bool? _tokenValid;
+  String? _tokenMessage;
 
   @override
   void initState() {
@@ -82,6 +83,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       obscureText: true,
                       validator: (v) => v?.isEmpty == true ? 'Required' : null,
                     ),
+                    if (_tokenMessage != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: _tokenValid == true ? Colors.green[50] : Colors.orange[50],
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          _tokenMessage!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _tokenValid == true ? Colors.green[800] : Colors.orange[800],
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Align(
                       alignment: Alignment.centerRight,
@@ -280,24 +298,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _isVerifying = true;
       _tokenValid = null;
+      _tokenMessage = null;
     });
 
     final settings = context.read<SettingsProvider>().settings.copyWith(
       githubToken: _tokenController.text,
+      repositoryOwner: _ownerController.text,
+      repositoryName: _repoController.text,
     );
     final service = GitHubService(settings: settings);
-    final valid = await service.verifyToken();
+    final result = await service.verifyToken();
 
     setState(() {
       _isVerifying = false;
-      _tokenValid = valid;
+      _tokenValid = result.isValid && result.canPush;
+      _tokenMessage = result.message;
     });
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(valid ? 'Token is valid!' : 'Invalid token'),
-          backgroundColor: valid ? Colors.green : Colors.red,
+          content: Text(result.isValid 
+              ? (result.canPush ? 'Token is valid with write access!' : 'Token valid but limited access')
+              : 'Invalid token'),
+          backgroundColor: result.isValid && result.canPush ? Colors.green : (result.isValid ? Colors.orange : Colors.red),
         ),
       );
     }
