@@ -26,6 +26,13 @@ class _TripEditScreenState extends State<TripEditScreen> {
   late TextEditingController _groupSizeController;
   late TextEditingController _pickupPointController;
   late TextEditingController _imageController;
+  // Website-specific fields
+  late TextEditingController _badgeController;
+  late TextEditingController _distanceController;
+  late TextEditingController _elevationController;
+  late TextEditingController _bestTimeController;
+  late TextEditingController _durationController;
+  late TextEditingController _availableDatesController;
 
   bool get isEditing => widget.trip != null;
 
@@ -48,6 +55,15 @@ class _TripEditScreenState extends State<TripEditScreen> {
     );
     _pickupPointController = TextEditingController(text: _tripData['pickupPoint'] ?? '');
     _imageController = TextEditingController(text: _tripData['image'] ?? '');
+    // Website-specific fields
+    _badgeController = TextEditingController(text: _tripData['badge']?.toString() ?? 'Trek');
+    _distanceController = TextEditingController(text: _tripData['distance']?.toString() ?? '');
+    _elevationController = TextEditingController(text: _tripData['elevation']?.toString() ?? '');
+    _bestTimeController = TextEditingController(text: _tripData['bestTime']?.toString() ?? '');
+    _durationController = TextEditingController(text: _tripData['duration']?.toString() ?? '');
+    // Available dates as newline-separated string
+    final availableDates = _tripData['availableDates'] as List<dynamic>? ?? [];
+    _availableDatesController = TextEditingController(text: availableDates.join('\n'));
   }
 
   Map<String, dynamic> _getDefaultTrip() {
@@ -64,6 +80,12 @@ class _TripEditScreenState extends State<TripEditScreen> {
       'groupSize': '',
       'pickupPoint': 'Bangalore',
       'featured': false,
+      'badge': 'Trek',
+      'distance': '',
+      'elevation': '',
+      'bestTime': '',
+      'duration': '',
+      'availableDates': <String>[],
       'highlights': <String>[],
       'itinerary': <Map<String, dynamic>>[],
       'inclusions': <String>[],
@@ -82,6 +104,12 @@ class _TripEditScreenState extends State<TripEditScreen> {
     _groupSizeController.dispose();
     _pickupPointController.dispose();
     _imageController.dispose();
+    _badgeController.dispose();
+    _distanceController.dispose();
+    _elevationController.dispose();
+    _bestTimeController.dispose();
+    _durationController.dispose();
+    _availableDatesController.dispose();
     super.dispose();
   }
 
@@ -236,6 +264,90 @@ class _TripEditScreenState extends State<TripEditScreen> {
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.directions_bus),
                     ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Website Fields Card (badge, distance, elevation, etc.)
+              _buildSectionCard(
+                title: 'Website Display Fields',
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _badgeController,
+                          decoration: const InputDecoration(
+                            labelText: 'Badge/Type',
+                            hintText: 'e.g., Weekend Trek, Road Trip',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.label),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _durationController,
+                          decoration: const InputDecoration(
+                            labelText: 'Duration',
+                            hintText: 'e.g., 2D/1N',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.schedule),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _distanceController,
+                          decoration: const InputDecoration(
+                            labelText: 'Distance',
+                            hintText: 'e.g., 15-20 km',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.straighten),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _elevationController,
+                          decoration: const InputDecoration(
+                            labelText: 'Elevation',
+                            hintText: 'e.g., 1,420 m',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.terrain),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _bestTimeController,
+                    decoration: const InputDecoration(
+                      labelText: 'Best Time to Visit',
+                      hintText: 'e.g., Oct - Feb',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.wb_sunny),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _availableDatesController,
+                    decoration: const InputDecoration(
+                      labelText: 'Available Dates (one per line)',
+                      hintText: 'Jan 18-19, 2026\\nJan 25-26, 2026',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.event),
+                    ),
+                    maxLines: 4,
                   ),
                 ],
               ),
@@ -715,6 +827,19 @@ class _TripEditScreenState extends State<TripEditScreen> {
     _tripData['image'] = _imageController.text;
     _tripData['groupSize'] = _groupSizeController.text;
     _tripData['pickupPoint'] = _pickupPointController.text;
+    
+    // Website-specific fields
+    _tripData['badge'] = _badgeController.text.isNotEmpty ? _badgeController.text : 'Trek';
+    _tripData['distance'] = _distanceController.text;
+    _tripData['elevation'] = _elevationController.text;
+    _tripData['bestTime'] = _bestTimeController.text;
+    _tripData['duration'] = _durationController.text;
+    // Parse available dates from newline-separated text
+    _tripData['availableDates'] = _availableDatesController.text
+        .split('\\n')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
     
     if (_discountedPriceController.text.isNotEmpty) {
       _tripData['discountedPrice'] = double.tryParse(_discountedPriceController.text);
