@@ -2,6 +2,36 @@
 /// Handles object format: const tripsData = { tripId: {...}, tripId2: {...} }
 class TripsParser {
   
+  /// Default pickup points used by the website when trip has no custom boardingLocations
+  static List<Map<String, dynamic>> getDefaultPickupPoints() {
+    return [
+      {
+        'name': 'Majestic',
+        'landmark': 'Metro Station / Shantala Silks',
+        'time': '8:30 PM - 10:00 PM',
+        'mapLink': 'https://maps.google.com/?q=Majestic+Metro+Station+Bangalore',
+      },
+      {
+        'name': 'Koramangala',
+        'landmark': 'Kota Kochari, Opp Forum Mall',
+        'time': '9:00 PM - 10:30 PM',
+        'mapLink': 'https://maps.google.com/?q=Forum+Mall+Koramangala+Bangalore',
+      },
+      {
+        'name': 'Silk Board',
+        'landmark': 'Silk Board Junction',
+        'time': '9:15 PM - 10:45 PM',
+        'mapLink': 'https://maps.google.com/?q=Silk+Board+Junction+Bangalore',
+      },
+      {
+        'name': 'Electronic City',
+        'landmark': 'Infosys Gate / Toll Plaza',
+        'time': '9:45 PM - 11:15 PM',
+        'mapLink': 'https://maps.google.com/?q=Electronic+City+Infosys+Bangalore',
+      },
+    ];
+  }
+  
   /// Parse the trips-data.js content into a list of trip maps
   static List<Map<String, dynamic>> parseTripsData(String jsContent) {
     final trips = <Map<String, dynamic>>[];
@@ -91,20 +121,21 @@ class TripsParser {
   static Map<String, dynamic> _parseTripObject(String tripId, String tripContent) {
     final result = <String, dynamic>{'id': tripId};
     
-    // Extract string fields
+    // Extract string fields - use patterns that properly handle apostrophes in double-quoted strings
+    // The pattern "([^"]*)" matches content between double quotes, allowing apostrophes inside
     final stringPatterns = {
-      'title': RegExp(r'''title:\s*["']([^"']+)["']'''),
-      'location': RegExp(r'''location:\s*["']([^"']+)["']'''),
-      'badge': RegExp(r'''badge:\s*["']([^"']+)["']'''),
-      'price': RegExp(r'''price:\s*["']([^"']+)["']'''),
-      'image': RegExp(r'''image:\s*["']([^"']+)["']'''),
-      'distance': RegExp(r'''distance:\s*["']([^"']+)["']'''),
-      'elevation': RegExp(r'''elevation:\s*["']([^"']+)["']'''),
-      'difficulty': RegExp(r'''difficulty:\s*["']([^"']+)["']'''),
-      'bestTime': RegExp(r'''bestTime:\s*["']([^"']+)["']'''),
-      'duration': RegExp(r'''duration:\s*["']([^"']+)["']'''),
-      'about': RegExp(r'''about:\s*["'](.+?)["'](?=,\s*\n|\s*\n\s*\w+:)''', dotAll: true),
-      'groupSize': RegExp(r'''groupSize:\s*["']([^"']*)["']'''),
+      'title': RegExp(r'title:\s*"([^"]*)"'),
+      'location': RegExp(r'location:\s*"([^"]*)"'),
+      'badge': RegExp(r'badge:\s*"([^"]*)"'),
+      'price': RegExp(r'price:\s*"([^"]*)"'),
+      'image': RegExp(r'image:\s*"([^"]*)"'),
+      'distance': RegExp(r'distance:\s*"([^"]*)"'),
+      'elevation': RegExp(r'elevation:\s*"([^"]*)"'),
+      'difficulty': RegExp(r'difficulty:\s*"([^"]*)"'),
+      'bestTime': RegExp(r'bestTime:\s*"([^"]*)"'),
+      'duration': RegExp(r'duration:\s*"([^"]*)"'),
+      'about': RegExp(r'about:\s*"(.+?)"(?=,\s*\n|\s*\n\s*\w+:)', dotAll: true),
+      'groupSize': RegExp(r'groupSize:\s*"([^"]*)"'),
     };
     
     for (final entry in stringPatterns.entries) {
@@ -131,10 +162,18 @@ class TripsParser {
     final datesMatch = RegExp(r'availableDates:\s*\[(.*?)\]', dotAll: true).firstMatch(tripContent);
     if (datesMatch != null) {
       final datesStr = datesMatch.group(1)!;
-      final dates = RegExp(r'''["']([^"']+)["']''')
-          .allMatches(datesStr)
-          .map((m) => m.group(1)!)
-          .toList();
+      // Use _parseStringArray to properly handle apostrophes in strings
+      final rawDates = _parseStringArray(datesStr);
+      // Handle corrupted data where dates were stored as single string with newlines
+      final dates = <String>[];
+      for (final date in rawDates) {
+        if (date.contains('\n')) {
+          // Split newline-joined dates into separate entries
+          dates.addAll(date.split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty));
+        } else {
+          dates.add(date);
+        }
+      }
       result['availableDates'] = dates;
       // Use first date as the main date
       if (dates.isNotEmpty) {
@@ -142,31 +181,38 @@ class TripsParser {
       }
     }
     
-    // Parse highlights array
+    // Parse highlights array - handle double-quoted strings with apostrophes
     final highlightsMatch = RegExp(r'highlights:\s*\[(.*?)\]', dotAll: true).firstMatch(tripContent);
     if (highlightsMatch != null) {
-      result['highlights'] = RegExp(r'''["']([^"']+)["']''')
-          .allMatches(highlightsMatch.group(1)!)
-          .map((m) => m.group(1)!)
-          .toList();
+      result['highlights'] = _parseStringArray(highlightsMatch.group(1)!);
     }
     
-    // Parse includes array
+    // Parse includes array - handle double-quoted strings with apostrophes
     final includesMatch = RegExp(r'includes:\s*\[(.*?)\]', dotAll: true).firstMatch(tripContent);
     if (includesMatch != null) {
-      result['inclusions'] = RegExp(r'''["']([^"']+)["']''')
-          .allMatches(includesMatch.group(1)!)
-          .map((m) => m.group(1)!)
-          .toList();
+      result['inclusions'] = _parseStringArray(includesMatch.group(1)!);
     }
     
-    // Parse excludes array
+    // Parse excludes array - handle double-quoted strings with apostrophes
     final excludesMatch = RegExp(r'excludes:\s*\[(.*?)\]', dotAll: true).firstMatch(tripContent);
     if (excludesMatch != null) {
-      result['exclusions'] = RegExp(r'''["']([^"']+)["']''')
-          .allMatches(excludesMatch.group(1)!)
-          .map((m) => m.group(1)!)
-          .toList();
+      result['exclusions'] = _parseStringArray(excludesMatch.group(1)!);
+    }
+    
+    // Parse galleryImages array - handle double-quoted strings with apostrophes
+    final galleryMatch = RegExp(r'galleryImages:\s*\[(.*?)\]', dotAll: true).firstMatch(tripContent);
+    if (galleryMatch != null) {
+      result['galleryImages'] = _parseStringArray(galleryMatch.group(1)!);
+    } else {
+      result['galleryImages'] = <String>[];
+    }
+    
+    // Parse boardingLocations array
+    final boardingMatch = RegExp(r'boardingLocations:\s*\[(.*?)\]\s*,?\s*(?:galleryImages:|groupSize:|$)', dotAll: true).firstMatch(tripContent);
+    if (boardingMatch != null) {
+      result['boardingLocations'] = _parseBoardingLocations(boardingMatch.group(1)!);
+    } else {
+      result['boardingLocations'] = <Map<String, dynamic>>[];
     }
     
     // Parse itinerary array
@@ -199,12 +245,14 @@ class TripsParser {
       final dayStr = match.group(0)!;
       final item = <String, dynamic>{};
       
-      final dayMatch = RegExp(r'''day:\s*["']?([^"',}]+)["']?''').firstMatch(dayStr);
+      // Match day field - can be unquoted or quoted
+      final dayMatch = RegExp(r'day:\s*"?([^",}]+)"?').firstMatch(dayStr);
       if (dayMatch != null) {
         item['day'] = dayMatch.group(1)?.trim();
       }
       
-      final titleMatch = RegExp(r'''title:\s*["']([^"']+)["']''').firstMatch(dayStr);
+      // Match title with double quotes (allows apostrophes inside)
+      final titleMatch = RegExp(r'title:\s*"([^"]*)"').firstMatch(dayStr);
       if (titleMatch != null) {
         item['title'] = titleMatch.group(1);
       }
@@ -212,10 +260,7 @@ class TripsParser {
       // Parse activities array within the day
       final activitiesMatch = RegExp(r'activities:\s*\[(.*?)\]', dotAll: true).firstMatch(dayStr);
       if (activitiesMatch != null) {
-        item['activities'] = RegExp(r'''["']([^"']+)["']''')
-            .allMatches(activitiesMatch.group(1)!)
-            .map((m) => m.group(1)!)
-            .toList();
+        item['activities'] = _parseStringArray(activitiesMatch.group(1)!);
         // Join activities into description
         item['description'] = (item['activities'] as List).join('\n');
       }
@@ -225,6 +270,98 @@ class TripsParser {
       }
     }
     
+    return items;
+  }
+  
+  /// Parse boarding location items
+  static List<Map<String, dynamic>> _parseBoardingLocations(String boardingStr) {
+    final items = <Map<String, dynamic>>[];
+    
+    // Find each boarding location object
+    final locationPattern = RegExp(r'\{[^{}]*name:[^{}]*\}', dotAll: true);
+    final locationMatches = locationPattern.allMatches(boardingStr);
+    
+    for (final match in locationMatches) {
+      final locStr = match.group(0)!;
+      final item = <String, dynamic>{};
+      
+      // Use double-quote patterns to allow apostrophes in values
+      final nameMatch = RegExp(r'name:\s*"([^"]*)"').firstMatch(locStr);
+      if (nameMatch != null) {
+        item['name'] = nameMatch.group(1);
+      }
+      
+      final landmarkMatch = RegExp(r'landmark:\s*"([^"]*)"').firstMatch(locStr);
+      if (landmarkMatch != null) {
+        item['landmark'] = landmarkMatch.group(1);
+      }
+      
+      final timeMatch = RegExp(r'time:\s*"([^"]*)"').firstMatch(locStr);
+      if (timeMatch != null) {
+        item['time'] = timeMatch.group(1);
+      }
+      
+      final mapLinkMatch = RegExp(r'mapLink:\s*"([^"]*)"').firstMatch(locStr);
+      if (mapLinkMatch != null) {
+        item['mapLink'] = mapLinkMatch.group(1);
+      }
+      
+      if (item.isNotEmpty) {
+        items.add(item);
+      }
+    }
+    
+    return items;
+  }
+  
+  /// Parse a string array that may contain apostrophes in double-quoted strings
+  static List<String> _parseStringArray(String arrayContent) {
+    final items = <String>[];
+    // Match double-quoted strings, handling escaped quotes
+    // Pattern matches: "content" where content can include apostrophes
+    // We iterate manually to handle escaped quotes properly
+    int i = 0;
+    while (i < arrayContent.length) {
+      // Find opening double quote
+      final startQuote = arrayContent.indexOf('"', i);
+      if (startQuote == -1) break;
+      
+      // Find closing double quote (not escaped)
+      int endQuote = startQuote + 1;
+      while (endQuote < arrayContent.length) {
+        if (arrayContent[endQuote] == '"') {
+          // Check if this quote is escaped
+          int backslashCount = 0;
+          int checkPos = endQuote - 1;
+          while (checkPos >= startQuote + 1 && arrayContent[checkPos] == '\\') {
+            backslashCount++;
+            checkPos--;
+          }
+          // If even number of backslashes, this quote is not escaped
+          if (backslashCount % 2 == 0) {
+            break;
+          }
+        }
+        endQuote++;
+      }
+      
+      if (endQuote < arrayContent.length) {
+        var value = arrayContent.substring(startQuote + 1, endQuote);
+        // Unescape common escape sequences
+        value = value
+            .replaceAll(r'\"', '"')
+            .replaceAll(r'\n', '\n')
+            .replaceAll(r'\r', '\r')
+            .replaceAll(r'\t', '\t')
+            .replaceAll(r'\\', '\\');
+        if (value.isNotEmpty) {
+          items.add(value);
+        }
+        i = endQuote + 1;
+      } else {
+        break;
+      }
+    }
     return items;
   }
   
@@ -287,6 +424,20 @@ class TripsParser {
       final excludes = trip['exclusions'] as List<dynamic>? ?? trip['excludes'] as List<dynamic>? ?? [];
       buffer.writeln('        excludes: [${excludes.map((e) => '"${_escapeJs(e.toString())}"').join(', ')}],');
       
+      // Boarding Locations
+      final boardingLocations = trip['boardingLocations'] as List<dynamic>? ?? [];
+      buffer.writeln('        boardingLocations: [');
+      for (final loc in boardingLocations) {
+        if (loc is Map) {
+          buffer.writeln('            {name: "${_escapeJs(loc['name']?.toString() ?? '')}", landmark: "${_escapeJs(loc['landmark']?.toString() ?? '')}", time: "${_escapeJs(loc['time']?.toString() ?? '')}", mapLink: "${_escapeJs(loc['mapLink']?.toString() ?? '')}"},');
+        }
+      }
+      buffer.writeln('        ],');
+      
+      // Gallery Images
+      final galleryImages = trip['galleryImages'] as List<dynamic>? ?? [];
+      buffer.writeln('        galleryImages: [${galleryImages.map((img) => '"${_escapeJs(img.toString())}"').join(', ')}],');
+      
       buffer.writeln('        groupSize: "${_escapeJs((trip['groupSize'] ?? '').toString())}",');
       buffer.writeln('    },');
     }
@@ -300,7 +451,160 @@ class TripsParser {
     buffer.writeln('function getTripData(tripId) {');
     buffer.writeln('    return tripsData[tripId] || tripsData[\'netravati\'];');
     buffer.writeln('}');
+    buffer.writeln();
+    
+    // Add common data sections
+    buffer.write(_getCommonDataSections());
+    
     return buffer.toString();
+  }
+  
+  /// Get common data sections (pickup points, cancellation policy, guidelines, FAQs)
+  static String _getCommonDataSections() {
+    return '''
+// ============================================
+// COMMON DATA - PICKUP POINTS
+// ============================================
+const commonPickupPoints = [
+    {
+        name: "Majestic",
+        landmark: "Metro Station / Shantala Silks",
+        time: "8:30 PM - 10:00 PM",
+        mapLink: "https://maps.google.com/?q=Majestic+Metro+Station+Bangalore"
+    },
+    {
+        name: "Koramangala",
+        landmark: "Kota Kochari, Opp Forum Mall",
+        time: "9:00 PM - 10:30 PM",
+        mapLink: "https://maps.google.com/?q=Forum+Mall+Koramangala+Bangalore"
+    },
+    {
+        name: "Silk Board",
+        landmark: "Silk Board Junction",
+        time: "9:15 PM - 10:45 PM",
+        mapLink: "https://maps.google.com/?q=Silk+Board+Junction+Bangalore"
+    },
+    {
+        name: "Electronic City",
+        landmark: "Infosys Gate / Toll Plaza",
+        time: "9:45 PM - 11:15 PM",
+        mapLink: "https://maps.google.com/?q=Electronic+City+Infosys+Bangalore"
+    }
+];
+
+// ============================================
+// COMMON DATA - CANCELLATION POLICY (PTU Style - Shows Fee)
+// ============================================
+const commonCancellationPolicy = [
+    {
+        days: "7+ days before trip",
+        refund: "50%",
+        color: "#22c55e"  // Green - least penalty
+    },
+    {
+        days: "3-6 days before trip",
+        refund: "70%",
+        color: "#f59e0b"  // Orange - medium penalty
+    },
+    {
+        days: "0-2 days before trip",
+        refund: "100%",
+        color: "#ef4444"  // Red - full penalty (no refund)
+    }
+];
+
+// ============================================
+// COMMON DATA - TRIP GUIDELINES (PTU Style)
+// ============================================
+const commonGuidelines = [
+    {
+        icon: "fa-ban",
+        title: "No Alcohol or Smoking",
+        desc: "Consumption of alcohol and smoking is strictly prohibited during the trip. Violation may result in immediate termination without refund."
+    },
+    {
+        icon: "fa-utensils",
+        title: "Dinner Before Boarding",
+        desc: "Please have your dinner before boarding the vehicle. We won't stop for dinner breaks during night journeys."
+    },
+    {
+        icon: "fa-bus",
+        title: "Travel Arrangements",
+        desc: "We use Tempo Travellers or Mini-buses with push-back seats. AC will be on from 7 AM to 7 PM only. Night travel is non-AC."
+    },
+    {
+        icon: "fa-mountain",
+        title: "Embrace the Outdoors",
+        desc: "This is an adventure trip, not a luxury vacation. Expect basic facilities, unpredictable weather, and some physical activity."
+    },
+    {
+        icon: "fa-seedling",
+        title: "Food (Vegetarian/Non-Vegetarian)",
+        desc: "All meals provided during the trip are vegetarian/Non-veg based on the situation."
+    },
+    {
+        icon: "fa-leaf",
+        title: "Leave No Trace",
+        desc: "Respect nature. Don't litter, don't pluck plants, and carry back all your waste. Let's keep our trails clean."
+    },
+    {
+        icon: "fa-suitcase",
+        title: "Personal Belongings",
+        desc: "Team Weekend Trekkers is not responsible for loss or damage to personal belongings. Keep valuables secure at all times."
+    },
+    {
+        icon: "fa-clock",
+        title: "Potential Delays",
+        desc: "Travel times are estimates. Traffic, weather, and unforeseen circumstances may cause delays. Please be patient and cooperative."
+    }
+];
+
+// ============================================
+// COMMON DATA - FAQs (PTU Style)
+// ============================================
+const commonFAQs = [
+    {
+        q: "How do I book a trip?",
+        a: "You can book directly through our website by selecting your preferred date and number of travelers, then completing the payment. Alternatively, you can WhatsApp us at 7019235581 for assistance."
+    },
+    {
+        q: "Is there a WhatsApp group for the trip?",
+        a: "Yes! Once your booking is confirmed, you'll be added to a WhatsApp group with fellow travelers and the trip coordinator 2-3 days before the trip."
+    },
+    {
+        q: "Is it safe for solo travelers?",
+        a: "Absolutely! Most of our travelers are solo. Our groups are friendly and you'll make great friends. We maintain a balanced male-female ratio on most trips."
+    },
+    {
+        q: "Is it safe for women travelers?",
+        a: "Yes, women's safety is our top priority. We have female travelers on almost every trip, and our coordinators ensure a safe and comfortable environment for everyone."
+    },
+    {
+        q: "Are there any discounts available?",
+        a: "We offer group discounts for 4+ people booking together. Students and repeat travelers may also get special offers. Contact us on WhatsApp for current deals."
+    },
+    {
+        q: "What should I pack for the trip?",
+        a: "Pack light! Essentials include: comfortable clothes, good walking shoes, rain jacket/poncho, water bottle, power bank, personal medicines, toiletries, and a small backpack."
+    },
+    {
+        q: "What is the luggage limit?",
+        a: "One backpack (40-50L) per person. Avoid large suitcases as they're difficult to carry on treks and take up space in the vehicle."
+    },
+    {
+        q: "Do I need to be super fit for treks?",
+        a: "Basic fitness is required. If you can walk 5-10 km and climb stairs without getting exhausted, you're good! Check the difficulty level on each trip page."
+    },
+    {
+        q: "What if I need to cancel my booking?",
+        a: "You can cancel through WhatsApp. Cancellation fees apply: 50% fee (7+ days before), 70% fee (3-6 days before), 100% fee (0-2 days before). Refunds are processed within 5-7 business days."
+    },
+    {
+        q: "What if the trip gets cancelled due to weather?",
+        a: "If we cancel due to bad weather or unforeseen circumstances, you'll get a full refund or option to reschedule to another date. Your safety comes first!"
+    }
+];
+''';
   }
   
   /// Escape special characters for JavaScript strings

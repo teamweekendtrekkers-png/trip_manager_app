@@ -1,6 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import '../providers/trips_provider.dart';
+import '../providers/settings_provider.dart';
+import '../services/image_upload_service.dart';
+import '../services/trips_parser.dart';
 
 class TripEditScreen extends StatefulWidget {
   final Map<String, dynamic>? trip;
@@ -90,6 +95,8 @@ class _TripEditScreenState extends State<TripEditScreen> {
       'itinerary': <Map<String, dynamic>>[],
       'inclusions': <String>[],
       'exclusions': <String>[],
+      'galleryImages': <String>[],
+      'boardingLocations': <Map<String, dynamic>>[],
     };
   }
 
@@ -156,15 +163,24 @@ class _TripEditScreenState extends State<TripEditScreen> {
                     ),
                     validator: (v) => v?.isEmpty == true ? 'Required' : null,
                   ),
-                  const SizedBox(height: 16),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // About Trip Card
+              _buildSectionCard(
+                title: 'About This Trip',
+                children: [
                   TextFormField(
                     controller: _descriptionController,
                     decoration: const InputDecoration(
-                      labelText: 'Description',
+                      labelText: 'Trip Description / About',
+                      hintText: 'Describe the trip experience, what makes it special, scenic beauty, etc.',
                       border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.description),
+                      alignLabelWithHint: true,
                     ),
-                    maxLines: 3,
+                    maxLines: 8,
+                    minLines: 5,
                   ),
                 ],
               ),
@@ -438,6 +454,14 @@ class _TripEditScreenState extends State<TripEditScreen> {
                 onRemove: (index) => _removeListItem('exclusions', index),
                 onEdit: (index, value) => _editListItem('exclusions', index, value),
               ),
+              const SizedBox(height: 16),
+
+              // Boarding Locations Card
+              _buildBoardingLocationsSection(),
+              const SizedBox(height: 16),
+
+              // Gallery Images Card
+              _buildGallerySection(),
               const SizedBox(height: 32),
 
               // Save Button
@@ -628,7 +652,511 @@ class _TripEditScreenState extends State<TripEditScreen> {
       ),
     );
   }
+  Widget _buildGallerySection() {
+    final galleryImages = List<String>.from(_tripData['galleryImages'] ?? []);
+    
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Gallery Images',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.add_photo_alternate),
+                      onPressed: () => _pickAndUploadImage(),
+                      color: Colors.green,
+                      tooltip: 'Upload from gallery',
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.camera_alt),
+                      onPressed: () => _pickAndUploadImage(fromCamera: true),
+                      color: Colors.blue,
+                      tooltip: 'Take photo',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (galleryImages.isEmpty)
+              Text(
+                'No gallery images yet. Tap icons to add photos.',
+                style: TextStyle(color: Colors.grey[500]),
+              )
+            else
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                ),
+                itemCount: galleryImages.length,
+                itemBuilder: (context, index) {
+                  final imagePath = galleryImages[index];
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          _getImageUrl(imagePath),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: Colors.grey[200],
+                            child: const Icon(Icons.broken_image),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: GestureDetector(
+                          onTap: () => _removeGalleryImage(index),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            const SizedBox(height: 8),
+            // Manual path input
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    decoration: const InputDecoration(
+                      hintText: 'Or enter image path manually',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    onSubmitted: (value) {
+                      if (value.isNotEmpty) {
+                        setState(() {
+                          galleryImages.add(value);
+                          _tripData['galleryImages'] = galleryImages;
+                        });
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
+  Future<void> _pickAndUploadImage({bool fromCamera = false}) async {
+    final picker = ImagePicker();
+    final List<XFile> pickedFiles;
+    
+    if (fromCamera) {
+      final photo = await picker.pickImage(source: ImageSource.camera);
+      pickedFiles = photo != null ? [photo] : [];
+    } else {
+      pickedFiles = await picker.pickMultiImage();
+    }
+    
+    if (pickedFiles.isEmpty) return;
+    
+    // Show loading dialog
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Uploading images...'),
+          ],
+        ),
+      ),
+    );
+    
+    try {
+      final settings = context.read<SettingsProvider>().settings;
+      final uploadService = ImageUploadService(settings: settings);
+      final tripId = _tripData['id']?.toString() ?? 'trip_${DateTime.now().millisecondsSinceEpoch}';
+      
+      final galleryImages = List<String>.from(_tripData['galleryImages'] ?? []);
+      
+      for (final pickedFile in pickedFiles) {
+        final file = File(pickedFile.path);
+        final result = await uploadService.uploadImage(
+          imageFile: file,
+          tripId: tripId,
+        );
+        
+        if (result.success && result.imagePath != null) {
+          galleryImages.add(result.imagePath!);
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to upload: ${result.error}')),
+            );
+          }
+        }
+      }
+      
+      setState(() {
+        _tripData['galleryImages'] = galleryImages;
+      });
+    } finally {
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+      }
+    }
+  }
+
+  void _removeGalleryImage(int index) {
+    setState(() {
+      final galleryImages = List<String>.from(_tripData['galleryImages'] ?? []);
+      galleryImages.removeAt(index);
+      _tripData['galleryImages'] = galleryImages;
+    });
+  }
+
+  Widget _buildBoardingLocationsSection() {
+    final boardingLocations = List<Map<String, dynamic>>.from(_tripData['boardingLocations'] ?? []);
+    final defaultPickupPoints = TripsParser.getDefaultPickupPoints();
+    final hasCustomLocations = boardingLocations.isNotEmpty;
+    
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Boarding Locations',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!hasCustomLocations)
+                      TextButton.icon(
+                        icon: const Icon(Icons.copy, size: 18),
+                        label: const Text('Use Defaults'),
+                        onPressed: () {
+                          setState(() {
+                            _tripData['boardingLocations'] = List<Map<String, dynamic>>.from(
+                              defaultPickupPoints.map((p) => Map<String, dynamic>.from(p))
+                            );
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Default pickup points copied. You can now edit them.')),
+                          );
+                        },
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.add_circle),
+                      onPressed: _addBoardingLocation,
+                      color: Colors.green,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            
+            // Show info about what's displayed on website
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: hasCustomLocations ? Colors.green[50] : Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: hasCustomLocations ? Colors.green[200]! : Colors.blue[200]!,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    hasCustomLocations ? Icons.check_circle : Icons.info,
+                    color: hasCustomLocations ? Colors.green[700] : Colors.blue[700],
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      hasCustomLocations 
+                        ? 'Website shows custom pickup points below'
+                        : 'Website shows default Bangalore pickup points (Majestic, Koramangala, Silk Board, Electronic City)',
+                      style: TextStyle(
+                        color: hasCustomLocations ? Colors.green[700] : Colors.blue[700],
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            
+            // Show default points if no custom locations
+            if (!hasCustomLocations) ...[
+              const Text(
+                'Default Pickup Points (shown on website):',
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...defaultPickupPoints.map((loc) => Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                color: Colors.grey[100],
+                child: ListTile(
+                  leading: const Icon(Icons.location_on, color: Colors.blue),
+                  title: Text(loc['name']?.toString() ?? ''),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Landmark: ${loc['landmark']}'),
+                      Text('Time: ${loc['time']}'),
+                    ],
+                  ),
+                  trailing: const Icon(Icons.lock, color: Colors.grey, size: 18),
+                ),
+              )),
+              const SizedBox(height: 8),
+              Text(
+                'Tap "Use Defaults" to copy and customize these points',
+                style: TextStyle(color: Colors.grey[600], fontSize: 12, fontStyle: FontStyle.italic),
+              ),
+            ],
+            
+            // Show custom locations if any
+            if (hasCustomLocations) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Custom Pickup Points:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: Colors.green,
+                    ),
+                  ),
+                  TextButton.icon(
+                    icon: const Icon(Icons.clear_all, size: 18, color: Colors.red),
+                    label: const Text('Clear All', style: TextStyle(color: Colors.red)),
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Clear Custom Points?'),
+                          content: const Text('This will remove all custom pickup points. The website will show default Bangalore pickup points instead.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _tripData['boardingLocations'] = <Map<String, dynamic>>[];
+                                });
+                                Navigator.pop(ctx);
+                              },
+                              child: const Text('Clear', style: TextStyle(color: Colors.red)),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ...boardingLocations.asMap().entries.map((entry) {
+                final index = entry.key;
+                final loc = entry.value;
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  color: Colors.green[50],
+                  child: ListTile(
+                    leading: const Icon(Icons.location_on, color: Colors.green),
+                    title: Text(loc['name']?.toString() ?? 'Unnamed Location'),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (loc['landmark']?.toString().isNotEmpty == true)
+                          Text('Landmark: ${loc['landmark']}'),
+                        if (loc['time']?.toString().isNotEmpty == true)
+                          Text('Time: ${loc['time']}'),
+                      ],
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit, size: 20),
+                          onPressed: () => _editBoardingLocation(index),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                          onPressed: () {
+                            setState(() {
+                              boardingLocations.removeAt(index);
+                              _tripData['boardingLocations'] = boardingLocations;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _addBoardingLocation() async {
+    final result = await _showBoardingLocationDialog(null);
+    if (result != null) {
+      setState(() {
+        final boardingLocations = List<Map<String, dynamic>>.from(_tripData['boardingLocations'] ?? []);
+        boardingLocations.add(result);
+        _tripData['boardingLocations'] = boardingLocations;
+      });
+    }
+  }
+
+  void _editBoardingLocation(int index) async {
+    final boardingLocations = List<Map<String, dynamic>>.from(_tripData['boardingLocations'] ?? []);
+    final loc = boardingLocations[index];
+    
+    final result = await _showBoardingLocationDialog(loc);
+    if (result != null) {
+      setState(() {
+        boardingLocations[index] = result;
+        _tripData['boardingLocations'] = boardingLocations;
+      });
+    }
+  }
+
+  Future<Map<String, dynamic>?> _showBoardingLocationDialog(Map<String, dynamic>? location) async {
+    final nameController = TextEditingController(text: location?['name']?.toString() ?? '');
+    final landmarkController = TextEditingController(text: location?['landmark']?.toString() ?? '');
+    final timeController = TextEditingController(text: location?['time']?.toString() ?? '');
+    final mapLinkController = TextEditingController(text: location?['mapLink']?.toString() ?? '');
+    
+    return showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(location == null ? 'Add Boarding Location' : 'Edit Boarding Location'),
+        content: SingleChildScrollView(
+          child: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Location Name *',
+                    hintText: 'e.g., Silk Board, Majestic',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: landmarkController,
+                  decoration: const InputDecoration(
+                    labelText: 'Landmark',
+                    hintText: 'e.g., Near Metro Station',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: timeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Pickup Time',
+                    hintText: 'e.g., 10:00 PM',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: mapLinkController,
+                  decoration: const InputDecoration(
+                    labelText: 'Google Maps Link',
+                    hintText: 'https://maps.google.com/...',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (nameController.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Location name is required')),
+                );
+                return;
+              }
+              Navigator.pop(context, {
+                'name': nameController.text,
+                'landmark': landmarkController.text,
+                'time': timeController.text,
+                'mapLink': mapLinkController.text,
+              });
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
   void _addListItem(String key) async {
     final value = await _showEditDialog('');
     if (value != null && value.isNotEmpty) {
@@ -836,10 +1364,14 @@ class _TripEditScreenState extends State<TripEditScreen> {
     _tripData['duration'] = _durationController.text;
     // Parse available dates from newline-separated text
     _tripData['availableDates'] = _availableDatesController.text
-        .split('\\n')
+        .split('\n')
         .map((s) => s.trim())
         .where((s) => s.isNotEmpty)
         .toList();
+    
+    // Ensure galleryImages and boardingLocations are preserved
+    _tripData['galleryImages'] = _tripData['galleryImages'] ?? <String>[];
+    _tripData['boardingLocations'] = _tripData['boardingLocations'] ?? <Map<String, dynamic>>[];
     
     if (_discountedPriceController.text.isNotEmpty) {
       _tripData['discountedPrice'] = double.tryParse(_discountedPriceController.text);

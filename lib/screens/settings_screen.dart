@@ -230,11 +230,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 'WhatsApp: $_websiteWhatsapp',
                                 style: TextStyle(fontSize: 12, color: Colors.blue[800]),
                               ),
-                            if (_websiteUpi != null)
+                            if (_websiteUpi != null) ...[
                               Text(
                                 'UPI: $_websiteUpi',
                                 style: TextStyle(fontSize: 12, color: Colors.blue[800]),
                               ),
+                              Builder(
+                                builder: (context) {
+                                  final parts = _websiteUpi!.split('@');
+                                  if (parts.length == 2) {
+                                    final lastFour = parts[0].length > 4 ? parts[0].substring(parts[0].length - 4) : parts[0];
+                                    return Text(
+                                      'Masked: ••••••$lastFour@${parts[1]}',
+                                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                },
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -472,8 +486,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Files to be updated:\n• js/security.js (UPI)\n• index.html, trips.html, etc. (WhatsApp)',
+              'Files to be updated:\n• js/security.js (UPI encoded)\n• HTML files (WhatsApp & masked UPI display)',
               style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 8),
+            Builder(
+              builder: (context) {
+                final parts = upi.split('@');
+                if (parts.length == 2) {
+                  final lastFour = parts[0].length > 4 ? parts[0].substring(parts[0].length - 4) : parts[0];
+                  return Text(
+                    'Masked UPI will show as: ••••••$lastFour@${parts[1]}',
+                    style: TextStyle(fontSize: 12, color: Colors.deepPurple[700], fontWeight: FontWeight.w500),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
             ),
           ],
         ),

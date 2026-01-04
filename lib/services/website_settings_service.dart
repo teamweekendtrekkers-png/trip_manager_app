@@ -23,15 +23,14 @@ class WebsiteSettingsService {
 
   String get _repoPath => '/repos/${settings.repositoryOwner}/${settings.repositoryName}';
 
-  /// Update UPI ID in security.js
-  /// The UPI is encoded as ASCII codes with a checksum for security
+  /// Update UPI ID in security.js AND masked display in HTML files
   Future<UpdateResult> updateUpiId(String newUpiId) async {
     try {
       // Validate UPI format
       if (!_isValidUpi(newUpiId)) {
         return UpdateResult(
           success: false,
-          error: 'Invalid UPI ID format. Expected: number@provider (e.g., 9538236581@ybl)',
+          error: 'Invalid UPI ID format. Expected: name@provider (e.g., 9538236581@ybl or business@icici)',
         );
       }
 
@@ -48,13 +47,13 @@ class WebsiteSettingsService {
 
       // Generate new encoded UPI
       final parts = newUpiId.split('@');
-      final number = parts[0]; // e.g., "9538236581"
-      final provider = parts[1]; // e.g., "ybl"
+      final number = parts[0];
+      final provider = parts[1];
       
       // Convert to ASCII arrays
-      final p1Array = number.codeUnits; // [57, 53, 51, 56, 50, 51, 54, 53, 56, 49]
-      final p2Code = '@'.codeUnitAt(0); // 64
-      final p3Array = provider.codeUnits; // [121, 98, 108]
+      final p1Array = number.codeUnits;
+      final p2Code = '@'.codeUnitAt(0);
+      final p3Array = provider.codeUnits;
       
       // Compute checksum
       final checksum = _computeChecksum(newUpiId);
@@ -68,7 +67,7 @@ class WebsiteSettingsService {
         checksum,
       );
 
-      // Push to GitHub
+      // Push security.js to GitHub
       await _dio.put(
         '$_repoPath/contents/js/security.js',
         data: {
@@ -79,9 +78,14 @@ class WebsiteSettingsService {
         },
       );
 
+      // Also update the masked UPI display in HTML files
+      final newMaskedUpi = _getMaskedUpi(newUpiId);
+      final htmlUpdateResult = await _updateMaskedUpiInHtml(newMaskedUpi);
+
       return UpdateResult(
         success: true,
-        message: 'UPI ID updated successfully to $newUpiId',
+        message: 'UPI ID updated to $newUpiId',
+        details: htmlUpdateResult,
       );
     } on DioException catch (e) {
       return UpdateResult(
@@ -94,6 +98,61 @@ class WebsiteSettingsService {
         error: 'Failed to update UPI: $e',
       );
     }
+  }
+
+  /// Update masked UPI display in HTML files (e.g., ••••••6581@ybl)
+  Future<String> _updateMaskedUpiInHtml(String newMaskedUpi) async {
+    final results = <String>[];
+    
+    // Files that might have the masked UPI display
+    final htmlFiles = ['index.html', 'trip-detail.html', 'trips.html', 'about.html', 'contact.html'];
+    
+    for (final file in htmlFiles) {
+      try {
+        final response = await _dio.get(
+          '$_repoPath/contents/$file',
+          queryParameters: {'ref': settings.branch},
+        );
+        
+        final content = utf8.decode(base64.decode(
+          response.data['content'].toString().replaceAll('\n', ''),
+        ));
+        final sha = response.data['sha'];
+
+        // Find and replace masked UPI pattern (••••••XXXX@XXX)
+        final maskedPattern = RegExp(r'••••••[a-zA-Z0-9]+@[a-zA-Z0-9]+');
+        
+        if (maskedPattern.hasMatch(content)) {
+          final updatedContent = content.replaceAll(maskedPattern, newMaskedUpi);
+          
+          await _dio.put(
+            '$_repoPath/contents/$file',
+            data: {
+              'message': 'Update masked UPI display in $file via Trip Manager App',
+              'content': base64.encode(utf8.encode(updatedContent)),
+              'sha': sha,
+              'branch': settings.branch,
+            },
+          );
+          results.add('✓ Updated masked UPI in $file');
+        } else {
+          results.add('ℹ No masked UPI found in $file');
+        }
+      } catch (e) {
+        results.add('✗ Failed to update $file: $e');
+      }
+    }
+    
+    return results.join('\n');
+  }
+
+  /// Get masked UPI format (••••••XXXX@provider)
+  String _getMaskedUpi(String upi) {
+    final parts = upi.split('@');
+    final name = parts[0];
+    final provider = parts[1];
+    final lastFour = name.length > 4 ? name.substring(name.length - 4) : name;
+    return '••••••$lastFour@$provider';
   }
 
   /// Update WhatsApp number across all HTML files
@@ -168,6 +227,9 @@ class WebsiteSettingsService {
     final upiResult = await updateUpiId(newUpiId);
     if (upiResult.success) {
       results.add('✓ UPI: ${upiResult.message}');
+      if (upiResult.details != null) {
+        results.add(upiResult.details!);
+      }
     } else {
       results.add('✗ UPI: ${upiResult.error}');
       hasError = true;
@@ -220,8 +282,8 @@ class WebsiteSettingsService {
   // ============== Private Helper Methods ==============
 
   bool _isValidUpi(String upi) {
-    // Format: number@provider
-    final regex = RegExp(r'^\d{10,12}@[a-z]{2,10}$', caseSensitive: false);
+    // Business UPI formats: name@bank, name.merchant@bank, number@provider
+    final regex = RegExp(r'^[a-zA-Z0-9._-]+@[a-zA-Z0-9]+$');
     return regex.hasMatch(upi);
   }
 
