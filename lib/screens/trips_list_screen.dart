@@ -720,14 +720,18 @@ class _TripCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isFeatured = trip['featured'] == true;
+    final isActive = trip['isActive'] != false; // Default to true if not set
     final name = trip['title'] ?? trip['name'] ?? 'Untitled Trip';
     final location = trip['location'] ?? trip['destination'] ?? '';
     final price = trip['price']?.toString() ?? '₹0';
     final date = trip['date'] ?? (trip['availableDates'] as List?)?.firstOrNull ?? '';
     
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: InkWell(
+    return Opacity(
+      opacity: isActive ? 1.0 : 0.5,
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        color: isActive ? null : Colors.grey[100],
+        child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
@@ -769,14 +773,28 @@ class _TripCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
+                              color: isActive ? null : Colors.grey,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if (!isActive)
+                          Container(
+                            margin: const EdgeInsets.only(right: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[600],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'INACTIVE',
+                              style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                            ),
+                          ),
                         if (isFeatured)
                           const Icon(
                             Icons.star,
@@ -808,9 +826,9 @@ class _TripCard extends StatelessWidget {
                       children: [
                         Text(
                           price,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.green,
+                            color: isActive ? Colors.green : Colors.grey,
                           ),
                         ),
                         const Spacer(),
@@ -830,14 +848,14 @@ class _TripCard extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: Colors.blue[100],
+                            color: isActive ? Colors.blue[100] : Colors.grey[300],
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             trip['badge'].toString(),
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.blue[800],
+                              color: isActive ? Colors.blue[800] : Colors.grey[600],
                             ),
                           ),
                         ),
@@ -884,6 +902,7 @@ class _TripCard extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 

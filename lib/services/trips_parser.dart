@@ -230,6 +230,14 @@ class TripsParser {
     // Set featured based on badge or other criteria
     result['featured'] = result['badge'] == 'Featured' || result['badge'] == 'Popular';
     
+    // Parse isActive field (defaults to true if not present)
+    final isActiveMatch = RegExp(r'isActive:\s*(true|false)').firstMatch(tripContent);
+    if (isActiveMatch != null) {
+      result['isActive'] = isActiveMatch.group(1) == 'true';
+    } else {
+      result['isActive'] = true; // Default to active
+    }
+    
     return result;
   }
   
@@ -437,6 +445,10 @@ class TripsParser {
       // Gallery Images
       final galleryImages = trip['galleryImages'] as List<dynamic>? ?? [];
       buffer.writeln('        galleryImages: [${galleryImages.map((img) => '"${_escapeJs(img.toString())}"').join(', ')}],');
+      
+      // Active status
+      final isActive = trip['isActive'] ?? true;
+      buffer.writeln('        isActive: $isActive,');
       
       buffer.writeln('        groupSize: "${_escapeJs((trip['groupSize'] ?? '').toString())}",');
       buffer.writeln('    },');

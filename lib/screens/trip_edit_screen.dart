@@ -85,6 +85,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
       'groupSize': '',
       'pickupPoint': 'Bangalore',
       'featured': false,
+      'isActive': true,
       'badge': 'Trek',
       'distance': '',
       'elevation': '',
@@ -404,10 +405,26 @@ class _TripEditScreenState extends State<TripEditScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Featured Toggle
+              // Featured Toggle & Active Status
               _buildSectionCard(
                 title: 'Visibility',
                 children: [
+                  SwitchListTile(
+                    title: const Text('Active Trip'),
+                    subtitle: Text(
+                      _tripData['isActive'] == false 
+                        ? 'Trip is greyed out and hidden from bookings'
+                        : 'Trip is visible and available for booking',
+                    ),
+                    value: _tripData['isActive'] ?? true,
+                    activeTrackColor: Colors.green[200],
+                    onChanged: (v) {
+                      setState(() {
+                        _tripData['isActive'] = v;
+                      });
+                    },
+                  ),
+                  const Divider(),
                   SwitchListTile(
                     title: const Text('Featured Trip'),
                     subtitle: const Text('Show on homepage carousel'),
