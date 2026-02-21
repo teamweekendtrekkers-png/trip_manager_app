@@ -167,6 +167,64 @@ class GitHubService {
     }
   }
 
+  /// Fetch any file from the repository by path
+  Future<GitHubFileResult> fetchFile(String filePath) async {
+    try {
+      final response = await _dio.get(
+        '$_repoPath/contents/$filePath',
+        queryParameters: {'ref': settings.branch},
+      );
+
+      final content = utf8.decode(base64.decode(
+        response.data['content'].toString().replaceAll('\n', ''),
+      ));
+
+      return GitHubFileResult(
+        content: content,
+        sha: response.data['sha'],
+        success: true,
+      );
+    } on DioException catch (e) {
+      return GitHubFileResult(
+        content: '',
+        sha: '',
+        success: false,
+        error: _getErrorMessage(e),
+      );
+    }
+  }
+
+  /// Update any file in the repository by path (no conflict check — caller handles it)
+  Future<GitHubCommitResult> updateFile({
+    required String filePath,
+    required String content,
+    required String sha,
+    required String commitMessage,
+  }) async {
+    try {
+      final response = await _dio.put(
+        '$_repoPath/contents/$filePath',
+        data: {
+          'message': commitMessage,
+          'content': base64.encode(utf8.encode(content)),
+          'sha': sha,
+          'branch': settings.branch,
+        },
+      );
+
+      return GitHubCommitResult(
+        success: true,
+        commitSha: response.data['commit']['sha'],
+        message: 'File updated successfully',
+      );
+    } on DioException catch (e) {
+      return GitHubCommitResult(
+        success: false,
+        error: _getErrorMessage(e),
+      );
+    }
+  }
+
   /// Upload an image to the repository with conflict handling
   Future<GitHubUploadResult> uploadImage({
     required String filePath,

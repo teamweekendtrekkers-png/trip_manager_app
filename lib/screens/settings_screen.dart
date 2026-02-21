@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../providers/settings_provider.dart';
 import '../services/github_service.dart';
 import '../services/website_settings_service.dart';
+import 'data_health_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -336,6 +337,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: 'Help & Info',
                   icon: Icons.help,
                   children: [
+                    ListTile(
+                      leading: const Icon(Icons.health_and_safety, color: Colors.deepPurple),
+                      title: const Text('Data Health Check'),
+                      subtitle: const Text('Scan for duplicates, corrupted data, missing fields'),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const DataHealthScreen()),
+                        );
+                      },
+                    ),
                     ListTile(
                       leading: const Icon(Icons.launch),
                       title: const Text('How to get GitHub Token'),

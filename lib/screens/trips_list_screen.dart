@@ -4,6 +4,7 @@ import '../providers/trips_provider.dart';
 import '../providers/settings_provider.dart';
 import 'trip_edit_screen.dart';
 import 'settings_screen.dart';
+import 'data_health_screen.dart';
 
 class TripsListScreen extends StatefulWidget {
   const TripsListScreen({super.key});
@@ -108,6 +109,16 @@ class _TripsListScreenState extends State<TripsListScreen> {
             },
           ),
           IconButton(
+            icon: const Icon(Icons.health_and_safety),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DataHealthScreen()),
+              );
+            },
+            tooltip: 'Data Health Check',
+          ),
+          IconButton(
             icon: Icon(_showFeaturedOnly ? Icons.star : Icons.star_border),
             onPressed: () {
               setState(() {
@@ -169,6 +180,49 @@ class _TripsListScreenState extends State<TripsListScreen> {
                         onPressed: () => _handleForceOverwrite(provider),
                         style: TextButton.styleFrom(foregroundColor: Colors.red),
                         child: const Text('Overwrite'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+          // Duplicate trip ID warning banner
+          Consumer<TripsProvider>(
+            builder: (context, provider, _) {
+              final duplicates = provider.trips.where((t) => t['_duplicateWarning'] == true).toList();
+              if (duplicates.isNotEmpty) {
+                final ids = duplicates.map((t) => t['id']).toSet().join(', ');
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  color: Colors.orange[100],
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.orange),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Duplicate Trip IDs Found',
+                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
+                            ),
+                            Text(
+                              'IDs: $ids — website only uses the last occurrence.',
+                              style: TextStyle(fontSize: 12, color: Colors.orange[800]),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.health_and_safety, color: Colors.orange),
+                        onPressed: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const DataHealthScreen()));
+                        },
+                        tooltip: 'View Data Health',
                       ),
                     ],
                   ),

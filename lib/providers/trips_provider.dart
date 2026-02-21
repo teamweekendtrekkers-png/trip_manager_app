@@ -21,6 +21,14 @@ class TripsProvider extends ChangeNotifier {
     _githubService = GitHubService(settings: _settings);
   }
 
+  /// Derive the featured-trips.js path from the tripsDataPath setting
+  String get _featuredTripsPath {
+    final dir = _settings.tripsDataPath.contains('/')
+        ? _settings.tripsDataPath.substring(0, _settings.tripsDataPath.lastIndexOf('/') + 1)
+        : '';
+    return '${dir}featured-trips.js';
+  }
+
   List<Map<String, dynamic>> get trips => _trips;
   List<Map<String, dynamic>> get featuredTrips => 
       _trips.where((t) => t['featured'] == true).toList();
@@ -56,6 +64,25 @@ class TripsProvider extends ChangeNotifier {
         _trips = TripsParser.parseTripsData(result.content);
         debugPrint('Parsed ${_trips.length} trips');
         _currentSha = result.sha;
+
+        // Also fetch featured-trips.js to sync featured status
+        try {
+          final featuredResult = await _githubService!.fetchFile(_featuredTripsPath);
+          if (featuredResult.success) {
+            final featuredIds = TripsParser.parseFeaturedTripIds(featuredResult.content);
+            debugPrint('Featured trip IDs from website: $featuredIds');
+            // Sync: mark trips as featured based on the website's featured-trips.js
+            for (final trip in _trips) {
+              final tripId = trip['id']?.toString() ?? '';
+              trip['featured'] = featuredIds.contains(tripId);
+            }
+          } else {
+            debugPrint('Could not fetch featured-trips.js: ${featuredResult.error}');
+          }
+        } catch (e) {
+          debugPrint('Error fetching featured-trips.js: $e');
+        }
+
         _error = null;
         _hasUnsavedChanges = false;
         _hasConflict = false;
@@ -147,7 +174,30 @@ class TripsProvider extends ChangeNotifier {
       );
       
       if (result.success) {
-        // Step 4: Reload to get new SHA (like git pull after push)
+        // Step 4: Also update featured-trips.js
+        debugPrint('Updating featured-trips.js...');
+        try {
+          // Get latest SHA for featured-trips.js (may have changed)
+          final featuredFile = await _githubService!.fetchFile(_featuredTripsPath);
+          if (featuredFile.success) {
+            final featuredContent = TripsParser.generateFeaturedTripsJs(_trips);
+            final featuredResult = await _githubService!.updateFile(
+              filePath: _featuredTripsPath,
+              content: featuredContent,
+              sha: featuredFile.sha,
+              commitMessage: 'Update featured trips via mobile app',
+            );
+            if (featuredResult.success) {
+              debugPrint('Featured trips updated successfully');
+            } else {
+              debugPrint('Warning: Failed to update featured-trips.js: ${featuredResult.error}');
+            }
+          }
+        } catch (e) {
+          debugPrint('Warning: Could not update featured-trips.js: $e');
+        }
+
+        // Step 5: Reload to get new SHA (like git pull after push)
         debugPrint('Reloading to get new SHA...');
         await loadTrips();
         _hasUnsavedChanges = false;
@@ -249,10 +299,20 @@ class TripsProvider extends ChangeNotifier {
     }
   }
 
-  void addTrip(Map<String, dynamic> trip) {
+  /// Add a new trip with duplicate ID validation
+  /// Returns error message if duplicate found, null on success
+  String? addTrip(Map<String, dynamic> trip) {
+    final newId = trip['id']?.toString();
+    if (newId != null && newId.isNotEmpty) {
+      final existingIndex = _trips.indexWhere((t) => t['id'] == newId);
+      if (existingIndex >= 0) {
+        return 'Duplicate trip ID "$newId" already exists at position ${existingIndex + 1}. Please use a unique ID.';
+      }
+    }
     _trips.add(trip);
     _hasUnsavedChanges = true;
     notifyListeners();
+    return null;
   }
 
   void updateTrip(int index, Map<String, dynamic> trip) {
@@ -322,6 +382,13 @@ class TripsProvider extends ChangeNotifier {
 
   void markChangesSaved() {
     _hasUnsavedChanges = false;
+    notifyListeners();
+  }
+
+  /// Public method to mark data as modified and notify listeners.
+  /// Used by screens that directly mutate trip data (e.g., Data Health auto-fix).
+  void markDataModified() {
+    _hasUnsavedChanges = true;
     notifyListeners();
   }
 }

@@ -66,6 +66,9 @@ class TripsParser {
     final tripPattern = RegExp(r'(?:(\w+)|"([^"]+)")\s*:\s*\{');
     final matches = tripPattern.allMatches(objectContent);
     
+    // Track seen IDs to detect duplicates
+    final seenIds = <String>{};
+    
     for (final match in matches) {
       final tripId = match.group(1) ?? match.group(2)!;
       final tripStart = match.end - 1;
@@ -87,6 +90,12 @@ class TripsParser {
       final tripContent = objectContent.substring(tripStart, tripEnd);
       final tripData = _parseTripObject(tripId, tripContent);
       if (tripData.isNotEmpty) {
+        // Flag duplicate IDs as errors
+        if (seenIds.contains(tripId)) {
+          tripData['_duplicateWarning'] = true;
+          tripData['_duplicateMessage'] = 'Duplicate trip ID: "$tripId" appears multiple times. The website only uses the last occurrence.';
+        }
+        seenIds.add(tripId);
         trips.add(tripData);
       }
     }
@@ -199,6 +208,14 @@ class TripsParser {
       result['exclusions'] = _parseStringArray(excludesMatch.group(1)!);
     }
     
+    // Parse thingsToCarry array
+    final thingsToCarryMatch = RegExp(r'thingsToCarry:\s*\[(.*?)\]', dotAll: true).firstMatch(tripContent);
+    if (thingsToCarryMatch != null) {
+      result['thingsToCarry'] = _parseStringArray(thingsToCarryMatch.group(1)!);
+    } else {
+      result['thingsToCarry'] = <String>[];
+    }
+    
     // Parse galleryImages array - handle double-quoted strings with apostrophes
     final galleryMatch = RegExp(r'galleryImages:\s*\[(.*?)\]', dotAll: true).firstMatch(tripContent);
     if (galleryMatch != null) {
@@ -227,8 +244,15 @@ class TripsParser {
       result['priceNumeric'] = double.tryParse(priceStr) ?? 0;
     }
     
-    // Set featured based on badge or other criteria
-    result['featured'] = result['badge'] == 'Featured' || result['badge'] == 'Popular';
+    // Parse featured as independent boolean field
+    // First check for explicit featured: true/false in the data
+    final featuredMatch = RegExp(r'featured:\s*(true|false)').firstMatch(tripContent);
+    if (featuredMatch != null) {
+      result['featured'] = featuredMatch.group(1) == 'true';
+    } else {
+      // Legacy fallback: derive from badge for data that doesn't have the field yet
+      result['featured'] = result['badge'] == 'Featured' || result['badge'] == 'Popular';
+    }
     
     // Parse isActive field (defaults to true if not present)
     final isActiveMatch = RegExp(r'isActive:\s*(true|false)').firstMatch(tripContent);
@@ -386,8 +410,19 @@ class TripsParser {
     buffer.writeln();
     buffer.writeln('const tripsData = {');
     
-    for (int i = 0; i < trips.length; i++) {
-      final trip = trips[i];
+    // Deduplicate: keep only the last occurrence of each trip ID (matching JS behavior)
+    final seenIds = <String>{};
+    final deduped = <Map<String, dynamic>>[];
+    for (int i = trips.length - 1; i >= 0; i--) {
+      final id = (trips[i]['id'] ?? 'trip_${i + 1}').toString();
+      if (!seenIds.contains(id)) {
+        seenIds.add(id);
+        deduped.insert(0, trips[i]);
+      }
+    }
+    
+    for (int i = 0; i < deduped.length; i++) {
+      final trip = deduped[i];
       final tripId = (trip['id'] ?? 'trip_${i + 1}').toString();
       
       final quotedId = tripId.contains("-") ? '"$tripId"' : tripId;
@@ -395,6 +430,8 @@ class TripsParser {
       buffer.writeln('        title: "${_escapeJs((trip['title'] ?? trip['name'] ?? '').toString())}",');
       buffer.writeln('        location: "${_escapeJs((trip['location'] ?? trip['destination'] ?? '').toString())}",');
       buffer.writeln('        badge: "${_escapeJs((trip['badge'] ?? 'Trek').toString())}",');
+      final isFeatured = trip['featured'] == true;
+      buffer.writeln('        featured: $isFeatured,');
       buffer.writeln('        price: "${_escapeJs((trip['price'] ?? '₹0').toString())}",');
       buffer.writeln('        image: "${_escapeJs((trip['image'] ?? 'images/trips/default.jpg').toString())}",');
       buffer.writeln('        distance: "${_escapeJs((trip['distance'] ?? '').toString())}",');
@@ -432,6 +469,10 @@ class TripsParser {
       final excludes = trip['exclusions'] as List<dynamic>? ?? trip['excludes'] as List<dynamic>? ?? [];
       buffer.writeln('        excludes: [${excludes.map((e) => '"${_escapeJs(e.toString())}"').join(', ')}],');
       
+      // Things to Carry
+      final thingsToCarry = trip['thingsToCarry'] as List<dynamic>? ?? [];
+      buffer.writeln('        thingsToCarry: [${thingsToCarry.map((t) => '"${_escapeJs(t.toString())}"').join(', ')}],');
+      
       // Boarding Locations
       final boardingLocations = trip['boardingLocations'] as List<dynamic>? ?? [];
       buffer.writeln('        boardingLocations: [');
@@ -446,11 +487,12 @@ class TripsParser {
       final galleryImages = trip['galleryImages'] as List<dynamic>? ?? [];
       buffer.writeln('        galleryImages: [${galleryImages.map((img) => '"${_escapeJs(img.toString())}"').join(', ')}],');
       
+      // Group size first (to match original file order)
+      buffer.writeln('        groupSize: "${_escapeJs((trip['groupSize'] ?? '').toString())}",');
+      
       // Active status
       final isActive = trip['isActive'] ?? true;
       buffer.writeln('        isActive: $isActive,');
-      
-      buffer.writeln('        groupSize: "${_escapeJs((trip['groupSize'] ?? '').toString())}",');
       buffer.writeln('    },');
     }
     
@@ -459,9 +501,9 @@ class TripsParser {
     buffer.writeln('// ============================================');
     buffer.writeln('// GET TRIP DATA FUNCTION');
     buffer.writeln('// ============================================');
-    buffer.writeln('// Returns trip data by ID, defaults to \'netravati\' if not found');
+    buffer.writeln('// Returns trip data by ID, defaults to first trip if not found');
     buffer.writeln('function getTripData(tripId) {');
-    buffer.writeln('    return tripsData[tripId] || tripsData[\'netravati\'];');
+    buffer.writeln('    return tripsData[tripId] || tripsData[Object.keys(tripsData)[0]];');
     buffer.writeln('}');
     buffer.writeln();
     
@@ -627,5 +669,59 @@ const commonFAQs = [
         .replaceAll('\n', '\\n')
         .replaceAll('\r', '\\r')
         .replaceAll('\t', '\\t');
+  }
+
+  /// Parse the featured-trips.js file to extract featured trip IDs
+  static List<String> parseFeaturedTripIds(String jsContent) {
+    final match = RegExp(r'const\s+featuredTripIds\s*=\s*\[(.*?)\]', dotAll: true)
+        .firstMatch(jsContent);
+    if (match == null) return [];
+
+    final arrayContent = match.group(1)!;
+    final ids = <String>[];
+    for (final m in RegExp(r'"([^"]+)"').allMatches(arrayContent)) {
+      ids.add(m.group(1)!);
+    }
+    return ids;
+  }
+
+  /// Generate the featured-trips.js file content from trip data
+  static String generateFeaturedTripsJs(List<Map<String, dynamic>> trips) {
+    final featuredIds = trips
+        .where((t) => t['featured'] == true)
+        .map((t) => t['id']?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+
+    final buffer = StringBuffer();
+    buffer.writeln('// ============================================');
+    buffer.writeln('// FEATURED TRIPS CONFIGURATION');
+    buffer.writeln('// ============================================');
+    buffer.writeln('// ');
+    buffer.writeln('// These trips will be displayed on the homepage');
+    buffer.writeln('// in the "Upcoming Adventures" section.');
+    buffer.writeln('// ');
+    buffer.writeln('// Edit using Trip Manager → ⭐ Featured Trips');
+    buffer.writeln('// Last updated: ${DateTime.now().toString().substring(0, 16)}');
+    buffer.writeln('// ============================================');
+    buffer.writeln();
+    buffer.writeln('const featuredTripIds = [');
+    for (final id in featuredIds) {
+      buffer.writeln('    "$id",');
+    }
+    buffer.writeln('];');
+    buffer.writeln();
+    buffer.writeln('// Function to get featured trips data');
+    buffer.writeln('function getFeaturedTrips() {');
+    buffer.writeln('    return featuredTripIds.map(id => {');
+    buffer.writeln('        const trip = tripsData[id];');
+    buffer.writeln('        if (trip) {');
+    buffer.writeln('            return { id, ...trip };');
+    buffer.writeln('        }');
+    buffer.writeln('        return null;');
+    buffer.writeln('    }).filter(t => t !== null);');
+    buffer.writeln('}');
+    return buffer.toString();
   }
 }

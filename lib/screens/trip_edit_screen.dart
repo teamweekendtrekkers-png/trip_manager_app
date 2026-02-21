@@ -96,6 +96,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
       'itinerary': <Map<String, dynamic>>[],
       'inclusions': <String>[],
       'exclusions': <String>[],
+      'thingsToCarry': <String>[],
       'galleryImages': <String>[],
       'boardingLocations': <Map<String, dynamic>>[],
     };
@@ -372,15 +373,34 @@ class _TripEditScreenState extends State<TripEditScreen> {
 
               // Image Card
               _buildSectionCard(
-                title: 'Image',
+                title: 'Display Image',
                 children: [
-                  TextFormField(
-                    controller: _imageController,
-                    decoration: const InputDecoration(
-                      labelText: 'Image Path (e.g., images/trips/goa.jpg)',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.image),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _imageController,
+                          decoration: const InputDecoration(
+                            labelText: 'Image Path (e.g., images/trips/goa.jpg)',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.image),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.add_photo_alternate),
+                        onPressed: () => _pickAndUploadMainImage(),
+                        color: Colors.green,
+                        tooltip: 'Upload from gallery',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.camera_alt),
+                        onPressed: () => _pickAndUploadMainImage(fromCamera: true),
+                        color: Colors.blue,
+                        tooltip: 'Take photo',
+                      ),
+                    ],
                   ),
                   if (_imageController.text.isNotEmpty) ...[
                     const SizedBox(height: 16),
@@ -470,6 +490,16 @@ class _TripEditScreenState extends State<TripEditScreen> {
                 onAdd: () => _addListItem('exclusions'),
                 onRemove: (index) => _removeListItem('exclusions', index),
                 onEdit: (index, value) => _editListItem('exclusions', index, value),
+              ),
+              const SizedBox(height: 16),
+
+              // Things to Carry Card
+              _buildListSection(
+                title: 'Things to Carry',
+                items: List<String>.from(_tripData['thingsToCarry'] ?? []),
+                onAdd: () => _addListItem('thingsToCarry'),
+                onRemove: (index) => _removeListItem('thingsToCarry', index),
+                onEdit: (index, value) => _editListItem('thingsToCarry', index, value),
               ),
               const SizedBox(height: 16),
 
@@ -848,6 +878,70 @@ class _TripEditScreenState extends State<TripEditScreen> {
       setState(() {
         _tripData['galleryImages'] = galleryImages;
       });
+    } finally {
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadMainImage({bool fromCamera = false}) async {
+    final picker = ImagePicker();
+    final XFile? pickedFile;
+    
+    if (fromCamera) {
+      pickedFile = await picker.pickImage(source: ImageSource.camera);
+    } else {
+      pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    }
+    
+    if (pickedFile == null) return;
+    
+    // Show loading dialog
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Uploading image...'),
+          ],
+        ),
+      ),
+    );
+    
+    try {
+      final settings = context.read<SettingsProvider>().settings;
+      final uploadService = ImageUploadService(settings: settings);
+      final tripId = _tripData['id']?.toString() ?? 'trip_${DateTime.now().millisecondsSinceEpoch}';
+      
+      final file = File(pickedFile.path);
+      final result = await uploadService.uploadImage(
+        imageFile: file,
+        tripId: tripId,
+        isMainImage: true,
+      );
+      
+      if (result.success && result.imagePath != null) {
+        setState(() {
+          _tripData['image'] = result.imagePath;
+          _imageController.text = result.imagePath!;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Display image updated successfully')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to upload: ${result.error}')),
+          );
+        }
+      }
     } finally {
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog
@@ -1401,7 +1495,19 @@ class _TripEditScreenState extends State<TripEditScreen> {
     if (isEditing && widget.index != null) {
       provider.updateTrip(widget.index!, _tripData);
     } else {
-      provider.addTrip(_tripData);
+      final error = provider.addTrip(_tripData);
+      if (error != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(error),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+        return;
+      }
     }
 
     Navigator.pop(context);
