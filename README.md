@@ -1,6 +1,24 @@
-# trip_manager_app
+# Trip Manager App
 
-A new Flutter project.
+Flutter administration app for Team Weekend Trekkers.
+
+## Download Android and iOS builds
+
+The `Build iOS & Android` GitHub Actions workflow runs automatically after a
+push to `main` and can also be started manually from the Actions tab.
+
+1. Open **Actions** in the GitHub repository.
+2. Select **Build iOS & Android**.
+3. Open a successful run, or select **Run workflow** to create fresh builds.
+4. Download the required file from the run's **Artifacts** section:
+
+   - `trip-manager-android-apk` — APK for direct Android installation.
+   - `trip-manager-android-aab` — Android App Bundle for Play Console.
+   - `trip-manager-ios-unsigned-ipa` — unsigned iOS IPA for later Apple signing.
+
+Artifacts are retained by GitHub Actions for 90 days. The iOS IPA is not
+directly installable until it is signed with an Apple Developer certificate
+and matching provisioning profile.
 
 ## Getting Started
 

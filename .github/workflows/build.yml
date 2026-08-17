@@ -7,37 +7,69 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build-android:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.38.5'
           channel: 'stable'
-      - run: flutter pub get
-      - run: flutter test --no-pub
-      - run: flutter build apk --release
-      - run: flutter build appbundle --release
-      - uses: actions/upload-artifact@v4
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Run tests
+        run: flutter test --no-pub
+      - name: Build Android APK
+        run: flutter build apk --release
+      - name: Build Android App Bundle
+        run: flutter build appbundle --release
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
         with:
-          name: android-release
-          path: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/bundle/release/app-release.aab
+          name: trip-manager-android-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 90
+      - name: Upload Android App Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: trip-manager-android-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 90
 
   build-ios:
     runs-on: macos-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.38.5'
           channel: 'stable'
-      - run: flutter pub get
-      - run: flutter build ios --release --no-codesign
-      - uses: actions/upload-artifact@v4
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Build unsigned iOS app
+        run: flutter build ios --release --no-codesign
+      - name: Package unsigned iOS IPA
+        run: |
+          mkdir -p build/ios/ipa/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
+          cd build/ios/ipa
+          zip -qry ../trip-manager-ios-unsigned.ipa Payload
+      - name: Upload unsigned iOS IPA
+        uses: actions/upload-artifact@v4
         with:
-          name: ios-release
-          path: build/ios/iphoneos/Runner.app
+          name: trip-manager-ios-unsigned-ipa
+          path: build/ios/trip-manager-ios-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 90
