@@ -5,6 +5,7 @@ import '../providers/settings_provider.dart';
 import '../services/github_service.dart';
 import '../services/website_settings_service.dart';
 import 'data_health_screen.dart';
+import 'deployment_status_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -345,6 +346,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(builder: (_) => const DataHealthScreen()),
+                        );
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.cloud_sync, color: Colors.blue),
+                      title: const Text('Deployment Status'),
+                      subtitle: const Text('Check if website is deployed after push'),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const DeploymentStatusScreen()),
                         );
                       },
                     ),

@@ -7,11 +7,11 @@ import 'models/app_settings.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize settings
   final settingsProvider = SettingsProvider();
   await settingsProvider.init();
-  
+
   runApp(
     MultiProvider(
       providers: [
@@ -42,15 +42,12 @@ class TripManagerApp extends StatelessWidget {
           theme: ThemeData(
             colorScheme: ColorScheme.fromSeed(
               seedColor: const Color(0xFF2E7D32), // Green theme for trekking
-              brightness: settings.settings.darkMode 
-                  ? Brightness.dark 
+              brightness: settings.settings.darkMode
+                  ? Brightness.dark
                   : Brightness.light,
             ),
             useMaterial3: true,
-            appBarTheme: const AppBarTheme(
-              centerTitle: true,
-              elevation: 0,
-            ),
+            appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
             cardTheme: CardThemeData(
               elevation: 2,
               shape: RoundedRectangleBorder(
@@ -70,10 +67,7 @@ class TripManagerApp extends StatelessWidget {
               brightness: Brightness.dark,
             ),
             useMaterial3: true,
-            appBarTheme: const AppBarTheme(
-              centerTitle: true,
-              elevation: 0,
-            ),
+            appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
             cardTheme: CardThemeData(
               elevation: 2,
               shape: RoundedRectangleBorder(
@@ -87,8 +81,8 @@ class TripManagerApp extends StatelessWidget {
               filled: true,
             ),
           ),
-          themeMode: settings.settings.darkMode 
-              ? ThemeMode.dark 
+          themeMode: settings.settings.darkMode
+              ? ThemeMode.dark
               : ThemeMode.light,
           home: const TripsListScreen(),
         );

@@ -6,6 +6,7 @@ import '../providers/trips_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/image_upload_service.dart';
 import '../services/trips_parser.dart';
+import '../services/trip_date_utils.dart';
 
 class TripEditScreen extends StatefulWidget {
   final Map<String, dynamic>? trip;
@@ -20,12 +21,11 @@ class TripEditScreen extends StatefulWidget {
 class _TripEditScreenState extends State<TripEditScreen> {
   final _formKey = GlobalKey<FormState>();
   late Map<String, dynamic> _tripData;
-  
+
   // Controllers for text fields
   late TextEditingController _nameController;
   late TextEditingController _destinationController;
   late TextEditingController _descriptionController;
-  late TextEditingController _dateController;
   late TextEditingController _priceController;
   late TextEditingController _discountedPriceController;
   late TextEditingController _groupSizeController;
@@ -37,7 +37,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
   late TextEditingController _elevationController;
   late TextEditingController _bestTimeController;
   late TextEditingController _durationController;
-  late TextEditingController _availableDatesController;
+  late List<String> _availableDates;
 
   bool get isEditing => widget.trip != null;
 
@@ -45,30 +45,49 @@ class _TripEditScreenState extends State<TripEditScreen> {
   void initState() {
     super.initState();
     _tripData = Map<String, dynamic>.from(widget.trip ?? _getDefaultTrip());
-    
+
     // Handle field name variations from parser (title/name, location/destination, about/description)
-    _nameController = TextEditingController(text: _tripData['title'] ?? _tripData['name'] ?? '');
-    _destinationController = TextEditingController(text: _tripData['location'] ?? _tripData['destination'] ?? '');
-    _descriptionController = TextEditingController(text: _tripData['about'] ?? _tripData['description'] ?? '');
-    _dateController = TextEditingController(text: _tripData['date'] ?? '');
-    _priceController = TextEditingController(text: _tripData['price']?.toString() ?? '₹0');
+    _nameController = TextEditingController(
+      text: _tripData['title'] ?? _tripData['name'] ?? '',
+    );
+    _destinationController = TextEditingController(
+      text: _tripData['location'] ?? _tripData['destination'] ?? '',
+    );
+    _descriptionController = TextEditingController(
+      text: _tripData['about'] ?? _tripData['description'] ?? '',
+    );
+    _priceController = TextEditingController(
+      text: _tripData['price']?.toString() ?? '₹0',
+    );
     _discountedPriceController = TextEditingController(
       text: _tripData['discountedPrice']?.toString() ?? '',
     );
     _groupSizeController = TextEditingController(
       text: _tripData['groupSize']?.toString() ?? '20',
     );
-    _pickupPointController = TextEditingController(text: _tripData['pickupPoint'] ?? '');
+    _pickupPointController = TextEditingController(
+      text: _tripData['pickupPoint'] ?? '',
+    );
     _imageController = TextEditingController(text: _tripData['image'] ?? '');
     // Website-specific fields
-    _badgeController = TextEditingController(text: _tripData['badge']?.toString() ?? 'Trek');
-    _distanceController = TextEditingController(text: _tripData['distance']?.toString() ?? '');
-    _elevationController = TextEditingController(text: _tripData['elevation']?.toString() ?? '');
-    _bestTimeController = TextEditingController(text: _tripData['bestTime']?.toString() ?? '');
-    _durationController = TextEditingController(text: _tripData['duration']?.toString() ?? '');
-    // Available dates as newline-separated string
+    _badgeController = TextEditingController(
+      text: _tripData['badge']?.toString() ?? 'Trek',
+    );
+    _distanceController = TextEditingController(
+      text: _tripData['distance']?.toString() ?? '',
+    );
+    _elevationController = TextEditingController(
+      text: _tripData['elevation']?.toString() ?? '',
+    );
+    _bestTimeController = TextEditingController(
+      text: _tripData['bestTime']?.toString() ?? '',
+    );
+    _durationController = TextEditingController(
+      text: _tripData['duration']?.toString() ?? '',
+    );
+    // Preserve remote labels until this trip is explicitly saved.
     final availableDates = _tripData['availableDates'] as List<dynamic>? ?? [];
-    _availableDatesController = TextEditingController(text: availableDates.join('\n'));
+    _availableDates = availableDates.map((date) => date.toString()).toList();
   }
 
   Map<String, dynamic> _getDefaultTrip() {
@@ -78,7 +97,6 @@ class _TripEditScreenState extends State<TripEditScreen> {
       'name': '',
       'destination': '',
       'description': '',
-      'date': '',
       'image': 'images/trips/default.jpg',
       'price': '₹0',
       'difficulty': 'Moderate',
@@ -107,7 +125,6 @@ class _TripEditScreenState extends State<TripEditScreen> {
     _nameController.dispose();
     _destinationController.dispose();
     _descriptionController.dispose();
-    _dateController.dispose();
     _priceController.dispose();
     _discountedPriceController.dispose();
     _groupSizeController.dispose();
@@ -118,7 +135,6 @@ class _TripEditScreenState extends State<TripEditScreen> {
     _elevationController.dispose();
     _bestTimeController.dispose();
     _durationController.dispose();
-    _availableDatesController.dispose();
     super.dispose();
   }
 
@@ -129,10 +145,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
         title: Text(isEditing ? 'Edit Trip' : 'New Trip'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.save),
-            onPressed: _saveTrip,
-          ),
+          IconButton(icon: const Icon(Icons.save), onPressed: _saveTrip),
         ],
       ),
       body: Form(
@@ -177,7 +190,8 @@ class _TripEditScreenState extends State<TripEditScreen> {
                     controller: _descriptionController,
                     decoration: const InputDecoration(
                       labelText: 'Trip Description / About',
-                      hintText: 'Describe the trip experience, what makes it special, scenic beauty, etc.',
+                      hintText:
+                          'Describe the trip experience, what makes it special, scenic beauty, etc.',
                       border: OutlineInputBorder(),
                       alignLabelWithHint: true,
                     ),
@@ -192,15 +206,6 @@ class _TripEditScreenState extends State<TripEditScreen> {
               _buildSectionCard(
                 title: 'Date & Pricing',
                 children: [
-                  TextFormField(
-                    controller: _dateController,
-                    decoration: const InputDecoration(
-                      labelText: 'Date (e.g., Jan 15-17, 2025)',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.calendar_today),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                   Row(
                     children: [
                       Expanded(
@@ -212,7 +217,8 @@ class _TripEditScreenState extends State<TripEditScreen> {
                             prefixIcon: Icon(Icons.currency_rupee),
                           ),
                           keyboardType: TextInputType.number,
-                          validator: (v) => v?.isEmpty == true ? 'Required' : null,
+                          validator: (v) =>
+                              v?.isEmpty == true ? 'Required' : null,
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -241,18 +247,37 @@ class _TripEditScreenState extends State<TripEditScreen> {
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: _tripData['difficulty'] ?? 'Moderate',
+                          isExpanded: true,
+                          initialValue: (_tripData['difficulty'] ?? 'Moderate')
+                              .toString(),
                           decoration: const InputDecoration(
                             labelText: 'Difficulty',
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.trending_up),
                           ),
-                          items: ['Easy', 'Moderate', 'Difficult', 'Extreme']
-                              .map((d) => DropdownMenuItem(
-                                    value: d,
-                                    child: Text(d),
-                                  ))
-                              .toList(),
+                          items:
+                              <String>{
+                                    'Easy',
+                                    'Easy-Moderate',
+                                    'Moderate',
+                                    'Moderate-Hard',
+                                    'Challenging',
+                                    'Difficult',
+                                    'Extreme',
+                                    // Retain a valid value introduced by the website
+                                    // even before this app has learned its label.
+                                    if ((_tripData['difficulty'] ?? '')
+                                        .toString()
+                                        .isNotEmpty)
+                                      _tripData['difficulty'].toString(),
+                                  }
+                                  .map(
+                                    (d) => DropdownMenuItem(
+                                      value: d,
+                                      child: Text(d),
+                                    ),
+                                  )
+                                  .toList(),
                           onChanged: (v) {
                             setState(() {
                               _tripData['difficulty'] = v;
@@ -357,16 +382,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _availableDatesController,
-                    decoration: const InputDecoration(
-                      labelText: 'Available Dates (one per line)',
-                      hintText: 'Jan 18-19, 2026\\nJan 25-26, 2026',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.event),
-                    ),
-                    maxLines: 4,
-                  ),
+                  _buildAvailableDatesEditor(),
                 ],
               ),
               const SizedBox(height: 16),
@@ -381,7 +397,8 @@ class _TripEditScreenState extends State<TripEditScreen> {
                         child: TextFormField(
                           controller: _imageController,
                           decoration: const InputDecoration(
-                            labelText: 'Image Path (e.g., images/trips/goa.jpg)',
+                            labelText:
+                                'Image Path (e.g., images/trips/goa.jpg)',
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.image),
                           ),
@@ -396,7 +413,8 @@ class _TripEditScreenState extends State<TripEditScreen> {
                       ),
                       IconButton(
                         icon: const Icon(Icons.camera_alt),
-                        onPressed: () => _pickAndUploadMainImage(fromCamera: true),
+                        onPressed: () =>
+                            _pickAndUploadMainImage(fromCamera: true),
                         color: Colors.blue,
                         tooltip: 'Take photo',
                       ),
@@ -411,7 +429,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
                         height: 150,
                         width: double.infinity,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
+                        errorBuilder: (_, _, _) => Container(
                           height: 150,
                           color: Colors.grey[200],
                           child: const Center(
@@ -432,9 +450,9 @@ class _TripEditScreenState extends State<TripEditScreen> {
                   SwitchListTile(
                     title: const Text('Active Trip'),
                     subtitle: Text(
-                      _tripData['isActive'] == false 
-                        ? 'Trip is greyed out and hidden from bookings'
-                        : 'Trip is visible and available for booking',
+                      _tripData['isActive'] == false
+                          ? 'Trip is greyed out and hidden from bookings'
+                          : 'Trip is visible and available for booking',
                     ),
                     value: _tripData['isActive'] ?? true,
                     activeTrackColor: Colors.green[200],
@@ -465,7 +483,8 @@ class _TripEditScreenState extends State<TripEditScreen> {
                 items: List<String>.from(_tripData['highlights'] ?? []),
                 onAdd: () => _addListItem('highlights'),
                 onRemove: (index) => _removeListItem('highlights', index),
-                onEdit: (index, value) => _editListItem('highlights', index, value),
+                onEdit: (index, value) =>
+                    _editListItem('highlights', index, value),
               ),
               const SizedBox(height: 16),
 
@@ -479,7 +498,8 @@ class _TripEditScreenState extends State<TripEditScreen> {
                 items: List<String>.from(_tripData['inclusions'] ?? []),
                 onAdd: () => _addListItem('inclusions'),
                 onRemove: (index) => _removeListItem('inclusions', index),
-                onEdit: (index, value) => _editListItem('inclusions', index, value),
+                onEdit: (index, value) =>
+                    _editListItem('inclusions', index, value),
               ),
               const SizedBox(height: 16),
 
@@ -489,7 +509,8 @@ class _TripEditScreenState extends State<TripEditScreen> {
                 items: List<String>.from(_tripData['exclusions'] ?? []),
                 onAdd: () => _addListItem('exclusions'),
                 onRemove: (index) => _removeListItem('exclusions', index),
-                onEdit: (index, value) => _editListItem('exclusions', index, value),
+                onEdit: (index, value) =>
+                    _editListItem('exclusions', index, value),
               ),
               const SizedBox(height: 16),
 
@@ -499,7 +520,8 @@ class _TripEditScreenState extends State<TripEditScreen> {
                 items: List<String>.from(_tripData['thingsToCarry'] ?? []),
                 onAdd: () => _addListItem('thingsToCarry'),
                 onRemove: (index) => _removeListItem('thingsToCarry', index),
-                onEdit: (index, value) => _editListItem('thingsToCarry', index, value),
+                onEdit: (index, value) =>
+                    _editListItem('thingsToCarry', index, value),
               ),
               const SizedBox(height: 16),
 
@@ -540,10 +562,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
           children: [
             Text(
               title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             ...children,
@@ -598,7 +617,10 @@ class _TripEditScreenState extends State<TripEditScreen> {
                   contentPadding: EdgeInsets.zero,
                   leading: CircleAvatar(
                     radius: 12,
-                    child: Text('${index + 1}', style: const TextStyle(fontSize: 12)),
+                    child: Text(
+                      '${index + 1}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
                   ),
                   title: Text(item),
                   trailing: Row(
@@ -614,7 +636,11 @@ class _TripEditScreenState extends State<TripEditScreen> {
                         },
                       ),
                       IconButton(
-                        icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                        icon: const Icon(
+                          Icons.delete,
+                          size: 20,
+                          color: Colors.red,
+                        ),
                         onPressed: () => onRemove(index),
                       ),
                     ],
@@ -628,23 +654,25 @@ class _TripEditScreenState extends State<TripEditScreen> {
   }
 
   Widget _buildItinerarySection() {
-    final itinerary = List<Map<String, dynamic>>.from(_tripData['itinerary'] ?? []);
-    
+    final itinerary = List<Map<String, dynamic>>.from(
+      _tripData['itinerary'] ?? [],
+    );
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 4,
               children: [
                 const Text(
                   'Itinerary',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 IconButton(
                   icon: const Icon(Icons.add_circle),
@@ -667,7 +695,9 @@ class _TripEditScreenState extends State<TripEditScreen> {
                   margin: const EdgeInsets.only(bottom: 8),
                   color: Colors.grey[50],
                   child: ListTile(
-                    title: Text('Day ${day['day'] ?? index + 1}: ${day['title'] ?? ''}'),
+                    title: Text(
+                      'Day ${day['day'] ?? index + 1}: ${day['title'] ?? ''}',
+                    ),
                     subtitle: Text(
                       day['description'] ?? '',
                       maxLines: 2,
@@ -681,7 +711,11 @@ class _TripEditScreenState extends State<TripEditScreen> {
                           onPressed: () => _editItineraryDay(index),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                          icon: const Icon(
+                            Icons.delete,
+                            size: 20,
+                            color: Colors.red,
+                          ),
                           onPressed: () {
                             setState(() {
                               itinerary.removeAt(index);
@@ -699,9 +733,10 @@ class _TripEditScreenState extends State<TripEditScreen> {
       ),
     );
   }
+
   Widget _buildGallerySection() {
     final galleryImages = List<String>.from(_tripData['galleryImages'] ?? []);
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -713,13 +748,10 @@ class _TripEditScreenState extends State<TripEditScreen> {
               children: [
                 const Text(
                   'Gallery Images',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     IconButton(
                       icon: const Icon(Icons.add_photo_alternate),
@@ -763,7 +795,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
                         child: Image.network(
                           _getImageUrl(imagePath),
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
+                          errorBuilder: (_, _, _) => Container(
                             color: Colors.grey[200],
                             child: const Icon(Icons.broken_image),
                           ),
@@ -824,16 +856,16 @@ class _TripEditScreenState extends State<TripEditScreen> {
   Future<void> _pickAndUploadImage({bool fromCamera = false}) async {
     final picker = ImagePicker();
     final List<XFile> pickedFiles;
-    
+
     if (fromCamera) {
       final photo = await picker.pickImage(source: ImageSource.camera);
       pickedFiles = photo != null ? [photo] : [];
     } else {
       pickedFiles = await picker.pickMultiImage();
     }
-    
+
     if (pickedFiles.isEmpty) return;
-    
+
     // Show loading dialog
     if (!mounted) return;
     showDialog(
@@ -849,21 +881,23 @@ class _TripEditScreenState extends State<TripEditScreen> {
         ),
       ),
     );
-    
+
     try {
       final settings = context.read<SettingsProvider>().settings;
       final uploadService = ImageUploadService(settings: settings);
-      final tripId = _tripData['id']?.toString() ?? 'trip_${DateTime.now().millisecondsSinceEpoch}';
-      
+      final tripId =
+          _tripData['id']?.toString() ??
+          'trip_${DateTime.now().millisecondsSinceEpoch}';
+
       final galleryImages = List<String>.from(_tripData['galleryImages'] ?? []);
-      
+
       for (final pickedFile in pickedFiles) {
         final file = File(pickedFile.path);
         final result = await uploadService.uploadImage(
           imageFile: file,
           tripId: tripId,
         );
-        
+
         if (result.success && result.imagePath != null) {
           galleryImages.add(result.imagePath!);
         } else {
@@ -874,7 +908,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
           }
         }
       }
-      
+
       setState(() {
         _tripData['galleryImages'] = galleryImages;
       });
@@ -888,15 +922,15 @@ class _TripEditScreenState extends State<TripEditScreen> {
   Future<void> _pickAndUploadMainImage({bool fromCamera = false}) async {
     final picker = ImagePicker();
     final XFile? pickedFile;
-    
+
     if (fromCamera) {
       pickedFile = await picker.pickImage(source: ImageSource.camera);
     } else {
       pickedFile = await picker.pickImage(source: ImageSource.gallery);
     }
-    
+
     if (pickedFile == null) return;
-    
+
     // Show loading dialog
     if (!mounted) return;
     showDialog(
@@ -912,19 +946,21 @@ class _TripEditScreenState extends State<TripEditScreen> {
         ),
       ),
     );
-    
+
     try {
       final settings = context.read<SettingsProvider>().settings;
       final uploadService = ImageUploadService(settings: settings);
-      final tripId = _tripData['id']?.toString() ?? 'trip_${DateTime.now().millisecondsSinceEpoch}';
-      
+      final tripId =
+          _tripData['id']?.toString() ??
+          'trip_${DateTime.now().millisecondsSinceEpoch}';
+
       final file = File(pickedFile.path);
       final result = await uploadService.uploadImage(
         imageFile: file,
         tripId: tripId,
         isMainImage: true,
       );
-      
+
       if (result.success && result.imagePath != null) {
         setState(() {
           _tripData['image'] = result.imagePath;
@@ -932,7 +968,11 @@ class _TripEditScreenState extends State<TripEditScreen> {
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Display image updated successfully')),
+            const SnackBar(
+              content: Text(
+                'Display image uploaded. Save this trip, then push to publish it.',
+              ),
+            ),
           );
         }
       } else {
@@ -958,28 +998,30 @@ class _TripEditScreenState extends State<TripEditScreen> {
   }
 
   Widget _buildBoardingLocationsSection() {
-    final boardingLocations = List<Map<String, dynamic>>.from(_tripData['boardingLocations'] ?? []);
+    final boardingLocations = List<Map<String, dynamic>>.from(
+      _tripData['boardingLocations'] ?? [],
+    );
     final defaultPickupPoints = TripsParser.getDefaultPickupPoints();
     final hasCustomLocations = boardingLocations.isNotEmpty;
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 4,
               children: [
                 const Text(
                   'Boarding Locations',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     if (!hasCustomLocations)
                       TextButton.icon(
@@ -987,12 +1029,19 @@ class _TripEditScreenState extends State<TripEditScreen> {
                         label: const Text('Use Defaults'),
                         onPressed: () {
                           setState(() {
-                            _tripData['boardingLocations'] = List<Map<String, dynamic>>.from(
-                              defaultPickupPoints.map((p) => Map<String, dynamic>.from(p))
-                            );
+                            _tripData['boardingLocations'] =
+                                List<Map<String, dynamic>>.from(
+                                  defaultPickupPoints.map(
+                                    (p) => Map<String, dynamic>.from(p),
+                                  ),
+                                );
                           });
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Default pickup points copied. You can now edit them.')),
+                            const SnackBar(
+                              content: Text(
+                                'Default pickup points copied. You can now edit them.',
+                              ),
+                            ),
                           );
                         },
                       ),
@@ -1006,7 +1055,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            
+
             // Show info about what's displayed on website
             Container(
               padding: const EdgeInsets.all(12),
@@ -1014,24 +1063,30 @@ class _TripEditScreenState extends State<TripEditScreen> {
                 color: hasCustomLocations ? Colors.green[50] : Colors.blue[50],
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: hasCustomLocations ? Colors.green[200]! : Colors.blue[200]!,
+                  color: hasCustomLocations
+                      ? Colors.green[200]!
+                      : Colors.blue[200]!,
                 ),
               ),
               child: Row(
                 children: [
                   Icon(
                     hasCustomLocations ? Icons.check_circle : Icons.info,
-                    color: hasCustomLocations ? Colors.green[700] : Colors.blue[700],
+                    color: hasCustomLocations
+                        ? Colors.green[700]
+                        : Colors.blue[700],
                     size: 20,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      hasCustomLocations 
-                        ? 'Website shows custom pickup points below'
-                        : 'Website shows default Bangalore pickup points (Majestic, Koramangala, Silk Board, Electronic City)',
+                      hasCustomLocations
+                          ? 'Website shows custom pickup points below'
+                          : 'Website shows default Bangalore pickup points (Majestic, Koramangala, Silk Board, Electronic City)',
                       style: TextStyle(
-                        color: hasCustomLocations ? Colors.green[700] : Colors.blue[700],
+                        color: hasCustomLocations
+                            ? Colors.green[700]
+                            : Colors.blue[700],
                         fontSize: 13,
                       ),
                     ),
@@ -1040,7 +1095,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            
+
             // Show default points if no custom locations
             if (!hasCustomLocations) ...[
               const Text(
@@ -1051,29 +1106,39 @@ class _TripEditScreenState extends State<TripEditScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              ...defaultPickupPoints.map((loc) => Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                color: Colors.grey[100],
-                child: ListTile(
-                  leading: const Icon(Icons.location_on, color: Colors.blue),
-                  title: Text(loc['name']?.toString() ?? ''),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Landmark: ${loc['landmark']}'),
-                      Text('Time: ${loc['time']}'),
-                    ],
+              ...defaultPickupPoints.map(
+                (loc) => Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  color: Colors.grey[100],
+                  child: ListTile(
+                    leading: const Icon(Icons.location_on, color: Colors.blue),
+                    title: Text(loc['name']?.toString() ?? ''),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Landmark: ${loc['landmark']}'),
+                        Text('Time: ${loc['time']}'),
+                      ],
+                    ),
+                    trailing: const Icon(
+                      Icons.lock,
+                      color: Colors.grey,
+                      size: 18,
+                    ),
                   ),
-                  trailing: const Icon(Icons.lock, color: Colors.grey, size: 18),
                 ),
-              )),
+              ),
               const SizedBox(height: 8),
               Text(
                 'Tap "Use Defaults" to copy and customize these points',
-                style: TextStyle(color: Colors.grey[600], fontSize: 12, fontStyle: FontStyle.italic),
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                ),
               ),
             ],
-            
+
             // Show custom locations if any
             if (hasCustomLocations) ...[
               Row(
@@ -1087,14 +1152,23 @@ class _TripEditScreenState extends State<TripEditScreen> {
                     ),
                   ),
                   TextButton.icon(
-                    icon: const Icon(Icons.clear_all, size: 18, color: Colors.red),
-                    label: const Text('Clear All', style: TextStyle(color: Colors.red)),
+                    icon: const Icon(
+                      Icons.clear_all,
+                      size: 18,
+                      color: Colors.red,
+                    ),
+                    label: const Text(
+                      'Clear All',
+                      style: TextStyle(color: Colors.red),
+                    ),
                     onPressed: () {
                       showDialog(
                         context: context,
                         builder: (ctx) => AlertDialog(
                           title: const Text('Clear Custom Points?'),
-                          content: const Text('This will remove all custom pickup points. The website will show default Bangalore pickup points instead.'),
+                          content: const Text(
+                            'This will remove all custom pickup points. The website will show default Bangalore pickup points instead.',
+                          ),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(ctx),
@@ -1103,11 +1177,15 @@ class _TripEditScreenState extends State<TripEditScreen> {
                             TextButton(
                               onPressed: () {
                                 setState(() {
-                                  _tripData['boardingLocations'] = <Map<String, dynamic>>[];
+                                  _tripData['boardingLocations'] =
+                                      <Map<String, dynamic>>[];
                                 });
                                 Navigator.pop(ctx);
                               },
-                              child: const Text('Clear', style: TextStyle(color: Colors.red)),
+                              child: const Text(
+                                'Clear',
+                                style: TextStyle(color: Colors.red),
+                              ),
                             ),
                           ],
                         ),
@@ -1143,11 +1221,16 @@ class _TripEditScreenState extends State<TripEditScreen> {
                           onPressed: () => _editBoardingLocation(index),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                          icon: const Icon(
+                            Icons.delete,
+                            size: 20,
+                            color: Colors.red,
+                          ),
                           onPressed: () {
                             setState(() {
                               boardingLocations.removeAt(index);
-                              _tripData['boardingLocations'] = boardingLocations;
+                              _tripData['boardingLocations'] =
+                                  boardingLocations;
                             });
                           },
                         ),
@@ -1167,7 +1250,9 @@ class _TripEditScreenState extends State<TripEditScreen> {
     final result = await _showBoardingLocationDialog(null);
     if (result != null) {
       setState(() {
-        final boardingLocations = List<Map<String, dynamic>>.from(_tripData['boardingLocations'] ?? []);
+        final boardingLocations = List<Map<String, dynamic>>.from(
+          _tripData['boardingLocations'] ?? [],
+        );
         boardingLocations.add(result);
         _tripData['boardingLocations'] = boardingLocations;
       });
@@ -1175,9 +1260,11 @@ class _TripEditScreenState extends State<TripEditScreen> {
   }
 
   void _editBoardingLocation(int index) async {
-    final boardingLocations = List<Map<String, dynamic>>.from(_tripData['boardingLocations'] ?? []);
+    final boardingLocations = List<Map<String, dynamic>>.from(
+      _tripData['boardingLocations'] ?? [],
+    );
     final loc = boardingLocations[index];
-    
+
     final result = await _showBoardingLocationDialog(loc);
     if (result != null) {
       setState(() {
@@ -1187,16 +1274,28 @@ class _TripEditScreenState extends State<TripEditScreen> {
     }
   }
 
-  Future<Map<String, dynamic>?> _showBoardingLocationDialog(Map<String, dynamic>? location) async {
-    final nameController = TextEditingController(text: location?['name']?.toString() ?? '');
-    final landmarkController = TextEditingController(text: location?['landmark']?.toString() ?? '');
-    final timeController = TextEditingController(text: location?['time']?.toString() ?? '');
-    final mapLinkController = TextEditingController(text: location?['mapLink']?.toString() ?? '');
-    
+  Future<Map<String, dynamic>?> _showBoardingLocationDialog(
+    Map<String, dynamic>? location,
+  ) async {
+    final nameController = TextEditingController(
+      text: location?['name']?.toString() ?? '',
+    );
+    final landmarkController = TextEditingController(
+      text: location?['landmark']?.toString() ?? '',
+    );
+    final timeController = TextEditingController(
+      text: location?['time']?.toString() ?? '',
+    );
+    final mapLinkController = TextEditingController(
+      text: location?['mapLink']?.toString() ?? '',
+    );
+
     return showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(location == null ? 'Add Boarding Location' : 'Edit Boarding Location'),
+        title: Text(
+          location == null ? 'Add Boarding Location' : 'Edit Boarding Location',
+        ),
         content: SingleChildScrollView(
           child: SizedBox(
             width: double.maxFinite,
@@ -1268,6 +1367,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
       ),
     );
   }
+
   void _addListItem(String key) async {
     final value = await _showEditDialog('');
     if (value != null && value.isNotEmpty) {
@@ -1303,9 +1403,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
         title: Text(initialValue.isEmpty ? 'Add Item' : 'Edit Item'),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-          ),
+          decoration: const InputDecoration(border: OutlineInputBorder()),
           autofocus: true,
         ),
         actions: [
@@ -1323,10 +1421,12 @@ class _TripEditScreenState extends State<TripEditScreen> {
   }
 
   void _addItineraryDay() async {
-    final itinerary = List<Map<String, dynamic>>.from(_tripData['itinerary'] ?? []);
+    final itinerary = List<Map<String, dynamic>>.from(
+      _tripData['itinerary'] ?? [],
+    );
     final dayNumber = itinerary.length;
     final dayLabel = 'Day $dayNumber';
-    
+
     final result = await _showItineraryDialog(dayLabel, '', []);
     if (result != null) {
       setState(() {
@@ -1337,9 +1437,11 @@ class _TripEditScreenState extends State<TripEditScreen> {
   }
 
   void _editItineraryDay(int index) async {
-    final itinerary = List<Map<String, dynamic>>.from(_tripData['itinerary'] ?? []);
+    final itinerary = List<Map<String, dynamic>>.from(
+      _tripData['itinerary'] ?? [],
+    );
     final day = itinerary[index];
-    
+
     // Handle activities as list or description as string
     List<String> activities = [];
     if (day['activities'] != null) {
@@ -1347,13 +1449,13 @@ class _TripEditScreenState extends State<TripEditScreen> {
     } else if (day['description'] != null) {
       activities = day['description'].toString().split('\n');
     }
-    
+
     final result = await _showItineraryDialog(
       day['day']?.toString() ?? 'Day ${index + 1}',
       day['title']?.toString() ?? '',
       activities,
     );
-    
+
     if (result != null) {
       setState(() {
         itinerary[index] = result;
@@ -1369,8 +1471,10 @@ class _TripEditScreenState extends State<TripEditScreen> {
   ) async {
     final dayController = TextEditingController(text: dayLabel);
     final titleController = TextEditingController(text: title);
-    final activitiesController = TextEditingController(text: activities.join('\n'));
-    
+    final activitiesController = TextEditingController(
+      text: activities.join('\n'),
+    );
+
     return showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => AlertDialog(
@@ -1403,7 +1507,8 @@ class _TripEditScreenState extends State<TripEditScreen> {
                   controller: activitiesController,
                   decoration: const InputDecoration(
                     labelText: 'Activities (one per line)',
-                    hintText: '6:00 AM - Wake up\n7:00 AM - Breakfast\n8:00 AM - Start trek',
+                    hintText:
+                        '6:00 AM - Wake up\n7:00 AM - Breakfast\n8:00 AM - Start trek',
                     border: OutlineInputBorder(),
                   ),
                   maxLines: 8,
@@ -1437,11 +1542,170 @@ class _TripEditScreenState extends State<TripEditScreen> {
       ),
     );
   }
+
+  Widget _buildAvailableDatesEditor() {
+    final theme = Theme.of(context);
+    final rangeKeyCounts = <String, int>{};
+    for (final label in _availableDates) {
+      final key = TripDateUtils.parse(label)?.key;
+      if (key != null) rangeKeyCounts[key] = (rangeKeyCounts[key] ?? 0) + 1;
+    }
+    return Column(
+      key: const Key('available-dates-editor'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.event),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Available Dates',
+                style: theme.textTheme.titleMedium,
+              ),
+            ),
+            FilledButton.tonalIcon(
+              key: const Key('add-date-range'),
+              onPressed: () => _pickDateRange(),
+              icon: const Icon(Icons.add),
+              label: const Text('Add'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'These ranges power the website date tags and Upcoming Batches.',
+          style: theme.textTheme.bodySmall,
+        ),
+        const SizedBox(height: 12),
+        if (_availableDates.isEmpty)
+          Container(
+            key: const Key('dates-empty-state'),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text(
+              'New dates coming soon. The website will show its empty-date message.',
+            ),
+          )
+        else
+          ...List.generate(_availableDates.length, (index) {
+            final label = _availableDates[index];
+            final range = TripDateUtils.parse(label);
+            final invalid = range == null;
+            final duplicate = range != null && rangeKeyCounts[range.key]! > 1;
+            final expired = range?.isExpired() == true;
+            final status = invalid
+                ? 'Invalid — edit or remove before saving'
+                : duplicate
+                ? 'Duplicate — edit or remove before saving'
+                : expired
+                ? 'Expired'
+                : 'Upcoming • ${range.weekdayLabel}';
+            final statusColor = invalid || duplicate
+                ? theme.colorScheme.error
+                : expired
+                ? theme.colorScheme.outline
+                : Colors.green;
+
+            return Card(
+              key: ValueKey('date-range-$index'),
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: Icon(
+                  invalid || duplicate ? Icons.error_outline : Icons.date_range,
+                  color: statusColor,
+                ),
+                title: Text(label),
+                subtitle: Text(status, style: TextStyle(color: statusColor)),
+                trailing: Wrap(
+                  spacing: 0,
+                  children: [
+                    IconButton(
+                      key: ValueKey('edit-date-$index'),
+                      tooltip: 'Edit date range',
+                      onPressed: () => _pickDateRange(index: index),
+                      icon: const Icon(Icons.edit_calendar),
+                    ),
+                    IconButton(
+                      key: ValueKey('remove-date-$index'),
+                      tooltip: 'Remove date range',
+                      onPressed: () {
+                        setState(() => _availableDates.removeAt(index));
+                      },
+                      icon: const Icon(Icons.delete_outline),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  Future<void> _pickDateRange({int? index}) async {
+    final now = DateTime.now();
+    final existing = index == null
+        ? null
+        : TripDateUtils.parse(_availableDates[index]);
+    final initialStart = existing == null
+        ? DateTime(now.year, now.month, now.day)
+        : DateTime(
+            existing.start.year,
+            existing.start.month,
+            existing.start.day,
+          );
+    final initialEnd = existing == null
+        ? initialStart
+        : DateTime(existing.end.year, existing.end.month, existing.end.day);
+    final defaultFirstDate = DateTime(2020);
+    final defaultLastDate = DateTime(now.year + 10, 12, 31);
+    final firstDate = initialStart.isBefore(defaultFirstDate)
+        ? initialStart
+        : defaultFirstDate;
+    final lastDate = initialEnd.isAfter(defaultLastDate)
+        ? initialEnd
+        : defaultLastDate;
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      initialDateRange: DateTimeRange(start: initialStart, end: initialEnd),
+      helpText: index == null ? 'Add trip dates' : 'Edit trip dates',
+    );
+    if (picked == null || !mounted) return;
+
+    final range = TripDateUtils.fromDates(picked.start, picked.end);
+    final duplicateIndex = _availableDates.indexWhere((label) {
+      final candidate = TripDateUtils.parse(label);
+      return candidate?.key == range.key;
+    });
+    if (duplicateIndex >= 0 && duplicateIndex != index) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('That date range already exists.')),
+      );
+      return;
+    }
+
+    setState(() {
+      final canonical = TripDateUtils.formatCanonical(range);
+      if (index == null) {
+        _availableDates.add(canonical);
+      } else {
+        _availableDates[index] = canonical;
+      }
+    });
+  }
+
   String _getImageUrl(String image) {
     if (image.startsWith('http')) {
       return image;
     }
-    return 'https://raw.githubusercontent.com/teamweekendtrekkers-png/teamweekendtrekkerwebsite/main/$image';
+    final settings = context.read<SettingsProvider>().settings;
+    return 'https://raw.githubusercontent.com/${settings.repositoryOwner}/${settings.repositoryName}/${settings.branch}/$image';
   }
 
   void _saveTrip() {
@@ -1452,6 +1716,44 @@ class _TripEditScreenState extends State<TripEditScreen> {
       return;
     }
 
+    final invalidDates = _availableDates
+        .where((label) => TripDateUtils.parse(label) == null)
+        .toList();
+    if (invalidDates.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Fix or remove ${invalidDates.length} invalid date range(s) before saving.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final seenDateKeys = <String>{};
+    final duplicateDates = _availableDates.where((label) {
+      final key = TripDateUtils.parse(label)!.key;
+      return !seenDateKeys.add(key);
+    }).toList();
+    if (duplicateDates.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Remove ${duplicateDates.length} duplicate date range(s) before saving.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final normalizedDates = _availableDates
+        .map(TripDateUtils.parse)
+        .whereType<TripDateRange>()
+        .map(TripDateUtils.formatCanonical)
+        .toList();
+
     // Update trip data from controllers - use both field name variations for compatibility
     _tripData['title'] = _nameController.text;
     _tripData['name'] = _nameController.text;
@@ -1459,41 +1761,58 @@ class _TripEditScreenState extends State<TripEditScreen> {
     _tripData['destination'] = _destinationController.text;
     _tripData['about'] = _descriptionController.text;
     _tripData['description'] = _descriptionController.text;
-    _tripData['date'] = _dateController.text;
+    if (normalizedDates.isNotEmpty) {
+      _tripData['date'] = normalizedDates.first;
+    } else {
+      _tripData.remove('date');
+    }
     // Keep price as string (e.g., "₹4,000")
     final priceText = _priceController.text.trim();
     _tripData['price'] = priceText.startsWith('₹') ? priceText : '₹$priceText';
     _tripData['image'] = _imageController.text;
     _tripData['groupSize'] = _groupSizeController.text;
     _tripData['pickupPoint'] = _pickupPointController.text;
-    
+
     // Website-specific fields
-    _tripData['badge'] = _badgeController.text.isNotEmpty ? _badgeController.text : 'Trek';
+    _tripData['badge'] = _badgeController.text.isNotEmpty
+        ? _badgeController.text
+        : 'Trek';
     _tripData['distance'] = _distanceController.text;
     _tripData['elevation'] = _elevationController.text;
     _tripData['bestTime'] = _bestTimeController.text;
     _tripData['duration'] = _durationController.text;
-    // Parse available dates from newline-separated text
-    _tripData['availableDates'] = _availableDatesController.text
-        .split('\n')
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
-    
+    _tripData['availableDates'] = normalizedDates;
+
     // Ensure galleryImages and boardingLocations are preserved
     _tripData['galleryImages'] = _tripData['galleryImages'] ?? <String>[];
-    _tripData['boardingLocations'] = _tripData['boardingLocations'] ?? <Map<String, dynamic>>[];
-    
+    _tripData['boardingLocations'] =
+        _tripData['boardingLocations'] ?? <Map<String, dynamic>>[];
+
     if (_discountedPriceController.text.isNotEmpty) {
-      _tripData['discountedPrice'] = double.tryParse(_discountedPriceController.text);
+      _tripData['discountedPrice'] = double.tryParse(
+        _discountedPriceController.text,
+      );
     } else {
       _tripData.remove('discountedPrice');
     }
 
     final provider = context.read<TripsProvider>();
-    
-    if (isEditing && widget.index != null) {
-      provider.updateTrip(widget.index!, _tripData);
+
+    if (isEditing) {
+      final tripId = widget.trip?['id']?.toString() ?? '';
+      final currentIndex = provider.getTripIndexById(tripId);
+      if (currentIndex == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'This trip no longer exists in the current list. Refresh before editing.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      provider.updateTrip(currentIndex, _tripData);
     } else {
       final error = provider.addTrip(_tripData);
       if (error != null) {

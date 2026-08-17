@@ -16,6 +16,7 @@ class Trip {
   final int groupSize;
   final String pickupPoint;
   final bool featured;
+  final bool isActive;
 
   Trip({
     required this.id,
@@ -34,6 +35,7 @@ class Trip {
     required this.groupSize,
     required this.pickupPoint,
     this.featured = false,
+    this.isActive = true,
   });
 
   factory Trip.fromMap(Map<String, dynamic> map) {
@@ -56,6 +58,7 @@ class Trip {
       groupSize: map['groupSize'] ?? 20,
       pickupPoint: map['pickupPoint'] ?? '',
       featured: map['featured'] ?? false,
+      isActive: map['isActive'] ?? true,
     );
   }
 
@@ -77,6 +80,7 @@ class Trip {
       'groupSize': groupSize,
       'pickupPoint': pickupPoint,
       'featured': featured,
+      'isActive': isActive,
     };
   }
 

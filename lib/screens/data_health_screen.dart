@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/trips_provider.dart';
+import '../services/trip_date_utils.dart';
 
 /// Severity levels for health check issues
 enum HealthSeverity { error, warning, info }
@@ -48,8 +49,29 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
     final trips = provider.trips;
     final issues = <HealthIssue>[];
 
+    // Surface provider errors before inspecting the in-memory data. This is
+    // especially useful when a load or schema failure leaves no trips to scan.
+    _checkProviderError(provider, issues);
+
+    // A schema-invalid document can intentionally yield partial trip maps so
+    // the load error is diagnosable. Do not run legacy health scans over those
+    // maps: several checks assume validated list/object shapes, and offering
+    // fixes against invalid source would be unsafe. The provider error above
+    // remains visible with the exact blocking fields.
+    if (provider.publicationErrors.isNotEmpty) {
+      setState(() {
+        _issues = issues;
+        _hasScanned = true;
+      });
+      return;
+    }
+
     // 1. Check for duplicate trip IDs
     _checkDuplicateIds(trips, issues);
+
+    // The embedded `featured` values are canonical. Report companion-file
+    // drift without mutating either representation during a health scan.
+    _checkFeaturedDrift(provider, issues);
 
     // 2. Check for corrupted strings (apostrophe fragments)
     _checkCorruptedStrings(trips, issues);
@@ -78,7 +100,39 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
     });
   }
 
-  void _checkDuplicateIds(List<Map<String, dynamic>> trips, List<HealthIssue> issues) {
+  void _checkProviderError(TripsProvider provider, List<HealthIssue> issues) {
+    final providerError = provider.error?.trim();
+    if (providerError == null || providerError.isEmpty) return;
+
+    issues.add(
+      HealthIssue(
+        severity: HealthSeverity.error,
+        title: 'Trip Data Error',
+        description: providerError,
+      ),
+    );
+  }
+
+  void _checkFeaturedDrift(TripsProvider provider, List<HealthIssue> issues) {
+    if (!provider.hasFeaturedDrift) return;
+
+    final driftIds = provider.featuredDriftIds.toList()..sort();
+    issues.add(
+      HealthIssue(
+        severity: HealthSeverity.warning,
+        title: 'Featured Trips Out of Sync',
+        description:
+            'Featured status differs for: ${driftIds.join(', ')}. The embedded '
+            '`featured` value in trips-data.js is canonical; the next atomic '
+            'save will synchronize featured-trips.js.',
+      ),
+    );
+  }
+
+  void _checkDuplicateIds(
+    List<Map<String, dynamic>> trips,
+    List<HealthIssue> issues,
+  ) {
     final idCounts = <String, int>{};
     for (final trip in trips) {
       final id = trip['id']?.toString() ?? '';
@@ -86,18 +140,24 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
     }
     for (final entry in idCounts.entries) {
       if (entry.value > 1) {
-        issues.add(HealthIssue(
-          severity: HealthSeverity.error,
-          title: 'Duplicate Trip ID',
-          description: '"${entry.key}" appears ${entry.value} times. The website silently uses only the last occurrence, making earlier entries invisible.',
-          tripId: entry.key,
-          autoFixable: false,
-        ));
+        issues.add(
+          HealthIssue(
+            severity: HealthSeverity.error,
+            title: 'Duplicate Trip ID',
+            description:
+                '"${entry.key}" appears ${entry.value} times. The website silently uses only the last occurrence, making earlier entries invisible.',
+            tripId: entry.key,
+            autoFixable: false,
+          ),
+        );
       }
     }
   }
 
-  void _checkCorruptedStrings(List<Map<String, dynamic>> trips, List<HealthIssue> issues) {
+  void _checkCorruptedStrings(
+    List<Map<String, dynamic>> trips,
+    List<HealthIssue> issues,
+  ) {
     for (final trip in trips) {
       final tripId = trip['id']?.toString() ?? 'unknown';
 
@@ -115,16 +175,23 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
           for (int i = 0; i < list.length; i++) {
             final item = list[i].toString();
             // Detect fragment patterns: standalone ", " or single-char items like "s"
-            if (item == ', ' || item == ',' || (item.length <= 2 && i > 0 && !RegExp(r'^\d+$').hasMatch(item))) {
-              issues.add(HealthIssue(
-                severity: HealthSeverity.error,
-                title: 'Corrupted String Fragment',
-                description: 'Trip "$tripId" → ${entry.key}[$i] = "$item". This is likely an apostrophe-corrupted fragment (e.g., "Sim\'s Park" was split into "Sim", ", ", "s Park").',
-                tripId: tripId,
-                field: entry.key,
-                autoFixable: true,
-                fix: () => _fixCorruptedArray(trip, entry.key),
-              ));
+            if (item == ', ' ||
+                item == ',' ||
+                (item.length <= 2 &&
+                    i > 0 &&
+                    !RegExp(r'^\d+$').hasMatch(item))) {
+              issues.add(
+                HealthIssue(
+                  severity: HealthSeverity.error,
+                  title: 'Corrupted String Fragment',
+                  description:
+                      'Trip "$tripId" → ${entry.key}[$i] = "$item". This is likely an apostrophe-corrupted fragment (e.g., "Sim\'s Park" was split into "Sim", ", ", "s Park").',
+                  tripId: tripId,
+                  field: entry.key,
+                  autoFixable: true,
+                  fix: () => _fixCorruptedArray(trip, entry.key),
+                ),
+              );
               break; // One error per field is enough
             }
           }
@@ -139,16 +206,23 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
           final activities = day['activities'] as List<dynamic>? ?? [];
           for (int a = 0; a < activities.length; a++) {
             final item = activities[a].toString();
-            if (item == ', ' || item == ',' || (item.length <= 2 && a > 0 && !RegExp(r'^\d+$').hasMatch(item))) {
-              issues.add(HealthIssue(
-                severity: HealthSeverity.error,
-                title: 'Corrupted Itinerary Fragment',
-                description: 'Trip "$tripId" → itinerary[Day ${d + 1}].activities[$a] = "$item". Apostrophe corruption detected.',
-                tripId: tripId,
-                field: 'itinerary',
-                autoFixable: true,
-                fix: () => _fixCorruptedItinerary(trip),
-              ));
+            if (item == ', ' ||
+                item == ',' ||
+                (item.length <= 2 &&
+                    a > 0 &&
+                    !RegExp(r'^\d+$').hasMatch(item))) {
+              issues.add(
+                HealthIssue(
+                  severity: HealthSeverity.error,
+                  title: 'Corrupted Itinerary Fragment',
+                  description:
+                      'Trip "$tripId" → itinerary[Day ${d + 1}].activities[$a] = "$item". Apostrophe corruption detected.',
+                  tripId: tripId,
+                  field: 'itinerary',
+                  autoFixable: true,
+                  fix: () => _fixCorruptedItinerary(trip),
+                ),
+              );
               break;
             }
           }
@@ -157,7 +231,10 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
     }
   }
 
-  void _checkMissingFields(List<Map<String, dynamic>> trips, List<HealthIssue> issues) {
+  void _checkMissingFields(
+    List<Map<String, dynamic>> trips,
+    List<HealthIssue> issues,
+  ) {
     for (final trip in trips) {
       final tripId = trip['id']?.toString() ?? 'unknown';
       final requiredFields = {
@@ -169,92 +246,119 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
 
       for (final entry in requiredFields.entries) {
         if (entry.value == null || entry.value.toString().isEmpty) {
-          issues.add(HealthIssue(
-            severity: HealthSeverity.error,
-            title: 'Missing Required Field',
-            description: 'Trip "$tripId" is missing "${entry.key}".',
-            tripId: tripId,
-            field: entry.key,
-          ));
+          issues.add(
+            HealthIssue(
+              severity: HealthSeverity.error,
+              title: 'Missing Required Field',
+              description: 'Trip "$tripId" is missing "${entry.key}".',
+              tripId: tripId,
+              field: entry.key,
+            ),
+          );
         }
       }
     }
   }
 
-  void _checkImagePaths(List<Map<String, dynamic>> trips, List<HealthIssue> issues) {
+  void _checkImagePaths(
+    List<Map<String, dynamic>> trips,
+    List<HealthIssue> issues,
+  ) {
     for (final trip in trips) {
       final tripId = trip['id']?.toString() ?? 'unknown';
       final image = trip['image']?.toString() ?? '';
 
-      if (image.isNotEmpty && !image.startsWith('http') && !image.startsWith('images/')) {
-        issues.add(HealthIssue(
-          severity: HealthSeverity.warning,
-          title: 'Unusual Image Path',
-          description: 'Trip "$tripId" has image path "$image" which doesn\'t match expected pattern "images/trips/..." or "images/gallery/...".',
-          tripId: tripId,
-          field: 'image',
-        ));
+      if (image.isNotEmpty &&
+          !image.startsWith('http') &&
+          !image.startsWith('images/')) {
+        issues.add(
+          HealthIssue(
+            severity: HealthSeverity.warning,
+            title: 'Unusual Image Path',
+            description:
+                'Trip "$tripId" has image path "$image" which doesn\'t match expected pattern "images/trips/..." or "images/gallery/...".',
+            tripId: tripId,
+            field: 'image',
+          ),
+        );
       }
 
       // Check gallery images
       final gallery = trip['galleryImages'] as List<dynamic>? ?? [];
       for (final img in gallery) {
         final imgStr = img.toString();
-        if (imgStr.isNotEmpty && !imgStr.startsWith('http') && !imgStr.startsWith('images/')) {
-          issues.add(HealthIssue(
-            severity: HealthSeverity.warning,
-            title: 'Unusual Gallery Path',
-            description: 'Trip "$tripId" has gallery image "$imgStr" with unexpected path format.',
-            tripId: tripId,
-            field: 'galleryImages',
-          ));
+        if (imgStr.isNotEmpty &&
+            !imgStr.startsWith('http') &&
+            !imgStr.startsWith('images/')) {
+          issues.add(
+            HealthIssue(
+              severity: HealthSeverity.warning,
+              title: 'Unusual Gallery Path',
+              description:
+                  'Trip "$tripId" has gallery image "$imgStr" with unexpected path format.',
+              tripId: tripId,
+              field: 'galleryImages',
+            ),
+          );
           break;
         }
       }
     }
   }
 
-  void _checkEmptyArrays(List<Map<String, dynamic>> trips, List<HealthIssue> issues) {
+  void _checkEmptyArrays(
+    List<Map<String, dynamic>> trips,
+    List<HealthIssue> issues,
+  ) {
     for (final trip in trips) {
       final tripId = trip['id']?.toString() ?? 'unknown';
 
       final highlights = trip['highlights'] as List<dynamic>? ?? [];
       if (highlights.isEmpty) {
-        issues.add(HealthIssue(
-          severity: HealthSeverity.info,
-          title: 'No Highlights',
-          description: 'Trip "$tripId" has no highlights listed.',
-          tripId: tripId,
-          field: 'highlights',
-        ));
+        issues.add(
+          HealthIssue(
+            severity: HealthSeverity.info,
+            title: 'No Highlights',
+            description: 'Trip "$tripId" has no highlights listed.',
+            tripId: tripId,
+            field: 'highlights',
+          ),
+        );
       }
 
       final itinerary = trip['itinerary'] as List<dynamic>? ?? [];
       if (itinerary.isEmpty) {
-        issues.add(HealthIssue(
-          severity: HealthSeverity.info,
-          title: 'No Itinerary',
-          description: 'Trip "$tripId" has no itinerary defined.',
-          tripId: tripId,
-          field: 'itinerary',
-        ));
+        issues.add(
+          HealthIssue(
+            severity: HealthSeverity.info,
+            title: 'No Itinerary',
+            description: 'Trip "$tripId" has no itinerary defined.',
+            tripId: tripId,
+            field: 'itinerary',
+          ),
+        );
       }
     }
   }
 
-  void _checkPriceFormats(List<Map<String, dynamic>> trips, List<HealthIssue> issues) {
+  void _checkPriceFormats(
+    List<Map<String, dynamic>> trips,
+    List<HealthIssue> issues,
+  ) {
     for (final trip in trips) {
       final tripId = trip['id']?.toString() ?? 'unknown';
       final price = trip['price']?.toString() ?? '';
 
       if (price.isNotEmpty && !price.startsWith('₹')) {
-        issues.add(HealthIssue(
-          severity: HealthSeverity.warning,
-          title: 'Price Missing ₹ Symbol',
-          description: 'Trip "$tripId" has price "$price" without ₹ prefix.',
-          tripId: tripId,
-          field: 'price',
-        ));
+        issues.add(
+          HealthIssue(
+            severity: HealthSeverity.warning,
+            title: 'Price Missing ₹ Symbol',
+            description: 'Trip "$tripId" has price "$price" without ₹ prefix.',
+            tripId: tripId,
+            field: 'price',
+          ),
+        );
       }
 
       // Check for missing comma in prices > 999
@@ -262,81 +366,139 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
         final numStr = price.substring(1).replaceAll(',', '');
         final num = int.tryParse(numStr);
         if (num != null && num >= 1000 && !price.contains(',')) {
-          issues.add(HealthIssue(
-            severity: HealthSeverity.warning,
-            title: 'Price Missing Comma',
-            description: 'Trip "$tripId" has price "$price" — should have comma formatting (e.g., "₹${_formatWithComma(num)}").',
-            tripId: tripId,
-            field: 'price',
-            autoFixable: true,
-            fix: () {
-              trip['price'] = '₹${_formatWithComma(num)}';
-              context.read<TripsProvider>().markDataModified();
-              _runHealthCheck();
-            },
-          ));
+          issues.add(
+            HealthIssue(
+              severity: HealthSeverity.warning,
+              title: 'Price Missing Comma',
+              description:
+                  'Trip "$tripId" has price "$price" — should have comma formatting (e.g., "₹${_formatWithComma(num)}").',
+              tripId: tripId,
+              field: 'price',
+              autoFixable: true,
+              fix: () {
+                final provider = context.read<TripsProvider>();
+                if (provider.isLoading) return;
+                trip['price'] = '₹${_formatWithComma(num)}';
+                provider.markDataModified();
+                _runHealthCheck();
+              },
+            ),
+          );
         }
       }
     }
   }
 
-  void _checkDateFormats(List<Map<String, dynamic>> trips, List<HealthIssue> issues) {
+  void _checkDateFormats(
+    List<Map<String, dynamic>> trips,
+    List<HealthIssue> issues,
+  ) {
     for (final trip in trips) {
       final tripId = trip['id']?.toString() ?? 'unknown';
-      final dates = trip['availableDates'] as List<dynamic>? ?? [];
+      final rawDates = trip['availableDates'];
+      if (rawDates == null) continue;
+      if (rawDates is! List) {
+        issues.add(
+          HealthIssue(
+            severity: HealthSeverity.error,
+            title: 'Invalid Trip Date',
+            description:
+                'Trip "$tripId" has an invalid availableDates value. Expected a list of website-compatible date labels.',
+            tripId: tripId,
+            field: 'availableDates',
+          ),
+        );
+        continue;
+      }
 
-      for (final date in dates) {
-        final dateStr = date.toString();
-        // Check for common date format issues
-        if (dateStr.contains('.') && !dateStr.contains('...')) {
-          issues.add(HealthIssue(
-            severity: HealthSeverity.warning,
-            title: 'Date Format Issue',
-            description: 'Trip "$tripId" has date "$dateStr" with period instead of comma.',
-            tripId: tripId,
-            field: 'availableDates',
-          ));
-          break;
+      // An empty list is valid and intentionally renders as
+      // "New dates coming soon" on the website.
+      final firstLabelByRange = <String, String>{};
+      for (final rawDate in rawDates) {
+        if (rawDate is! String) {
+          issues.add(
+            HealthIssue(
+              severity: HealthSeverity.error,
+              title: 'Invalid Trip Date',
+              description:
+                  'Trip "$tripId" has a non-text date value "$rawDate". Dates must use a website-compatible text format.',
+              tripId: tripId,
+              field: 'availableDates',
+            ),
+          );
+          continue;
         }
-        // Check for missing space after dash
-        if (RegExp(r'\d-[A-Z]').hasMatch(dateStr)) {
-          issues.add(HealthIssue(
-            severity: HealthSeverity.warning,
-            title: 'Date Format Issue',
-            description: 'Trip "$tripId" has date "$dateStr" with missing space after dash.',
-            tripId: tripId,
-            field: 'availableDates',
-          ));
-          break;
+
+        final parsed = TripDateUtils.parse(rawDate);
+        if (parsed == null) {
+          issues.add(
+            HealthIssue(
+              severity: HealthSeverity.error,
+              title: 'Invalid Trip Date',
+              description:
+                  'Trip "$tripId" has date "$rawDate", which the website date parser cannot read.',
+              tripId: tripId,
+              field: 'availableDates',
+            ),
+          );
+          continue;
+        }
+
+        final firstLabel = firstLabelByRange[parsed.key];
+        if (firstLabel != null) {
+          issues.add(
+            HealthIssue(
+              severity: HealthSeverity.warning,
+              title: 'Duplicate Date Range',
+              description:
+                  'Trip "$tripId" has "$rawDate", which duplicates "$firstLabel" as ${TripDateUtils.formatCanonical(parsed)}.',
+              tripId: tripId,
+              field: 'availableDates',
+            ),
+          );
+        } else {
+          firstLabelByRange[parsed.key] = rawDate;
         }
       }
     }
   }
 
-  void _checkInactiveTrips(List<Map<String, dynamic>> trips, List<HealthIssue> issues) {
+  void _checkInactiveTrips(
+    List<Map<String, dynamic>> trips,
+    List<HealthIssue> issues,
+  ) {
     final inactiveCount = trips.where((t) => t['isActive'] == false).length;
     if (inactiveCount > 0) {
-      issues.add(HealthIssue(
-        severity: HealthSeverity.info,
-        title: 'Inactive Trips',
-        description: '$inactiveCount trip(s) are marked as inactive and hidden from bookings.',
-      ));
+      issues.add(
+        HealthIssue(
+          severity: HealthSeverity.info,
+          title: 'Inactive Trips',
+          description:
+              '$inactiveCount trip(s) are marked as inactive and hidden from bookings.',
+        ),
+      );
     }
   }
 
   /// Attempt to merge corrupted string fragments back together
   void _fixCorruptedArray(Map<String, dynamic> trip, String fieldKey) {
+    final provider = context.read<TripsProvider>();
+    if (provider.isLoading) return;
     final list = List<String>.from(trip[fieldKey] ?? []);
     final fixed = _mergeFragments(list);
     trip[fieldKey] = fixed;
-    context.read<TripsProvider>().markDataModified();
+    provider.markDataModified();
     _runHealthCheck();
   }
 
   /// Attempt to merge corrupted itinerary activity fragments
   void _fixCorruptedItinerary(Map<String, dynamic> trip) {
+    final provider = context.read<TripsProvider>();
+    if (provider.isLoading) return;
     final itinerary = List<Map<String, dynamic>>.from(
-      (trip['itinerary'] as List<dynamic>? ?? []).map((d) => Map<String, dynamic>.from(d as Map)),
+      (trip['itinerary'] as List<dynamic>? ?? []).map(
+        (d) => Map<String, dynamic>.from(d as Map),
+      ),
     );
     for (final day in itinerary) {
       if (day['activities'] is List) {
@@ -346,7 +508,7 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
       }
     }
     trip['itinerary'] = itinerary;
-    context.read<TripsProvider>().markDataModified();
+    provider.markDataModified();
     _runHealthCheck();
   }
 
@@ -362,7 +524,10 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
         // Merge: current + apostrophe + next meaningful part
         var merged = items[i];
         int j = i + 1;
-        while (j < items.length && (items[j] == ', ' || (items[j].length <= 2 && !RegExp(r'^\d+$').hasMatch(items[j])))) {
+        while (j < items.length &&
+            (items[j] == ', ' ||
+                (items[j].length <= 2 &&
+                    !RegExp(r'^\d+$').hasMatch(items[j])))) {
           if (items[j] == ', ') {
             merged += "'";
           } else {
@@ -378,7 +543,10 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
         }
         result.add(merged);
         i = j;
-      } else if (items[i] == ', ' || (items[i].length == 1 && i > 0 && !RegExp(r'^\d$').hasMatch(items[i]))) {
+      } else if (items[i] == ', ' ||
+          (items[i].length == 1 &&
+              i > 0 &&
+              !RegExp(r'^\d$').hasMatch(items[i]))) {
         // Skip orphaned fragments (shouldn't happen after merge above)
         i++;
       } else {
@@ -400,13 +568,16 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
       final start = i - 2 < 0 ? 0 : i - 2;
       parts.insert(0, rest.substring(start, i));
     }
-    return '${parts.join(',')},${last3}';
+    return '${parts.join(',')},$last3';
   }
 
   int _fixAllAutoFixable() {
+    if (context.read<TripsProvider>().isLoading) return 0;
     int fixed = 0;
     // Get auto-fixable issues and run their fixes
-    final autoFixable = _issues.where((i) => i.autoFixable && i.fix != null).toList();
+    final autoFixable = _issues
+        .where((i) => i.autoFixable && i.fix != null)
+        .toList();
     for (final issue in autoFixable) {
       issue.fix!();
       fixed++;
@@ -416,9 +587,17 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final errorCount = _issues.where((i) => i.severity == HealthSeverity.error).length;
-    final warningCount = _issues.where((i) => i.severity == HealthSeverity.warning).length;
-    final infoCount = _issues.where((i) => i.severity == HealthSeverity.info).length;
+    final provider = context.watch<TripsProvider>();
+    final operationInProgress = provider.isLoading;
+    final errorCount = _issues
+        .where((i) => i.severity == HealthSeverity.error)
+        .length;
+    final warningCount = _issues
+        .where((i) => i.severity == HealthSeverity.warning)
+        .length;
+    final infoCount = _issues
+        .where((i) => i.severity == HealthSeverity.info)
+        .length;
     final autoFixCount = _issues.where((i) => i.autoFixable).length;
 
     return Scaffold(
@@ -428,7 +607,7 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _runHealthCheck,
+            onPressed: operationInProgress ? null : _runHealthCheck,
             tooltip: 'Re-scan',
           ),
         ],
@@ -447,17 +626,27 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
                   child: Column(
                     children: [
                       Icon(
-                        _issues.isEmpty ? Icons.check_circle : (errorCount > 0 ? Icons.error : Icons.warning),
+                        _issues.isEmpty
+                            ? Icons.check_circle
+                            : (errorCount > 0 ? Icons.error : Icons.warning),
                         size: 48,
-                        color: _issues.isEmpty ? Colors.green : (errorCount > 0 ? Colors.red : Colors.orange),
+                        color: _issues.isEmpty
+                            ? Colors.green
+                            : (errorCount > 0 ? Colors.red : Colors.orange),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        _issues.isEmpty ? 'All Clear!' : '${_issues.length} Issues Found',
+                        _issues.isEmpty
+                            ? 'All Clear!'
+                            : '${_issues.length} Issues Found',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: _issues.isEmpty ? Colors.green[800] : (errorCount > 0 ? Colors.red[800] : Colors.orange[800]),
+                          color: _issues.isEmpty
+                              ? Colors.green[800]
+                              : (errorCount > 0
+                                    ? Colors.red[800]
+                                    : Colors.orange[800]),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -465,7 +654,10 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
                         builder: (context, provider, _) {
                           return Text(
                             'Scanning ${provider.tripCount} trips',
-                            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
                           );
                         },
                       ),
@@ -473,27 +665,43 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          _buildSeverityChip('🔴 Errors', errorCount, Colors.red),
+                          _buildSeverityChip(
+                            '🔴 Errors',
+                            errorCount,
+                            Colors.red,
+                          ),
                           const SizedBox(width: 12),
-                          _buildSeverityChip('🟡 Warnings', warningCount, Colors.orange),
+                          _buildSeverityChip(
+                            '🟡 Warnings',
+                            warningCount,
+                            Colors.orange,
+                          ),
                           const SizedBox(width: 12),
-                          _buildSeverityChip('🟢 Info', infoCount, Colors.green),
+                          _buildSeverityChip(
+                            '🟢 Info',
+                            infoCount,
+                            Colors.green,
+                          ),
                         ],
                       ),
                       if (autoFixCount > 0) ...[
                         const SizedBox(height: 12),
                         ElevatedButton.icon(
-                          onPressed: () {
-                            final fixed = _fixAllAutoFixable();
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Auto-fixed $fixed issue(s). Push to save changes.'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                            }
-                          },
+                          onPressed: operationInProgress
+                              ? null
+                              : () {
+                                  final fixed = _fixAllAutoFixable();
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Auto-fixed $fixed issue(s). Push to save changes.',
+                                        ),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  }
+                                },
                           icon: const Icon(Icons.auto_fix_high),
                           label: Text('Fix $autoFixCount Auto-Fixable Issues'),
                           style: ElevatedButton.styleFrom(
@@ -512,9 +720,16 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.thumb_up, size: 64, color: Colors.green[300]),
+                              Icon(
+                                Icons.thumb_up,
+                                size: 64,
+                                color: Colors.green[300],
+                              ),
                               const SizedBox(height: 16),
-                              const Text('No issues found!', style: TextStyle(fontSize: 18)),
+                              const Text(
+                                'No issues found!',
+                                style: TextStyle(fontSize: 18),
+                              ),
                               Text(
                                 'Your trip data looks healthy.',
                                 style: TextStyle(color: Colors.grey[600]),
@@ -527,7 +742,10 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
                           itemCount: _issues.length,
                           itemBuilder: (context, index) {
                             final issue = _issues[index];
-                            return _buildIssueCard(issue);
+                            return _buildIssueCard(
+                              issue,
+                              operationInProgress: operationInProgress,
+                            );
                           },
                         ),
                 ),
@@ -555,7 +773,10 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
     );
   }
 
-  Widget _buildIssueCard(HealthIssue issue) {
+  Widget _buildIssueCard(
+    HealthIssue issue, {
+    required bool operationInProgress,
+  }) {
     final Color color;
     final IconData icon;
     switch (issue.severity) {
@@ -605,7 +826,11 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
               const SizedBox(height: 4),
               Text(
                 'Trip: ${issue.tripId}${issue.field != null ? ' → ${issue.field}' : ''}',
-                style: TextStyle(fontSize: 11, color: Colors.grey[600], fontStyle: FontStyle.italic),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey[600],
+                  fontStyle: FontStyle.italic,
+                ),
               ),
             ],
           ],
@@ -613,15 +838,17 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
         trailing: issue.autoFixable && issue.fix != null
             ? IconButton(
                 icon: const Icon(Icons.auto_fix_high, color: Colors.deepPurple),
-                onPressed: () {
-                  issue.fix!();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Fixed: ${issue.title}'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                },
+                onPressed: operationInProgress
+                    ? null
+                    : () {
+                        issue.fix!();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Fixed: ${issue.title}'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      },
                 tooltip: 'Auto-fix this issue',
               )
             : null,

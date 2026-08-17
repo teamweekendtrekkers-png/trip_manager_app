@@ -8,15 +8,24 @@ class ImageUploadService {
   final Dio _dio;
   final AppSettings settings;
 
-  ImageUploadService({required this.settings})
-      : _dio = Dio(BaseOptions(
-          baseUrl: 'https://api.github.com',
-          headers: {
-            'Accept': 'application/vnd.github.v3+json',
-          },
-          connectTimeout: const Duration(seconds: 60),
-          receiveTimeout: const Duration(seconds: 60),
-        )) {
+  ImageUploadService({required this.settings, Dio? dio})
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              baseUrl: 'https://api.github.com',
+              headers: {'Accept': 'application/vnd.github.v3+json'},
+              connectTimeout: const Duration(seconds: 60),
+              receiveTimeout: const Duration(seconds: 60),
+            ),
+          ) {
+    if (_dio.options.baseUrl.isEmpty) {
+      _dio.options.baseUrl = 'https://api.github.com';
+    }
+    _dio.options.headers.putIfAbsent(
+      'Accept',
+      () => 'application/vnd.github.v3+json',
+    );
     if (settings.githubToken.isNotEmpty) {
       _dio.options.headers['Authorization'] = 'token ${settings.githubToken}';
     }
@@ -38,7 +47,7 @@ class ImageUploadService {
       final extension = imageFile.path.split('.').last.toLowerCase();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = customFileName ?? 'img_$timestamp.$extension';
-      
+
       // Use different path for main images vs gallery images
       final String remotePath;
       final String commitMessage;
@@ -79,26 +88,17 @@ class ImageUploadService {
         data['sha'] = existingSha;
       }
 
-      await _dio.put(
-        '$_repoPath/contents/$remotePath',
-        data: data,
-      );
-
-      // If this is a main/display image, also update the image path in trips-data.js
-      if (isMainImage) {
-        await _updateTripsDataImage(tripId: tripId, newImagePath: remotePath);
-      }
+      await _dio.put('$_repoPath/contents/$remotePath', data: data);
 
       return ImageUploadResult(
         success: true,
         imagePath: remotePath,
-        message: 'Image uploaded successfully',
+        message: isMainImage
+            ? 'Image uploaded. Push trip changes to publish it.'
+            : 'Image uploaded successfully',
       );
     } on DioException catch (e) {
-      return ImageUploadResult(
-        success: false,
-        error: _getErrorMessage(e),
-      );
+      return ImageUploadResult(success: false, error: _getErrorMessage(e));
     } catch (e) {
       return ImageUploadResult(
         success: false,
@@ -131,9 +131,7 @@ class ImageUploadService {
   }
 
   /// Delete an image from the repository
-  Future<ImageUploadResult> deleteImage({
-    required String imagePath,
-  }) async {
+  Future<ImageUploadResult> deleteImage({required String imagePath}) async {
     try {
       // Get the SHA of the file
       final response = await _dio.get(
@@ -157,97 +155,13 @@ class ImageUploadService {
         message: 'Image deleted successfully',
       );
     } on DioException catch (e) {
-      return ImageUploadResult(
-        success: false,
-        error: _getErrorMessage(e),
-      );
+      return ImageUploadResult(success: false, error: _getErrorMessage(e));
     } catch (e) {
       return ImageUploadResult(
         success: false,
         error: 'Failed to delete image: $e',
       );
     }
-  }
-
-  /// Update the image path in js/trips-data.js for a given trip
-  /// This ensures the website displays the correct image after upload
-  Future<void> _updateTripsDataImage({
-    required String tripId,
-    required String newImagePath,
-  }) async {
-    const tripsDataPath = 'js/trips-data.js';
-
-    try {
-      // Fetch the current file content and SHA
-      final response = await _dio.get(
-        '$_repoPath/contents/$tripsDataPath',
-        queryParameters: {'ref': settings.branch},
-      );
-      final currentSha = response.data['sha'] as String;
-      final currentContent = utf8.decode(
-        base64.decode(
-          (response.data['content'] as String).replaceAll('\n', ''),
-        ),
-      );
-
-      // Find and replace the image path for this trip
-      // Pattern: find the trip's key block and update its image field
-      final updatedContent = _replaceImageInTripsData(
-        content: currentContent,
-        tripId: tripId,
-        newImagePath: newImagePath,
-      );
-
-      if (updatedContent == null || updatedContent == currentContent) {
-        // No change needed or trip not found — skip silently
-        return;
-      }
-
-      // Commit the updated file
-      await _dio.put(
-        '$_repoPath/contents/$tripsDataPath',
-        data: {
-          'message': 'Update display image path for $tripId in trips-data.js via Trip Manager App',
-          'content': base64.encode(utf8.encode(updatedContent)),
-          'sha': currentSha,
-          'branch': settings.branch,
-        },
-      );
-    } catch (e) {
-      // Log but don't fail the image upload if JS update fails
-      // The image was uploaded successfully, this is a secondary operation
-      print('Warning: Failed to update trips-data.js for $tripId: $e');
-    }
-  }
-
-  /// Replace the image path for a specific trip in the trips-data.js content
-  /// Handles both quoted keys ("trip-id": {) and unquoted keys (tripId: {)
-  String? _replaceImageInTripsData({
-    required String content,
-    required String tripId,
-    required String newImagePath,
-  }) {
-    // Try quoted key first (for hyphenated IDs like "alleppey-varkala": {)
-    RegExpMatch? tripMatch = RegExp('"${RegExp.escape(tripId)}"\\s*:\\s*\\{').firstMatch(content);
-    
-    // Try unquoted key (for simple IDs like kerala: {)
-    tripMatch ??= RegExp('(?<!["\'])${RegExp.escape(tripId)}\\s*:\\s*\\{').firstMatch(content);
-    
-    if (tripMatch == null) return null;
-
-    // From the trip block start, find the image field
-    final afterTripKey = content.substring(tripMatch.start);
-    final imagePattern = RegExp(r'image:\s*"[^"]*"');
-    final imageMatch = imagePattern.firstMatch(afterTripKey);
-    if (imageMatch == null) return null;
-
-    // Calculate absolute position and replace
-    final absoluteStart = tripMatch.start + imageMatch.start;
-    final absoluteEnd = tripMatch.start + imageMatch.end;
-
-    return content.substring(0, absoluteStart) +
-        'image: "$newImagePath"' +
-        content.substring(absoluteEnd);
   }
 
   /// Get full URL for an image path

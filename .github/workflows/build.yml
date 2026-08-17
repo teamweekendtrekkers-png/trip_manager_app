@@ -2,9 +2,9 @@ name: Build iOS & Android
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
@@ -17,6 +17,7 @@ jobs:
           flutter-version: '3.38.5'
           channel: 'stable'
       - run: flutter pub get
+      - run: flutter test --no-pub
       - run: flutter build apk --release
       - run: flutter build appbundle --release
       - uses: actions/upload-artifact@v4
