@@ -114,5 +114,24 @@ void main() {
       expect(generated, contains('price: "1000"'));
       expect(generated, contains('groupSize: "20"'));
     });
+
+    test('generator uses the current website policy and travel wording', () {
+      final generated = TripsParser.generateTripsDataJs(
+        TripsParser.parseTripsData(_fixture),
+      );
+
+      expect(generated, contains('days: "6+ days before departure"'));
+      expect(generated, contains('refund: "25%"'));
+      expect(generated, contains('days: "4 days before departure"'));
+      expect(generated, contains('refund: "50%"'));
+      expect(generated, contains('days: "< 3 days before departure"'));
+      expect(generated, contains('refund: "100%"'));
+      expect(
+        generated,
+        contains('Travel will be AC or NON AC based on conditions.'),
+      );
+      expect(generated, isNot(contains('70% fee')));
+      expect(generated, isNot(contains('AC will be on from 7 AM')));
+    });
   });
 }

@@ -869,17 +869,17 @@ const commonPickupPoints = [
 // ============================================
 const commonCancellationPolicy = [
     {
-        days: "7+ days before trip",
-        refund: "50%",
+        days: "6+ days before departure",
+        refund: "25%",
         color: "#22c55e"  // Green - least penalty
     },
     {
-        days: "3-6 days before trip",
-        refund: "70%",
+        days: "4 days before departure",
+        refund: "50%",
         color: "#f59e0b"  // Orange - medium penalty
     },
     {
-        days: "0-2 days before trip",
+        days: "< 3 days before departure",
         refund: "100%",
         color: "#ef4444"  // Red - full penalty (no refund)
     }
@@ -902,7 +902,7 @@ const commonGuidelines = [
     {
         icon: "fa-bus",
         title: "Travel Arrangements",
-        desc: "We use Tempo Travellers or Mini-buses with push-back seats. AC will be on from 7 AM to 7 PM only. Night travel is non-AC."
+        desc: "We use Tempo Travellers or Mini-buses with push-back seats. Travel will be AC or NON AC based on conditions."
     },
     {
         icon: "fa-mountain",
@@ -969,7 +969,7 @@ const commonFAQs = [
     },
     {
         q: "What if I need to cancel my booking?",
-        a: "You can cancel through WhatsApp. Cancellation fees apply: 50% fee (7+ days before), 70% fee (3-6 days before), 100% fee (0-2 days before). Refunds are processed within 5-7 business days."
+        a: "You can cancel through WhatsApp. Cancellation fees apply: 25% fee (6+ days before departure), 50% fee (4 days before departure), and 100% fee (< 3 days before departure). Refunds are processed within 5-7 business days."
     },
     {
         q: "What if the trip gets cancelled due to weather?",
