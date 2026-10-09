@@ -2,6 +2,17 @@
 
 Flutter administration app for Team Weekend Trekkers.
 
+## Custom trip detail sections
+
+Open a trip and edit **Things to Carry** and **Perfect For**, save the trip,
+then use the normal Save to GitHub action. Both sections support adding,
+editing, and removing labels. **Use defaults** restores the original labels
+for editing; leaving a section empty keeps the website defaults.
+
+These use `thingsToCarry` and the optional `perfectFor` string lists in the
+website's trip data. Deploy the matching website renderer before expecting
+custom labels to appear. Existing trips and unrelated fields are preserved.
+
 ## Download Android and iOS builds
 
 The `Build iOS & Android` GitHub Actions workflow runs automatically after a

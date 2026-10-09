@@ -5,6 +5,7 @@ import 'package:trip_manager_app/models/app_settings.dart';
 import 'package:trip_manager_app/providers/settings_provider.dart';
 import 'package:trip_manager_app/providers/trips_provider.dart';
 import 'package:trip_manager_app/screens/trip_edit_screen.dart';
+import 'package:trip_manager_app/services/trip_date_utils.dart';
 
 void main() {
   Map<String, dynamic> tripWithDates(List<String> dates) => <String, dynamic>{
@@ -140,24 +141,36 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Add trip dates'), findsOneWidget);
-    await tester.tap(find.bySemanticsLabel(RegExp(r'August 14, 2026')).first);
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, 14);
+    final end = DateTime(now.year, now.month, 16);
+    final editedEnd = DateTime(now.year, now.month, 17);
+    final labels = MaterialLocalizations.of(
+      tester.element(find.byType(DateRangePickerDialog)),
+    );
+    Finder day(DateTime date) => find
+        .bySemanticsLabel(RegExp(RegExp.escape(labels.formatFullDate(date))))
+        .first;
+    String rangeLabel(DateTime end) =>
+        TripDateUtils.formatCanonical(TripDateUtils.fromDates(start, end));
+    await tester.tap(day(start));
     await tester.pump();
-    await tester.tap(find.bySemanticsLabel(RegExp(r'August 16, 2026')).first);
+    await tester.tap(day(end));
     await tester.pump();
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
-    expect(find.text('Aug 14-16, 2026'), findsOneWidget);
+    expect(find.text(rangeLabel(end)), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey<String>('edit-date-0')));
     await tester.pumpAndSettle();
     expect(find.text('Edit trip dates'), findsOneWidget);
-    await tester.tap(find.bySemanticsLabel(RegExp(r'August 14, 2026')).first);
+    await tester.tap(day(start));
     await tester.pump();
-    await tester.tap(find.bySemanticsLabel(RegExp(r'August 17, 2026')).first);
+    await tester.tap(day(editedEnd));
     await tester.pump();
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
-    expect(find.text('Aug 14-17, 2026'), findsOneWidget);
+    expect(find.text(rangeLabel(editedEnd)), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey<String>('remove-date-0')));
     await tester.pump();

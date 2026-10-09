@@ -20,6 +20,7 @@ class TripsParser {
     'includes',
     'excludes',
     'thingsToCarry',
+    'perfectFor',
     'boardingLocations',
     'galleryImages',
     'groupSize',
@@ -225,6 +226,7 @@ class TripsParser {
       'includes',
       'excludes',
       'thingsToCarry',
+      'perfectFor',
       'galleryImages',
     };
 
@@ -343,6 +345,7 @@ class TripsParser {
       'about',
       'highlights',
       'thingsToCarry',
+      'perfectFor',
       'galleryImages',
       'groupSize',
     };
@@ -563,6 +566,7 @@ class TripsParser {
       writeStringListField('includes', const ['inclusions', 'includes']);
       writeStringListField('excludes', const ['exclusions', 'excludes']);
       writeStringListField('thingsToCarry', const ['thingsToCarry']);
+      writeStringListField('perfectFor', const ['perfectFor']);
 
       if (trip.containsKey('boardingLocations')) {
         final boardingLocations = trip['boardingLocations'] as List<dynamic>;
@@ -659,6 +663,7 @@ class TripsParser {
       'excludes',
       'exclusions',
       'thingsToCarry',
+      'perfectFor',
       'galleryImages',
     };
 

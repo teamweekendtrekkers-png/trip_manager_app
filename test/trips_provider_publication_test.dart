@@ -140,6 +140,93 @@ TripsProvider providerFor(FakeGitHubService service) =>
 
 void main() {
   group('TripsProvider safe publication', () {
+    test(
+      'merges and atomically publishes both customizable detail lists',
+      () async {
+        final base = [
+          {
+            ...trip('a'),
+            'thingsToCarry': <String>['Shoes'],
+          },
+        ];
+        final remote = [
+          {
+            ...base.single,
+            'price': '₹2,000',
+            'perfectFor': <String>['Families'],
+          },
+        ];
+        final service = FakeGitHubService()
+          ..queueSnapshot(
+            base,
+            tripsSha: 'loaded',
+            featuredSha: 'featured-loaded',
+          )
+          ..queueSnapshot(
+            remote,
+            tripsSha: 'latest',
+            featuredSha: 'featured-latest',
+          );
+        final provider = providerFor(service);
+        await provider.loadTrips();
+        provider.updateTrip(0, {
+          ...provider.trips.single,
+          'thingsToCarry': <String>['Raincoat', 'Power bank'],
+        });
+
+        final result = await provider.saveTrips();
+        expect(result.success, isTrue, reason: result.error);
+        expect(service.atomicCalls, hasLength(1));
+        expect(service.atomicCalls.single.files.keys, {
+          tripsPath,
+          featuredPath,
+        });
+        final saved = TripsParser.parseTripsDocument(
+          service.atomicCalls.single.files[tripsPath]!,
+        );
+        expect(saved.errors, isEmpty);
+        expect(saved.trips.single['thingsToCarry'], ['Raincoat', 'Power bank']);
+        expect(saved.trips.single['perfectFor'], ['Families']);
+        expect(saved.trips.single['price'], '₹2,000');
+      },
+    );
+
+    test('conflicting audience edits block the atomic publication', () async {
+      final base = [
+        {
+          ...trip('a'),
+          'perfectFor': <String>['Solo Travelers'],
+        },
+      ];
+      final service = FakeGitHubService()
+        ..queueSnapshot(
+          base,
+          tripsSha: 'loaded',
+          featuredSha: 'featured-loaded',
+        )
+        ..queueSnapshot(
+          [
+            {
+              ...base.single,
+              'perfectFor': <String>['Families'],
+            },
+          ],
+          tripsSha: 'latest',
+          featuredSha: 'featured-latest',
+        );
+      final provider = providerFor(service);
+      await provider.loadTrips();
+      provider.updateTrip(0, {
+        ...provider.trips.single,
+        'perfectFor': <String>['Couples'],
+      });
+      final result = await provider.saveTrips();
+      expect(result.success, isFalse);
+      expect(result.error, contains('perfectFor'));
+      expect(service.atomicCalls, isEmpty);
+      expect(provider.trips.single['perfectFor'], ['Couples']);
+    });
+
     test('load keeps embedded featured canonical and reports drift', () async {
       final service = FakeGitHubService()
         ..queueSnapshot(

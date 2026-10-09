@@ -167,6 +167,7 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
         'inclusions': trip['inclusions'],
         'exclusions': trip['exclusions'],
         'thingsToCarry': trip['thingsToCarry'],
+        'perfectFor': trip['perfectFor'],
       };
 
       for (final entry in arrayFields.entries) {

@@ -7,6 +7,7 @@ import '../providers/settings_provider.dart';
 import '../services/image_upload_service.dart';
 import '../services/trips_parser.dart';
 import '../services/trip_date_utils.dart';
+import '../services/trip_detail_defaults.dart';
 
 class TripEditScreen extends StatefulWidget {
   final Map<String, dynamic>? trip;
@@ -515,13 +516,17 @@ class _TripEditScreenState extends State<TripEditScreen> {
               const SizedBox(height: 16),
 
               // Things to Carry Card
-              _buildListSection(
+              _buildTripDetailListSection(
+                field: 'thingsToCarry',
                 title: 'Things to Carry',
-                items: List<String>.from(_tripData['thingsToCarry'] ?? []),
-                onAdd: () => _addListItem('thingsToCarry'),
-                onRemove: (index) => _removeListItem('thingsToCarry', index),
-                onEdit: (index, value) =>
-                    _editListItem('thingsToCarry', index, value),
+                defaults: TripDetailDefaults.thingsToCarry,
+              ),
+              const SizedBox(height: 16),
+
+              _buildTripDetailListSection(
+                field: 'perfectFor',
+                title: 'Perfect For',
+                defaults: TripDetailDefaults.perfectFor,
               ),
               const SizedBox(height: 16),
 
@@ -569,6 +574,47 @@ class _TripEditScreenState extends State<TripEditScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTripDetailListSection({
+    required String field,
+    required String title,
+    required List<String> defaults,
+  }) {
+    return Column(
+      key: ValueKey('trip-detail-list-$field'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildListSection(
+          title: title,
+          items: List<String>.from(_tripData[field] ?? []),
+          onAdd: () => _addListItem(field),
+          onRemove: (index) => _removeListItem(field, index),
+          onEdit: (index, value) => _editListItem(field, index, value),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Shown on this trip’s website page. Leave empty to use defaults: '
+                '${defaults.join(', ')}.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              TextButton.icon(
+                key: ValueKey('use-defaults-$field'),
+                onPressed: () => setState(() {
+                  _tripData[field] = List<String>.from(defaults);
+                }),
+                icon: const Icon(Icons.restore),
+                label: const Text('Use defaults'),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -746,9 +792,11 @@ class _TripEditScreenState extends State<TripEditScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Gallery Images',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                const Expanded(
+                  child: Text(
+                    'Gallery Images',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
                 ),
                 Wrap(
                   crossAxisAlignment: WrapCrossAlignment.center,

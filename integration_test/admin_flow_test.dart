@@ -14,6 +14,7 @@ import 'package:trip_manager_app/screens/trips_list_screen.dart';
 import 'package:trip_manager_app/services/github_service.dart';
 import 'package:trip_manager_app/services/notification_service.dart';
 import 'package:trip_manager_app/services/trips_parser.dart';
+import 'package:trip_manager_app/services/trip_date_utils.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -203,22 +204,35 @@ void registerAdminFlowTests() {
       await tester.tap(addDate);
       await tester.pumpAndSettle();
       expect(find.text('Add trip dates'), findsOneWidget);
-      final augustFourteenth = find.bySemanticsLabel(
-        RegExp(r'August 14, 2026'),
+      final now = DateTime.now();
+      final start = DateTime(now.year, now.month, 14);
+      final end = DateTime(now.year, now.month, 16);
+      final labels = MaterialLocalizations.of(
+        tester.element(find.byType(DateRangePickerDialog)),
       );
-      final augustSixteenth = find.bySemanticsLabel(RegExp(r'August 16, 2026'));
-      expect(augustFourteenth, findsOneWidget);
-      expect(augustSixteenth, findsOneWidget);
-      await tester.tap(augustFourteenth);
+      final startDay = find.bySemanticsLabel(
+        RegExp(RegExp.escape(labels.formatFullDate(start))),
+      );
+      final endDay = find.bySemanticsLabel(
+        RegExp(RegExp.escape(labels.formatFullDate(end))),
+      );
+      expect(startDay, findsOneWidget);
+      expect(endDay, findsOneWidget);
+      await tester.tap(startDay);
       await tester.pump();
-      await tester.tap(augustSixteenth);
+      await tester.tap(endDay);
       await tester.pump();
       final calendarSave = find.widgetWithText(TextButton, 'Save');
       expect(tester.widget<TextButton>(calendarSave).onPressed, isNotNull);
       await tester.tap(calendarSave);
       await tester.pumpAndSettle();
       expect(find.text('Add trip dates'), findsNothing);
-      expect(find.text('Aug 14-16, 2026'), findsOneWidget);
+      expect(
+        find.text(
+          TripDateUtils.formatCanonical(TripDateUtils.fromDates(start, end)),
+        ),
+        findsOneWidget,
+      );
 
       // Toggle active status in the real editor, then restore it so the later
       // same-tier reorder remains part of this end-to-end scenario.
@@ -246,9 +260,37 @@ void registerAdminFlowTests() {
       await tester.tap(removeDate);
       await tester.pump();
       expect(find.textContaining('New dates coming soon'), findsOneWidget);
+
+      // Edit both customizable website sections through the real phone UI.
+      for (final entry in const {
+        'thingsToCarry': 'Raincoat',
+        'perfectFor': 'Couples',
+      }.entries) {
+        final addItem = find.descendant(
+          of: find.byKey(ValueKey('trip-detail-list-${entry.key}')),
+          matching: find.byIcon(Icons.add_circle),
+        );
+        await tester.ensureVisible(addItem);
+        await tester.pumpAndSettle();
+        await tester.tap(addItem);
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.byType(TextField),
+          ),
+          entry.value,
+        );
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Save'));
+        await tester.pumpAndSettle();
+      }
       await tester.tap(_appBarSaveButton());
       await tester.pumpAndSettle();
       expect(providers.trips.getTripById('beta')!['availableDates'], isEmpty);
+      expect(providers.trips.getTripById('beta')!['thingsToCarry'], [
+        'Raincoat',
+      ]);
+      expect(providers.trips.getTripById('beta')!['perfectFor'], ['Couples']);
 
       // Clear search and exercise the actual list reorder callback within the
       // active, non-featured tier.
