@@ -616,6 +616,83 @@ void main() {
       expect(github.calls, isEmpty);
     },
   );
+
+  testWidgets(
+    'curated review selection and Maps link publish only homepage JSON',
+    (tester) async {
+      final github = await openEditor(tester);
+      await tapKey(tester, 'homepage-section-reviews');
+      await showKey(tester, 'section-reviews-googleMapsUrl');
+      await tester.enterText(
+        find.byKey(const ValueKey('section-reviews-googleMapsUrl')),
+        'https://maps.app.goo.gl/newBusiness',
+      );
+      await showKey(tester, 'homepage-review-selection-summary');
+      await showKey(tester, 'homepage-section-reviews');
+      final details = find.byKey(
+        const PageStorageKey('details-section-reviews-review-1'),
+      );
+      await tester.ensureVisible(details);
+      await tester.pumpAndSettle();
+      await tester.tap(details);
+      await tester.pumpAndSettle();
+      await tapKey(tester, 'section-reviews-review-1-visible');
+      await publish(tester);
+      expect(github.calls.single.keys, [HomepageSettingsService.path]);
+      final saved = HomepageConfig.parse(
+        github.calls.single.values.single,
+      ).toJson()['sections'];
+      expect(
+        saved['reviews']['googleMapsUrl'],
+        'https://maps.app.goo.gl/newBusiness',
+      );
+      expect(saved['reviews']['items'][0]['visible'], false);
+      expect(find.text('Homepage settings published.'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'unsafe review link blocks confirmation and retains draft without writes',
+    (tester) async {
+      final github = await openEditor(tester);
+      await tapKey(tester, 'homepage-section-reviews');
+      await showKey(tester, 'section-reviews-googleMapsUrl');
+      await tester.enterText(
+        find.byKey(const ValueKey('section-reviews-googleMapsUrl')),
+        'https://evil.test/maps',
+      );
+      await tapKey(tester, 'homepage-publish');
+      expect(find.text('Publish homepage?'), findsNothing);
+      expect(github.calls, isEmpty);
+      await showKey(tester, 'homepage-error');
+      expect(find.textContaining('valid HTTPS Google Maps'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'confirmed reload resets review field state even when remote JSON is unchanged',
+    (tester) async {
+      final github = await openEditor(tester);
+      await tapKey(tester, 'homepage-section-reviews');
+      await showKey(tester, 'section-reviews-rating');
+      await tester.enterText(
+        find.byKey(const ValueKey('section-reviews-rating')),
+        '4.9',
+      );
+      await tester.tap(find.byTooltip('Reload homepage'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Reload'));
+      await tester.pumpAndSettle();
+      await tapKey(tester, 'homepage-section-reviews');
+      await showKey(tester, 'section-reviews-rating');
+      final field = find.descendant(
+        of: find.byKey(const ValueKey('section-reviews-rating')),
+        matching: find.byType(EditableText),
+      );
+      expect(tester.widget<EditableText>(field).controller.text, '4.8');
+      expect(github.calls, isEmpty);
+    },
+  );
   testWidgets('conflicting edits retain draft with no commit', (tester) async {
     final github = await openEditor(
       tester,

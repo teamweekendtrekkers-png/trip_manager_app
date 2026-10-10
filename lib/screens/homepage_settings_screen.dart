@@ -12,6 +12,7 @@ import '../services/homepage_settings_service.dart';
 import '../services/image_upload_service.dart';
 import '../services/trip_date_utils.dart';
 import 'deployment_status_screen.dart';
+import '../widgets/homepage_sections_editor.dart';
 
 class HomepageSettingsScreen extends StatefulWidget {
   const HomepageSettingsScreen({
@@ -41,6 +42,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
   String? _savedCommit;
   bool _busy = true;
   bool _allowExit = false;
+  int _sectionsRevision = 0;
   final _controllers = <String, TextEditingController>{};
   bool get _dirty => _draft != null && jsonEncode(_draft) != _saved;
   Map<String, dynamic> get _hero => _draft!['hero'] as Map<String, dynamic>;
@@ -82,6 +84,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
       setState(() {
         _draft = config.toJson();
         _saved = jsonEncode(_draft);
+        _sectionsRevision++;
       });
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
@@ -193,6 +196,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
       if (result.success) {
         _draft = _service.savedConfig!.toJson();
         _saved = jsonEncode(_draft);
+        _sectionsRevision++;
         _savedCommit = result.commitSha;
         for (final entry in _controllers.entries) {
           final parts = entry.key.split('.');
@@ -559,6 +563,12 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
                       ),
                     const SizedBox(height: 16),
                     _preview(),
+                    const SizedBox(height: 16),
+                    HomepageSectionsEditor(
+                      key: ValueKey(_sectionsRevision),
+                      sections: _draft!['sections'] as Map<String, dynamic>,
+                      onChanged: () => setState(() {}),
+                    ),
                     const SizedBox(height: 16),
                     FilledButton.icon(
                       key: const Key('homepage-publish'),

@@ -21,6 +21,12 @@ Choose automatic selection or specific trips/departures; toggle visible card
 details and preview the result before publishing. Empty manual selections show
 an empty state. Expired dates and inactive trips remain excluded.
 
+Below the batches preview, expand **Statistics**, **Why Travel With Us**,
+**Google Reviews** or **Bottom Call to Action** to edit their content/visibility.
+Select and order genuine reviews, set Google Maps/review links, and configure
+automatic sliding. Reviews are manually curated, not an automatic Google feed.
+See [verification and rollout notes](HOMEPAGE_SECTIONS_VERIFICATION.md).
+
 Homepage publishing updates only `js/homepage-config.json`, independently of
 trip edits, featured trips and payment/contact settings. Image upload adds the
 asset; **Publish homepage** applies it. Publish new trip dates separately first.

@@ -1,5 +1,7 @@
 import 'dart:convert';
 import '../services/trip_date_utils.dart';
+import 'homepage_section_defaults.dart';
+import 'homepage_sections.dart';
 
 /// Website-only configuration. Trip records and local app settings stay separate.
 class HomepageConfig {
@@ -76,7 +78,12 @@ class HomepageConfig {
       };
     }
 
-    final data = fill(defaults, decoded, 'homepage');
+    final data = fill(
+      {...defaults, 'sections': homepageSectionDefaults()},
+      decoded,
+      'homepage',
+    );
+    HomepageSections.validate(data['sections'] as Map<String, dynamic>);
     final hero = data['hero'] as Map<String, dynamic>;
     final batches = data['upcomingBatches'] as Map<String, dynamic>;
     for (final entry in {
