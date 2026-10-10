@@ -8,6 +8,8 @@ import '../services/image_upload_service.dart';
 import '../services/trips_parser.dart';
 import '../services/trip_date_utils.dart';
 import '../services/trip_detail_defaults.dart';
+import '../services/trip_brochure_service.dart';
+import 'trip_brochure_screen.dart';
 
 class TripEditScreen extends StatefulWidget {
   final Map<String, dynamic>? trip;
@@ -725,6 +727,12 @@ class _TripEditScreenState extends State<TripEditScreen> {
                   onPressed: _addItineraryDay,
                   color: Colors.green,
                 ),
+                OutlinedButton.icon(
+                  key: const Key('trip-brochure'),
+                  onPressed: _openBrochure,
+                  icon: const Icon(Icons.picture_as_pdf),
+                  label: const Text('Brochure (PDF)'),
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -778,6 +786,37 @@ class _TripEditScreenState extends State<TripEditScreen> {
         ),
       ),
     );
+  }
+
+  void _openBrochure() {
+    try {
+      final draft = <String, dynamic>{
+        ..._tripData,
+        'title': _nameController.text,
+        'location': _destinationController.text,
+        'about': _descriptionController.text,
+        'price': _priceController.text,
+        'duration': _durationController.text,
+        'distance': _distanceController.text,
+        'elevation': _elevationController.text,
+        'groupSize': _groupSizeController.text,
+        'availableDates': List<String>.from(_availableDates),
+      };
+      final brochure = TripBrochure.fromTrip(
+        draft,
+        whatsapp: context.read<SettingsProvider>().settings.whatsappNumber,
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TripBrochureScreen(brochure: brochure),
+        ),
+      );
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to preview brochure: $error')),
+      );
+    }
   }
 
   Widget _buildGallerySection() {
