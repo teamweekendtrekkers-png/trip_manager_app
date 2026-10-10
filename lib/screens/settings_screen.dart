@@ -6,6 +6,7 @@ import '../services/github_service.dart';
 import '../services/website_settings_service.dart';
 import 'data_health_screen.dart';
 import 'deployment_status_screen.dart';
+import 'homepage_settings_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -338,6 +339,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: 'Help & Info',
                   icon: Icons.help,
                   children: [
+                    ListTile(
+                      leading: const Icon(Icons.home_outlined),
+                      title: const Text('Homepage Customization'),
+                      subtitle: const Text('Background image, hero text and Upcoming Batches'),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HomepageSettingsScreen())),
+                    ),
                     ListTile(
                       leading: const Icon(Icons.health_and_safety, color: Colors.deepPurple),
                       title: const Text('Data Health Check'),

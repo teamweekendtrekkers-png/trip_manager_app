@@ -2,6 +2,20 @@
 
 Flutter administration app for Team Weekend Trekkers.
 
+## Homepage customization
+
+Open **Settings → Homepage Customization** to change the background image
+(upload, repository path or HTTPS URL), hero text, and Upcoming Batches.
+Choose automatic selection or specific trips/departures; toggle visible card
+details and preview the result before publishing. Empty manual selections show
+an empty state. Expired dates and inactive trips remain excluded.
+
+Homepage publishing updates only `js/homepage-config.json`, independently of
+trip edits, featured trips and payment/contact settings. Image upload adds the
+asset; **Publish homepage** applies it. Publish new trip dates separately first.
+Conflicts retain the draft; reload confirms discard. Install and deploy the
+matching website changes to enable the new controls on the live homepage.
+
 ## Custom trip detail sections
 
 Open a trip and edit **Things to Carry** and **Perfect For**, save the trip,

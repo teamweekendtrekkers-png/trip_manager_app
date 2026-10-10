@@ -205,6 +205,7 @@ class GitHubService {
         sha: '',
         success: false,
         error: _getErrorMessage(e),
+        statusCode: e.response?.statusCode,
       );
     }
   }
@@ -798,12 +799,14 @@ class GitHubFileResult {
   final String sha;
   final bool success;
   final String? error;
+  final int? statusCode;
 
   GitHubFileResult({
     required this.content,
     required this.sha,
     required this.success,
     this.error,
+    this.statusCode,
   });
 }
 
