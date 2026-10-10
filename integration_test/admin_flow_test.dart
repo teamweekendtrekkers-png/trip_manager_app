@@ -259,7 +259,13 @@ void registerAdminFlowTests() {
       await tester.ensureVisible(removeDate);
       await tester.tap(removeDate);
       await tester.pump();
-      expect(find.textContaining('New dates coming soon'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('dates-empty-state')),
+          matching: find.textContaining('New dates coming soon'),
+        ),
+        findsOneWidget,
+      );
 
       // Edit both customizable website sections through the real phone UI.
       for (final entry in const {

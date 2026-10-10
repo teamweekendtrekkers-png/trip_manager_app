@@ -41,7 +41,8 @@ class HomepageSectionsEditor extends StatelessWidget {
     children: [
       for (final entry in {
         'stats': 'Statistics',
-        'whyUs': 'Why Travel With Us',
+        'howItWorks': 'How It Works',
+        'whyChooseUs': 'Why Thousands Choose Us',
         'reviews': 'Google Reviews',
         'cta': 'Bottom Call to Action',
       }.entries)
@@ -76,6 +77,24 @@ class HomepageSectionsEditor extends StatelessWidget {
       ),
       if (name != 'stats') _text(section, 'title', 'Section heading', prefix),
     ];
+    if (name == 'howItWorks' || name == 'whyChooseUs') {
+      widgets.addAll([
+        _text(section, 'eyebrow', 'Small heading / badge (optional)', prefix),
+        _text(
+          section,
+          'subtitle',
+          'Supporting text (optional)',
+          prefix,
+          lines: 3,
+        ),
+        Text(
+          name == 'howItWorks'
+              ? 'Steps are numbered automatically in their visible order. Edit the text to match your actual booking process.'
+              : 'Keep claims accurate. Edit the highlighted value or leave it blank. Your previous Why Travel With Us content is preserved in saved settings but is no longer displayed.',
+        ),
+        const SizedBox(height: 12),
+      ]);
+    }
     if (name == 'cta') {
       widgets.addAll([
         _text(section, 'description', 'Supporting text', prefix, lines: 3),
@@ -196,12 +215,46 @@ class HomepageSectionsEditor extends StatelessWidget {
                 ],
               ),
               if (name == 'stats') ...[
-                _text(item, 'value', 'Value (e.g. 683+)', itemPrefix),
+                if (id == 'rating') ...[
+                  Text(
+                    'Google rating: ${sections['reviews']['rating']}⭐',
+                    key: ValueKey('$itemPrefix-shared-rating'),
+                  ),
+                  const Text(
+                    'Shared with Google Reviews. Change Overall Google rating '
+                    'in Google Reviews below.',
+                  ),
+                  const SizedBox(height: 12),
+                ] else
+                  _text(item, 'value', 'Value (e.g. 683+)', itemPrefix),
                 _text(item, 'label', 'Label', itemPrefix),
-              ] else if (name == 'whyUs') ...[
+              ] else if (name == 'howItWorks' || name == 'whyChooseUs') ...[
                 _text(item, 'icon', 'Emoji / icon text', itemPrefix),
+                if (name == 'whyChooseUs')
+                  _text(
+                    item,
+                    'value',
+                    'Highlighted value (optional)',
+                    itemPrefix,
+                  ),
                 _text(item, 'title', 'Card heading', itemPrefix),
                 _text(item, 'text', 'Description', itemPrefix, lines: 5),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('$itemPrefix-accent'),
+                  initialValue: item['accent'] as String,
+                  decoration: const InputDecoration(labelText: 'Card colour'),
+                  items: const [
+                    DropdownMenuItem(value: 'blue', child: Text('Blue')),
+                    DropdownMenuItem(value: 'orange', child: Text('Orange')),
+                    DropdownMenuItem(value: 'green', child: Text('Green')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      item['accent'] = value;
+                      onChanged();
+                    }
+                  },
+                ),
               ] else ...[
                 _text(item, 'name', 'Reviewer name', itemPrefix),
                 _text(
@@ -265,11 +318,13 @@ class HomepageSectionsEditor extends StatelessWidget {
                 };
                 if (name == 'stats') {
                   item.addAll({'value': '0+', 'label': 'New statistic'});
-                } else if (name == 'whyUs') {
+                } else if (name == 'howItWorks' || name == 'whyChooseUs') {
                   item.addAll({
                     'icon': '🏕️',
-                    'title': 'New reason',
+                    'title': name == 'howItWorks' ? 'New step' : 'New reason',
                     'text': 'Add your description.',
+                    'accent': 'green',
+                    if (name == 'whyChooseUs') 'value': '',
                   });
                 } else {
                   item.addAll({

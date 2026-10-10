@@ -46,8 +46,8 @@ const homepageSectionDefaultsJson = r'''
       {
         "id": "inclusive",
         "icon": "✅",
-        "title": "All-Inclusive",
-        "text": "Transport, stay, permits, food, guides & entry tickets - everything handled. No hidden charges, no surprises.",
+        "title": "Trip Arrangements",
+        "text": "Transport, stays and trip arrangements handled. See each package for inclusions.",
         "visible": true
       },
       {
@@ -55,6 +55,73 @@ const homepageSectionDefaultsJson = r'''
         "icon": "🎉",
         "title": "Vibe Over Volume",
         "text": "Small groups, music, bonfire nights & new friendships. Every trip feels like traveling with old friends.",
+        "visible": true
+      }
+    ]
+  },
+  "howItWorks": {
+    "enabled": true,
+    "eyebrow": "Your next adventure, made simple",
+    "title": "How It Works",
+    "subtitle": "Three simple steps from your everyday routine to a memorable weekend.",
+    "items": [
+      {
+        "id": "pick",
+        "icon": "📱",
+        "title": "Pick a Weekend",
+        "text": "Browse our trips and choose the destination and departure that suit you.",
+        "accent": "blue",
+        "visible": true
+      },
+      {
+        "id": "book",
+        "icon": "🎟️",
+        "title": "Book Your Spot",
+        "text": "Check the itinerary and price, then book online or chat with our team for help.",
+        "accent": "orange",
+        "visible": true
+      },
+      {
+        "id": "explore",
+        "icon": "🎒",
+        "title": "Show Up & Explore",
+        "text": "Pack your essentials, meet your travel crew and make memories along the way.",
+        "accent": "green",
+        "visible": true
+      }
+    ]
+  },
+  "whyChooseUs": {
+    "enabled": true,
+    "eyebrow": "The Weekend Trekkers way",
+    "title": "Why Thousands Choose Us",
+    "subtitle": "Thoughtful trips. Shared experiences. A team you can talk to.",
+    "items": [
+      {
+        "id": "pricing",
+        "icon": "₹",
+        "value": "Upfront",
+        "title": "Clear Trip Details",
+        "text": "See the price, inclusions and exclusions before you book.",
+        "accent": "orange",
+        "visible": true
+      },
+      {
+        "id": "planned",
+        "icon": "🗺️",
+        "value": "For you",
+        "title": "Thoughtfully Planned",
+        "text": "Explore the day-wise itinerary and find the trip that matches your travel style.",
+        "accent": "blue",
+        "visible": true
+      },
+      {
+        "id": "support",
+        "icon": "💬",
+        "value": "Real people",
+        "title": "A Friendly Team",
+        "text": "Have a question? Connect with us on WhatsApp before your next adventure.",
+        "accent": "green",
         "visible": true
       }
     ]

@@ -53,7 +53,11 @@ class HomepageSections {
             key == 'intervalSeconds') {
           continue;
         }
-        text(section[key], '$name.$key');
+        text(
+          section[key],
+          '$name.$key',
+          optional: ['eyebrow', 'subtitle'].contains(key),
+        );
       }
       if (name == 'reviews') {
         if (!safeGoogleMapsUrl(section['googleMapsUrl'] as String)) {
@@ -101,8 +105,16 @@ class HomepageSections {
           text(
             item[key],
             '$name.${item['id']}.$key',
-            optional: ['photo', 'googleMapsUrl', 'date', 'icon'].contains(key),
+            optional:
+                ['photo', 'googleMapsUrl', 'date', 'icon'].contains(key) ||
+                (name == 'whyChooseUs' && key == 'value'),
             max: key == 'text' ? 10000 : 2000,
+          );
+        }
+        if (template.containsKey('accent') &&
+            !['blue', 'orange', 'green'].contains(item['accent'])) {
+          throw FormatException(
+            'Choose blue, orange or green for $name card colour.',
           );
         }
         if (name == 'reviews') {

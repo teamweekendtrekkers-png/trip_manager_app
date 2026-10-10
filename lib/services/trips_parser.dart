@@ -1,3 +1,6 @@
+import '../models/trip_section_settings.dart';
+import '../models/trip_card_settings.dart';
+
 /// Parser for the trips-data.js JavaScript file
 /// Handles object format: const tripsData = { tripId: {...}, tripId2: {...} }
 class TripsParser {
@@ -8,6 +11,7 @@ class TripsParser {
     'featured',
     'price',
     'image',
+    ...TripCardSettings.optionalFields,
     'distance',
     'elevation',
     'difficulty',
@@ -21,6 +25,7 @@ class TripsParser {
     'excludes',
     'thingsToCarry',
     'perfectFor',
+    'expandedSections',
     'boardingLocations',
     'galleryImages',
     'groupSize',
@@ -205,12 +210,18 @@ class TripsParser {
     Map<String, dynamic> source,
   ) {
     final errors = <String>[];
+    errors.addAll(
+      TripCardSettings.validationErrors(
+        source,
+      ).map((error) => 'Trip "$tripId": $error'),
+    );
     const stringFields = {
       'title',
       'location',
       'badge',
       'price',
       'image',
+      ...TripCardSettings.optionalFields,
       'distance',
       'elevation',
       'difficulty',
@@ -249,6 +260,12 @@ class TripsParser {
     }
 
     final itinerary = source['itinerary'];
+    if (source.containsKey('expandedSections')) {
+      final error = TripSectionSettings.validationError(
+        source['expandedSections'],
+      );
+      if (error != null) errors.add('Trip "$tripId": $error');
+    }
     if (itinerary != null || source.containsKey('itinerary')) {
       if (itinerary is! List) {
         errors.add('Trip "$tripId" field "itinerary" must be a list.');
@@ -337,6 +354,7 @@ class TripsParser {
       'badge',
       'price',
       'image',
+      ...TripCardSettings.optionalFields,
       'distance',
       'elevation',
       'difficulty',
@@ -346,6 +364,7 @@ class TripsParser {
       'highlights',
       'thingsToCarry',
       'perfectFor',
+      'expandedSections',
       'galleryImages',
       'groupSize',
     };
@@ -539,6 +558,9 @@ class TripsParser {
       }
       writeStringField('price', const ['price']);
       writeStringField('image', const ['image']);
+      for (final field in TripCardSettings.optionalFields) {
+        writeStringField(field, [field]);
+      }
       writeStringField('distance', const ['distance']);
       writeStringField('elevation', const ['elevation']);
       writeStringField('difficulty', const ['difficulty']);
@@ -567,6 +589,7 @@ class TripsParser {
       writeStringListField('excludes', const ['exclusions', 'excludes']);
       writeStringListField('thingsToCarry', const ['thingsToCarry']);
       writeStringListField('perfectFor', const ['perfectFor']);
+      writeStringListField('expandedSections', const ['expandedSections']);
 
       if (trip.containsKey('boardingLocations')) {
         final boardingLocations = trip['boardingLocations'] as List<dynamic>;
@@ -672,6 +695,11 @@ class TripsParser {
       final rawId = trip['id'];
       final id = rawId is String ? rawId : '';
       final label = id.isEmpty ? 'at position ${index + 1}' : '"$id"';
+      errors.addAll(
+        TripCardSettings.validationErrors(
+          trip,
+        ).map((error) => 'Trip $label: $error'),
+      );
       if (rawId is! String) {
         errors.add(
           'Trip at position ${index + 1} field "id" must be a string.',
@@ -720,6 +748,13 @@ class TripsParser {
         if (value is! List || value.any((item) => item is! String)) {
           errors.add('Trip $label field "$field" must be a list of strings.');
         }
+      }
+
+      if (trip.containsKey('expandedSections')) {
+        final error = TripSectionSettings.validationError(
+          trip['expandedSections'],
+        );
+        if (error != null) errors.add('Trip $label: $error');
       }
 
       if (trip.containsKey('itinerary')) {

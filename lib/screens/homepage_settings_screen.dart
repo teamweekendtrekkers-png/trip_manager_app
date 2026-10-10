@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import '../widgets/footer_settings_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -13,6 +14,7 @@ import '../services/image_upload_service.dart';
 import '../services/trip_date_utils.dart';
 import 'deployment_status_screen.dart';
 import '../widgets/homepage_sections_editor.dart';
+import '../widgets/discovery_settings_editor.dart';
 
 class HomepageSettingsScreen extends StatefulWidget {
   const HomepageSettingsScreen({
@@ -564,9 +566,22 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
                     const SizedBox(height: 16),
                     _preview(),
                     const SizedBox(height: 16),
+                    DiscoverySettingsEditor(
+                      discovery: _draft!['discovery'] as Map<String, dynamic>,
+                      onChanged: (field, value) => setState(() {
+                        (_draft!['discovery'] as Map)[field] = value;
+                      }),
+                    ),
+                    const SizedBox(height: 16),
                     HomepageSectionsEditor(
                       key: ValueKey(_sectionsRevision),
                       sections: _draft!['sections'] as Map<String, dynamic>,
+                      onChanged: () => setState(() {}),
+                    ),
+                    const SizedBox(height: 16),
+                    FooterSettingsEditor(
+                      key: ValueKey('footer-$_sectionsRevision'),
+                      footer: _draft!['footer'] as Map<String, dynamic>,
                       onChanged: () => setState(() {}),
                     ),
                     const SizedBox(height: 16),

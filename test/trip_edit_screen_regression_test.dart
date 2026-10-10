@@ -115,7 +115,13 @@ void main() {
       await tester.pumpWidget(buildSubject(provider, trip));
 
       expect(find.byKey(const Key('dates-empty-state')), findsOneWidget);
-      expect(find.textContaining('New dates coming soon'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('dates-empty-state')),
+          matching: find.textContaining('New dates coming soon'),
+        ),
+        findsOneWidget,
+      );
       expect(find.textContaining('Invalid —'), findsNothing);
     },
   );
@@ -254,7 +260,14 @@ void main() {
       await tester.pump();
 
       expect(tester.takeException(), isNull, reason: difficulty);
-      expect(find.text(difficulty), findsOneWidget, reason: difficulty);
+      expect(
+        find.descendant(
+          of: find.byType(DropdownButtonFormField<String>),
+          matching: find.text(difficulty),
+        ),
+        findsOneWidget,
+        reason: difficulty,
+      );
       await tester.pumpWidget(const SizedBox.shrink());
     }
   });

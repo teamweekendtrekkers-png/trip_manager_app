@@ -2,6 +2,7 @@ import 'dart:convert';
 import '../services/trip_date_utils.dart';
 import 'homepage_section_defaults.dart';
 import 'homepage_sections.dart';
+import 'footer_config.dart';
 
 /// Website-only configuration. Trip records and local app settings stay separate.
 class HomepageConfig {
@@ -10,6 +11,12 @@ class HomepageConfig {
 
   static const defaults = <String, dynamic>{
     'version': 1,
+    'discovery': {
+      'enabled': true,
+      'showSearch': true,
+      'showExperienceFilter': true,
+      'showWeekendFilter': true,
+    },
     'hero': {
       'backgroundImage': 'images/wix/hero1.jpg',
       'title': 'Explore. Travel. Experience.',
@@ -79,11 +86,29 @@ class HomepageConfig {
     }
 
     final data = fill(
-      {...defaults, 'sections': homepageSectionDefaults()},
+      {
+        ...defaults,
+        'sections': homepageSectionDefaults(),
+        'footer': FooterConfig.defaults(),
+      },
       decoded,
       'homepage',
     );
+    final rawSections = decoded['sections'];
+    if (rawSections is Map &&
+        rawSections['whyUs'] is Map &&
+        rawSections['whyUs']['enabled'] == false) {
+      for (final name in ['howItWorks', 'whyChooseUs']) {
+        if (!rawSections.containsKey(name)) {
+          data['sections'][name]['enabled'] = false;
+        }
+      }
+    }
     HomepageSections.validate(data['sections'] as Map<String, dynamic>);
+    FooterConfig.validate(data['footer'] as Map<String, dynamic>);
+    if ((data['discovery'] as Map).values.any((value) => value is! bool)) {
+      throw const FormatException('Discovery settings must be booleans.');
+    }
     final hero = data['hero'] as Map<String, dynamic>;
     final batches = data['upcomingBatches'] as Map<String, dynamic>;
     for (final entry in {

@@ -238,6 +238,8 @@ void main() {
           find.byKey(const ValueKey('section-reviews-review-1-name')),
           'Edited reviewer',
         );
+        // Flush the input edit's UI updates before inspecting the draft.
+        await tester.pumpAndSettle();
         expect(sections['reviews']['items'][0]['name'], 'Edited reviewer');
         await tap(tester, 'section-reviews-review-1-down');
         expect(sections['reviews']['items'][1]['id'], 'review-1');
@@ -262,7 +264,7 @@ void main() {
     tester,
   ) async {
     final sections = await open(tester);
-    for (final name in ['stats', 'whyUs', 'cta']) {
+    for (final name in ['stats', 'howItWorks', 'whyChooseUs', 'cta']) {
       await tap(tester, 'homepage-section-$name');
       await tap(tester, 'section-$name-enabled');
       expect(sections[name]['enabled'], false);
@@ -278,11 +280,11 @@ void main() {
       '999+',
     );
     expect(sections['stats']['items'][0]['value'], '999+');
-    await tap(tester, 'details-section-whyUs-offbeat');
+    await tap(tester, 'details-section-whyChooseUs-pricing');
     await tester.enterText(
-      find.byKey(const ValueKey('section-whyUs-offbeat-text')),
+      find.byKey(const ValueKey('section-whyChooseUs-pricing-text')),
       'Our custom promise',
     );
-    expect(sections['whyUs']['items'][0]['text'], 'Our custom promise');
+    expect(sections['whyChooseUs']['items'][0]['text'], 'Our custom promise');
   });
 }

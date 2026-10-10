@@ -9,13 +9,27 @@ import '../services/trips_parser.dart';
 import '../services/trip_date_utils.dart';
 import '../services/trip_detail_defaults.dart';
 import '../services/trip_brochure_service.dart';
+import '../models/trip_section_settings.dart';
+import '../models/trip_card_settings.dart';
+import '../widgets/trip_section_settings_editor.dart';
+import '../widgets/trip_card_settings_editor.dart';
 import 'trip_brochure_screen.dart';
 
 class TripEditScreen extends StatefulWidget {
   final Map<String, dynamic>? trip;
   final int? index;
+  final Future<String?> Function()? cardCoverUploader;
+  final Widget Function(String path)? cardImagePreviewBuilder;
+  final DateTime? referenceDate;
 
-  const TripEditScreen({super.key, this.trip, this.index});
+  const TripEditScreen({
+    super.key,
+    this.trip,
+    this.index,
+    this.cardCoverUploader,
+    this.cardImagePreviewBuilder,
+    this.referenceDate,
+  });
 
   @override
   State<TripEditScreen> createState() => _TripEditScreenState();
@@ -91,6 +105,19 @@ class _TripEditScreenState extends State<TripEditScreen> {
     // Preserve remote labels until this trip is explicitly saved.
     final availableDates = _tripData['availableDates'] as List<dynamic>? ?? [];
     _availableDates = availableDates.map((date) => date.toString()).toList();
+    for (final controller in [
+      _nameController,
+      _destinationController,
+      _priceController,
+      _durationController,
+      _imageController,
+    ]) {
+      controller.addListener(_updateCardPreview);
+    }
+  }
+
+  void _updateCardPreview() {
+    if (mounted) setState(() {});
   }
 
   Map<String, dynamic> _getDefaultTrip() {
@@ -532,12 +559,26 @@ class _TripEditScreenState extends State<TripEditScreen> {
               ),
               const SizedBox(height: 16),
 
+              // Website display preferences do not alter trip or PDF content.
+              TripSectionSettingsEditor(
+                key: const ValueKey('website-section-display'),
+                expandedSections: TripSectionSettings.expandedFor(_tripData),
+                onChanged: (sections) => setState(() {
+                  _tripData['expandedSections'] = sections;
+                }),
+              ),
+              const SizedBox(height: 16),
+
               // Boarding Locations Card
               _buildBoardingLocationsSection(),
               const SizedBox(height: 16),
 
               // Gallery Images Card
               _buildGallerySection(),
+              const SizedBox(height: 16),
+
+              // Optional card controls follow every existing editor section.
+              _buildWebsiteCardEditor(),
               const SizedBox(height: 32),
 
               // Save Button
@@ -556,6 +597,40 @@ class _TripEditScreenState extends State<TripEditScreen> {
       ),
     );
   }
+
+  Widget _buildWebsiteCardEditor() => TripCardSettingsEditor(
+    key: const Key('website-trip-card'),
+    trip: {
+      ..._tripData,
+      'title': _nameController.text,
+      'location': _destinationController.text,
+      'image': _imageController.text,
+      'price': _priceController.text,
+      'duration': _durationController.text,
+      'availableDates': _availableDates,
+    },
+    referenceDate: widget.referenceDate,
+    onChanged: (field, value) => setState(() {
+      if (value == null) {
+        _tripData.remove(field);
+      } else {
+        _tripData[field] = value;
+      }
+    }),
+    onUploadCover: widget.cardCoverUploader ?? _uploadCardCover,
+    imagePreviewBuilder:
+        widget.cardImagePreviewBuilder ??
+        (path) => Image.network(
+          _getImageUrl(path),
+          height: 150,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => const SizedBox(
+            height: 150,
+            child: Center(child: Icon(Icons.broken_image, size: 48)),
+          ),
+        ),
+  );
 
   Widget _buildSectionCard({
     required String title,
@@ -1074,6 +1149,52 @@ class _TripEditScreenState extends State<TripEditScreen> {
         Navigator.of(context).pop(); // Close loading dialog
       }
     }
+  }
+
+  Future<String?> _uploadCardCover() async {
+    final target = context.read<SettingsProvider>().settings.copyWith();
+    bool targetMatches() {
+      final current = context.read<SettingsProvider>().settings;
+      return current.repositoryOwner == target.repositoryOwner &&
+          current.repositoryName == target.repositoryName &&
+          current.branch == target.branch &&
+          current.githubToken == target.githubToken &&
+          current.tripsDataPath == target.tripsDataPath;
+    }
+
+    final file = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      imageQuality: 85,
+    );
+    if (file == null) return null;
+    if (!mounted || !targetMatches()) {
+      throw StateError(
+        'GitHub settings changed. Reopen this trip before uploading.',
+      );
+    }
+    if (![
+      'jpg',
+      'jpeg',
+      'png',
+      'webp',
+    ].contains(file.path.split('.').last.toLowerCase())) {
+      throw StateError('Choose a JPG, PNG or WebP photograph.');
+    }
+    final result = await ImageUploadService(settings: target).uploadImage(
+      imageFile: File(file.path),
+      tripId: '${_tripData['id']}_card',
+      isMainImage: true,
+    );
+    if (!result.success || result.imagePath == null) {
+      throw StateError(result.error ?? 'Card cover upload failed.');
+    }
+    if (!mounted || !targetMatches()) {
+      throw StateError(
+        'GitHub settings changed. The uploaded asset was not applied to this trip.',
+      );
+    }
+    return result.imagePath;
   }
 
   void _removeGalleryImage(int index) {
@@ -1869,6 +1990,12 @@ class _TripEditScreenState extends State<TripEditScreen> {
     _tripData['bestTime'] = _bestTimeController.text;
     _tripData['duration'] = _durationController.text;
     _tripData['availableDates'] = normalizedDates;
+    // Do not populate optional card fields on legacy trips unless edited.
+    for (final field in TripCardSettings.optionalFields) {
+      if (_tripData[field] is String) {
+        _tripData[field] = (_tripData[field] as String).trim();
+      }
+    }
 
     // Ensure galleryImages and boardingLocations are preserved
     _tripData['galleryImages'] = _tripData['galleryImages'] ?? <String>[];

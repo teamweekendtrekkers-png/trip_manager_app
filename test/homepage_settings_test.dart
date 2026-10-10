@@ -760,6 +760,8 @@ void main() {
       find.byKey(const ValueKey('homepage-hero-title')),
       'Local',
     );
+    // Flush the input edit's UI updates before opening a dialog.
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Reload homepage'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Keep editing'));
@@ -769,6 +771,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(TextButton, 'Reload'));
     await tester.pumpAndSettle();
+    expect(
+      github.snapshots,
+      isEmpty,
+      reason: 'Confirmed reload fetched the remote fixture',
+    );
     await showKey(tester, 'homepage-hero-title');
     expect(
       tester
@@ -822,6 +829,110 @@ void main() {
         ),
         findsOneWidget,
       );
+    },
+  );
+  testWidgets(
+    'new homepage sections edit, publish and reload through the full screen without changing existing content',
+    (tester) async {
+      final initial = config((data) {
+        data['hero']['backgroundImage'] = 'images/custom-hero.jpg';
+        data['sections']['whyUs']['title'] = 'Preserve archived reasons';
+      });
+      final github = await openEditor(tester, initial: initial);
+      for (final name in ['howItWorks', 'whyChooseUs']) {
+        await tapKey(tester, 'homepage-section-$name');
+        await showKey(tester, 'section-$name-title');
+        await tester.enterText(
+          find.byKey(ValueKey('section-$name-title')),
+          'Custom $name',
+        );
+        await tester.pumpAndSettle();
+      }
+      await publish(tester);
+      final saved = HomepageConfig.parse(github.calls.single.values.single);
+      for (final name in ['howItWorks', 'whyChooseUs']) {
+        expect(saved.toJson()['sections'][name]['title'], 'Custom $name');
+      }
+      for (final name in ['hero', 'upcomingBatches']) {
+        expect(saved.toJson()[name], initial.toJson()[name]);
+      }
+      for (final name in ['stats', 'whyUs', 'reviews', 'cta']) {
+        expect(
+          saved.toJson()['sections'][name],
+          initial.toJson()['sections'][name],
+        );
+      }
+      github.snapshots.add(file(saved, 'saved'));
+      await tester.tap(find.byIcon(Icons.refresh));
+      await tester.pumpAndSettle();
+      expect(github.snapshots, isEmpty);
+      for (final name in ['howItWorks', 'whyChooseUs']) {
+        await tapKey(tester, 'homepage-section-$name');
+        await showKey(tester, 'section-$name-title');
+        expect(
+          tester
+              .widget<TextFormField>(
+                find.byKey(ValueKey('section-$name-title')),
+              )
+              .initialValue,
+          'Custom $name',
+        );
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'footer edits publish and reload through the homepage screen without altering payment settings',
+    (tester) async {
+      final initial = config();
+      final github = await openEditor(tester, initial: initial);
+      await tapKey(tester, 'website-footer-editor');
+      await tapKey(tester, 'footer-showUpi');
+      await showKey(tester, 'footer-brandName');
+      await tester.enterText(
+        find.byKey(const ValueKey('footer-brandName')),
+        'Weekend Crew',
+      );
+      await tester.pumpAndSettle();
+      await tapKey(tester, 'footer-add-link');
+      final provider = Provider.of<SettingsProvider>(
+        tester.element(find.byType(HomepageSettingsScreen)),
+        listen: false,
+      );
+      final settingsBefore = jsonEncode(provider.settings.toJson());
+      await publish(tester);
+      expect(github.calls.single.keys, [HomepageSettingsService.path]);
+      final saved = HomepageConfig.parse(github.calls.single.values.single);
+      expect(saved.toJson()['footer']['showUpi'], false);
+      expect(saved.toJson()['footer']['brandName'], 'Weekend Crew');
+      expect(saved.toJson()['footer']['informationLinks'], hasLength(1));
+      for (final name in ['hero', 'sections', 'upcomingBatches']) {
+        expect(saved.toJson()[name], initial.toJson()[name]);
+      }
+      expect(jsonEncode(provider.settings.toJson()), settingsBefore);
+      github.snapshots.add(file(saved, 'saved'));
+      await tester.tap(find.byIcon(Icons.refresh));
+      await tester.pumpAndSettle();
+      await tapKey(tester, 'website-footer-editor');
+      await showKey(tester, 'footer-showUpi');
+      expect(
+        tester
+            .widget<SwitchListTile>(
+              find.byKey(const ValueKey('footer-showUpi')),
+            )
+            .value,
+        false,
+      );
+      await showKey(tester, 'footer-brandName');
+      expect(
+        tester
+            .widget<TextFormField>(
+              find.byKey(const ValueKey('footer-brandName')),
+            )
+            .initialValue,
+        'Weekend Crew',
+      );
+      expect(tester.takeException(), isNull);
     },
   );
   if (!Platform.isAndroid) {
