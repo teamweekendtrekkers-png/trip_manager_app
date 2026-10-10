@@ -1,4 +1,4 @@
-name: Build iOS & Android
+name: Build Mobile & Windows Desktop
 
 on:
   push:
@@ -11,9 +11,9 @@ permissions:
   contents: read
 
 jobs:
-  build-android:
+  test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -26,6 +26,21 @@ jobs:
         run: flutter pub get
       - name: Run tests
         run: flutter test --no-pub
+
+  build-android:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.5'
+          channel: 'stable'
+      - name: Install dependencies
+        run: flutter pub get
       - name: Build Android APK
         run: flutter build apk --release
       - name: Build Android App Bundle
@@ -44,8 +59,8 @@ jobs:
           path: build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 90
-
   build-ios:
+    needs: test
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
@@ -73,3 +88,31 @@ jobs:
           path: build/ios/trip-manager-ios-unsigned.ipa
           if-no-files-found: error
           retention-days: 90
+
+  build-windows:
+    needs: test
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.5'
+          channel: 'stable'
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Build Windows desktop app
+        run: flutter build windows --release
+      - name: Package Windows desktop app
+        shell: pwsh
+        run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath build/trip-manager-windows-x64.zip
+      - name: Upload Windows desktop app
+        uses: actions/upload-artifact@v4
+        with:
+          name: trip-manager-windows-x64
+          path: build/trip-manager-windows-x64.zip
+          if-no-files-found: error
+          retention-days: 90
+# Windows is the supported desktop target for this application.

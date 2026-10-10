@@ -4,6 +4,7 @@ import 'providers/settings_provider.dart';
 import 'providers/trips_provider.dart';
 import 'screens/trips_list_screen.dart';
 import 'models/app_settings.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,48 +40,9 @@ class TripManagerApp extends StatelessWidget {
         return MaterialApp(
           title: 'Trip Manager',
           debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF2E7D32), // Green theme for trekking
-              brightness: settings.settings.darkMode
-                  ? Brightness.dark
-                  : Brightness.light,
-            ),
-            useMaterial3: true,
-            appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
-            cardTheme: CardThemeData(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            inputDecorationTheme: InputDecorationTheme(
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              filled: true,
-            ),
-          ),
-          darkTheme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF2E7D32),
-              brightness: Brightness.dark,
-            ),
-            useMaterial3: true,
-            appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
-            cardTheme: CardThemeData(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            inputDecorationTheme: InputDecorationTheme(
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              filled: true,
-            ),
-          ),
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          scrollBehavior: const ManagerScrollBehavior(),
           themeMode: settings.settings.darkMode
               ? ThemeMode.dark
               : ThemeMode.light,

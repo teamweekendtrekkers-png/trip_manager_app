@@ -27,30 +27,32 @@ class UpcomingBatchesScreen extends StatelessWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Upcoming Batches'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
+      appBar: AppBar(title: const Text('Upcoming Batches')),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-          children: [
-            const _UnsavedDataNotice(),
-            const SizedBox(height: 24),
-            if (batches.isEmpty)
-              const _EmptyBatchesView()
-            else ...[
-              Text(
-                'Next ${batches.length} ${batches.length == 1 ? 'batch' : 'batches'}',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 12),
-              for (final batch in batches) ...[
-                _BatchCard(batch: batch),
-                const SizedBox(height: 12),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              children: [
+                const _UnsavedDataNotice(),
+                const SizedBox(height: 24),
+                if (batches.isEmpty)
+                  const _EmptyBatchesView()
+                else ...[
+                  Text(
+                    'Next ${batches.length} ${batches.length == 1 ? 'batch' : 'batches'}',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 12),
+                  for (final batch in batches) ...[
+                    _BatchCard(batch: batch),
+                    const SizedBox(height: 12),
+                  ],
+                ],
               ],
-            ],
-          ],
+            ),
+          ),
         ),
       ),
     );

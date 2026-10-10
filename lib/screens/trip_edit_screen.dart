@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../providers/trips_provider.dart';
@@ -173,425 +174,444 @@ class _TripEditScreenState extends State<TripEditScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(isEditing ? 'Edit Trip' : 'New Trip'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
-          IconButton(icon: const Icon(Icons.save), onPressed: _saveTrip),
+          IconButton(
+            icon: const Icon(Icons.save),
+            onPressed: _saveTrip,
+            tooltip: isEditing ? 'Update trip' : 'Create trip',
+          ),
         ],
       ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Basic Info Card
-              _buildSectionCard(
-                title: 'Basic Information',
-                children: [
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Trip Name *',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.title),
-                    ),
-                    validator: (v) => v?.isEmpty == true ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _destinationController,
-                    decoration: const InputDecoration(
-                      labelText: 'Destination *',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.location_on),
-                    ),
-                    validator: (v) => v?.isEmpty == true ? 'Required' : null,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // About Trip Card
-              _buildSectionCard(
-                title: 'About This Trip',
-                children: [
-                  TextFormField(
-                    controller: _descriptionController,
-                    decoration: const InputDecoration(
-                      labelText: 'Trip Description / About',
-                      hintText:
-                          'Describe the trip experience, what makes it special, scenic beauty, etc.',
-                      border: OutlineInputBorder(),
-                      alignLabelWithHint: true,
-                    ),
-                    maxLines: 8,
-                    minLines: 5,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Date & Pricing Card
-              _buildSectionCard(
-                title: 'Date & Pricing',
-                children: [
-                  Row(
+      body: CallbackShortcuts(
+        bindings: <ShortcutActivator, VoidCallback>{
+          const SingleActivator(LogicalKeyboardKey.keyS, control: true):
+              _saveTrip,
+        },
+        child: Focus(
+          autofocus: true,
+          child: Form(
+            key: _formKey,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1080),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _priceController,
-                          decoration: const InputDecoration(
-                            labelText: 'Price (₹) *',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.currency_rupee),
-                          ),
-                          keyboardType: TextInputType.number,
-                          validator: (v) =>
-                              v?.isEmpty == true ? 'Required' : null,
+                      Text(
+                        isEditing ? 'Update trip details' : 'Create a new trip',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Work through each section, save the draft, then publish it from the trips workspace.',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _discountedPriceController,
-                          decoration: const InputDecoration(
-                            labelText: 'Discounted Price (₹)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.local_offer),
+                      const SizedBox(height: 20),
+                      // Basic Info Card
+                      _buildSectionCard(
+                        title: 'Basic Information',
+                        children: [
+                          TextFormField(
+                            controller: _nameController,
+                            decoration: const InputDecoration(
+                              labelText: 'Trip Name *',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.title),
+                            ),
+                            validator: (v) =>
+                                v?.isEmpty == true ? 'Required' : null,
                           ),
-                          keyboardType: TextInputType.number,
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _destinationController,
+                            decoration: const InputDecoration(
+                              labelText: 'Destination *',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.location_on),
+                            ),
+                            validator: (v) =>
+                                v?.isEmpty == true ? 'Required' : null,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // About Trip Card
+                      _buildSectionCard(
+                        title: 'About This Trip',
+                        children: [
+                          TextFormField(
+                            controller: _descriptionController,
+                            decoration: const InputDecoration(
+                              labelText: 'Trip Description / About',
+                              hintText:
+                                  'Describe the trip experience, what makes it special, scenic beauty, etc.',
+                              border: OutlineInputBorder(),
+                              alignLabelWithHint: true,
+                            ),
+                            maxLines: 8,
+                            minLines: 5,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Date & Pricing Card
+                      _buildSectionCard(
+                        title: 'Date & Pricing',
+                        children: [
+                          _responsivePair(
+                            TextFormField(
+                              controller: _priceController,
+                              decoration: const InputDecoration(
+                                labelText: 'Price (₹) *',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.currency_rupee),
+                              ),
+                              keyboardType: TextInputType.number,
+                              validator: (v) =>
+                                  v?.isEmpty == true ? 'Required' : null,
+                            ),
+                            TextFormField(
+                              controller: _discountedPriceController,
+                              decoration: const InputDecoration(
+                                labelText: 'Discounted Price (₹)',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.local_offer),
+                              ),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Trip Details Card
+                      _buildSectionCard(
+                        title: 'Trip Details',
+                        children: [
+                          _responsivePair(
+                            DropdownButtonFormField<String>(
+                              isExpanded: true,
+                              initialValue:
+                                  (_tripData['difficulty'] ?? 'Moderate')
+                                      .toString(),
+                              decoration: const InputDecoration(
+                                labelText: 'Difficulty',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.trending_up),
+                              ),
+                              items:
+                                  <String>{
+                                        'Easy',
+                                        'Easy-Moderate',
+                                        'Moderate',
+                                        'Moderate-Hard',
+                                        'Challenging',
+                                        'Difficult',
+                                        'Extreme',
+                                        // Retain a valid value introduced by the website
+                                        // even before this app has learned its label.
+                                        if ((_tripData['difficulty'] ?? '')
+                                            .toString()
+                                            .isNotEmpty)
+                                          _tripData['difficulty'].toString(),
+                                      }
+                                      .map(
+                                        (d) => DropdownMenuItem(
+                                          value: d,
+                                          child: Text(d),
+                                        ),
+                                      )
+                                      .toList(),
+                              onChanged: (v) {
+                                setState(() {
+                                  _tripData['difficulty'] = v;
+                                });
+                              },
+                            ),
+                            TextFormField(
+                              controller: _groupSizeController,
+                              decoration: const InputDecoration(
+                                labelText: 'Group Size',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.group),
+                              ),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _pickupPointController,
+                            decoration: const InputDecoration(
+                              labelText: 'Pickup Point',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.directions_bus),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Website Fields Card (badge, distance, elevation, etc.)
+                      _buildSectionCard(
+                        title: 'Website Display Fields',
+                        children: [
+                          _responsivePair(
+                            TextFormField(
+                              controller: _badgeController,
+                              decoration: const InputDecoration(
+                                labelText: 'Badge/Type',
+                                hintText: 'e.g., Weekend Trek, Road Trip',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.label),
+                              ),
+                            ),
+                            TextFormField(
+                              controller: _durationController,
+                              decoration: const InputDecoration(
+                                labelText: 'Duration',
+                                hintText: 'e.g., 2D/1N',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.schedule),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          _responsivePair(
+                            TextFormField(
+                              controller: _distanceController,
+                              decoration: const InputDecoration(
+                                labelText: 'Distance',
+                                hintText: 'e.g., 15-20 km',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.straighten),
+                              ),
+                            ),
+                            TextFormField(
+                              controller: _elevationController,
+                              decoration: const InputDecoration(
+                                labelText: 'Elevation',
+                                hintText: 'e.g., 1,420 m',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.terrain),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _bestTimeController,
+                            decoration: const InputDecoration(
+                              labelText: 'Best Time to Visit',
+                              hintText: 'e.g., Oct - Feb',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.wb_sunny),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildAvailableDatesEditor(),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Image Card
+                      _buildSectionCard(
+                        title: 'Display Image',
+                        children: [
+                          Text(
+                            'Recommended: 1800 × 1200 px (3:2). Keep the main subject near the centre so it also crops well on phones.',
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _imageController,
+                                  decoration: const InputDecoration(
+                                    labelText:
+                                        'Image Path (e.g., images/trips/goa.jpg)',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.image),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(Icons.add_photo_alternate),
+                                onPressed: () => _pickAndUploadMainImage(),
+                                color: Colors.green,
+                                tooltip: 'Upload from gallery',
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.camera_alt),
+                                onPressed: () =>
+                                    _pickAndUploadMainImage(fromCamera: true),
+                                color: Colors.blue,
+                                tooltip: 'Take photo',
+                              ),
+                            ],
+                          ),
+                          if (_imageController.text.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                _getImageUrl(_imageController.text),
+                                height: 150,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => Container(
+                                  height: 150,
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: Icon(Icons.broken_image, size: 48),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Featured Toggle & Active Status
+                      _buildSectionCard(
+                        title: 'Visibility',
+                        children: [
+                          SwitchListTile(
+                            title: const Text('Active Trip'),
+                            subtitle: Text(
+                              _tripData['isActive'] == false
+                                  ? 'Trip is greyed out and hidden from bookings'
+                                  : 'Trip is visible and available for booking',
+                            ),
+                            value: _tripData['isActive'] ?? true,
+                            activeTrackColor: Colors.green[200],
+                            onChanged: (v) {
+                              setState(() {
+                                _tripData['isActive'] = v;
+                              });
+                            },
+                          ),
+                          const Divider(),
+                          SwitchListTile(
+                            title: const Text('Featured Trip'),
+                            subtitle: const Text('Show on homepage carousel'),
+                            value: _tripData['featured'] ?? false,
+                            onChanged: (v) {
+                              setState(() {
+                                _tripData['featured'] = v;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Highlights Card
+                      _buildListSection(
+                        title: 'Highlights',
+                        items: List<String>.from(_tripData['highlights'] ?? []),
+                        onAdd: () => _addListItem('highlights'),
+                        onRemove: (index) =>
+                            _removeListItem('highlights', index),
+                        onEdit: (index, value) =>
+                            _editListItem('highlights', index, value),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Itinerary Card
+                      _buildItinerarySection(),
+                      const SizedBox(height: 16),
+
+                      // Inclusions Card
+                      _buildListSection(
+                        title: 'Inclusions',
+                        items: List<String>.from(_tripData['inclusions'] ?? []),
+                        onAdd: () => _addListItem('inclusions'),
+                        onRemove: (index) =>
+                            _removeListItem('inclusions', index),
+                        onEdit: (index, value) =>
+                            _editListItem('inclusions', index, value),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Exclusions Card
+                      _buildListSection(
+                        title: 'Exclusions',
+                        items: List<String>.from(_tripData['exclusions'] ?? []),
+                        onAdd: () => _addListItem('exclusions'),
+                        onRemove: (index) =>
+                            _removeListItem('exclusions', index),
+                        onEdit: (index, value) =>
+                            _editListItem('exclusions', index, value),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Things to Carry Card
+                      _buildTripDetailListSection(
+                        field: 'thingsToCarry',
+                        title: 'Things to Carry',
+                        defaults: TripDetailDefaults.thingsToCarry,
+                      ),
+                      const SizedBox(height: 16),
+
+                      _buildTripDetailListSection(
+                        field: 'perfectFor',
+                        title: 'Perfect For',
+                        defaults: TripDetailDefaults.perfectFor,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Website display preferences do not alter trip or PDF content.
+                      TripSectionSettingsEditor(
+                        key: const ValueKey('website-section-display'),
+                        expandedSections: TripSectionSettings.expandedFor(
+                          _tripData,
+                        ),
+                        onChanged: (sections) => setState(() {
+                          _tripData['expandedSections'] = sections;
+                        }),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Boarding Locations Card
+                      _buildBoardingLocationsSection(),
+                      const SizedBox(height: 16),
+
+                      // Gallery Images Card
+                      _buildGallerySection(),
+                      const SizedBox(height: 16),
+
+                      // Optional card controls follow every existing editor section.
+                      _buildWebsiteCardEditor(),
+                      const SizedBox(height: 32),
+
+                      // Save Button
+                      FilledButton.icon(
+                        onPressed: _saveTrip,
+                        icon: const Icon(Icons.save),
+                        label: Text(isEditing ? 'Update Trip' : 'Create Trip'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.all(16),
                         ),
                       ),
+                      const SizedBox(height: 16),
                     ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Trip Details Card
-              _buildSectionCard(
-                title: 'Trip Details',
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          isExpanded: true,
-                          initialValue: (_tripData['difficulty'] ?? 'Moderate')
-                              .toString(),
-                          decoration: const InputDecoration(
-                            labelText: 'Difficulty',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.trending_up),
-                          ),
-                          items:
-                              <String>{
-                                    'Easy',
-                                    'Easy-Moderate',
-                                    'Moderate',
-                                    'Moderate-Hard',
-                                    'Challenging',
-                                    'Difficult',
-                                    'Extreme',
-                                    // Retain a valid value introduced by the website
-                                    // even before this app has learned its label.
-                                    if ((_tripData['difficulty'] ?? '')
-                                        .toString()
-                                        .isNotEmpty)
-                                      _tripData['difficulty'].toString(),
-                                  }
-                                  .map(
-                                    (d) => DropdownMenuItem(
-                                      value: d,
-                                      child: Text(d),
-                                    ),
-                                  )
-                                  .toList(),
-                          onChanged: (v) {
-                            setState(() {
-                              _tripData['difficulty'] = v;
-                            });
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _groupSizeController,
-                          decoration: const InputDecoration(
-                            labelText: 'Group Size',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.group),
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _pickupPointController,
-                    decoration: const InputDecoration(
-                      labelText: 'Pickup Point',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.directions_bus),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Website Fields Card (badge, distance, elevation, etc.)
-              _buildSectionCard(
-                title: 'Website Display Fields',
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _badgeController,
-                          decoration: const InputDecoration(
-                            labelText: 'Badge/Type',
-                            hintText: 'e.g., Weekend Trek, Road Trip',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.label),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _durationController,
-                          decoration: const InputDecoration(
-                            labelText: 'Duration',
-                            hintText: 'e.g., 2D/1N',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.schedule),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _distanceController,
-                          decoration: const InputDecoration(
-                            labelText: 'Distance',
-                            hintText: 'e.g., 15-20 km',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.straighten),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _elevationController,
-                          decoration: const InputDecoration(
-                            labelText: 'Elevation',
-                            hintText: 'e.g., 1,420 m',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.terrain),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _bestTimeController,
-                    decoration: const InputDecoration(
-                      labelText: 'Best Time to Visit',
-                      hintText: 'e.g., Oct - Feb',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.wb_sunny),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildAvailableDatesEditor(),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Image Card
-              _buildSectionCard(
-                title: 'Display Image',
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _imageController,
-                          decoration: const InputDecoration(
-                            labelText:
-                                'Image Path (e.g., images/trips/goa.jpg)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.image),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.add_photo_alternate),
-                        onPressed: () => _pickAndUploadMainImage(),
-                        color: Colors.green,
-                        tooltip: 'Upload from gallery',
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.camera_alt),
-                        onPressed: () =>
-                            _pickAndUploadMainImage(fromCamera: true),
-                        color: Colors.blue,
-                        tooltip: 'Take photo',
-                      ),
-                    ],
-                  ),
-                  if (_imageController.text.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        _getImageUrl(_imageController.text),
-                        height: 150,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Container(
-                          height: 150,
-                          color: Colors.grey[200],
-                          child: const Center(
-                            child: Icon(Icons.broken_image, size: 48),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Featured Toggle & Active Status
-              _buildSectionCard(
-                title: 'Visibility',
-                children: [
-                  SwitchListTile(
-                    title: const Text('Active Trip'),
-                    subtitle: Text(
-                      _tripData['isActive'] == false
-                          ? 'Trip is greyed out and hidden from bookings'
-                          : 'Trip is visible and available for booking',
-                    ),
-                    value: _tripData['isActive'] ?? true,
-                    activeTrackColor: Colors.green[200],
-                    onChanged: (v) {
-                      setState(() {
-                        _tripData['isActive'] = v;
-                      });
-                    },
-                  ),
-                  const Divider(),
-                  SwitchListTile(
-                    title: const Text('Featured Trip'),
-                    subtitle: const Text('Show on homepage carousel'),
-                    value: _tripData['featured'] ?? false,
-                    onChanged: (v) {
-                      setState(() {
-                        _tripData['featured'] = v;
-                      });
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Highlights Card
-              _buildListSection(
-                title: 'Highlights',
-                items: List<String>.from(_tripData['highlights'] ?? []),
-                onAdd: () => _addListItem('highlights'),
-                onRemove: (index) => _removeListItem('highlights', index),
-                onEdit: (index, value) =>
-                    _editListItem('highlights', index, value),
-              ),
-              const SizedBox(height: 16),
-
-              // Itinerary Card
-              _buildItinerarySection(),
-              const SizedBox(height: 16),
-
-              // Inclusions Card
-              _buildListSection(
-                title: 'Inclusions',
-                items: List<String>.from(_tripData['inclusions'] ?? []),
-                onAdd: () => _addListItem('inclusions'),
-                onRemove: (index) => _removeListItem('inclusions', index),
-                onEdit: (index, value) =>
-                    _editListItem('inclusions', index, value),
-              ),
-              const SizedBox(height: 16),
-
-              // Exclusions Card
-              _buildListSection(
-                title: 'Exclusions',
-                items: List<String>.from(_tripData['exclusions'] ?? []),
-                onAdd: () => _addListItem('exclusions'),
-                onRemove: (index) => _removeListItem('exclusions', index),
-                onEdit: (index, value) =>
-                    _editListItem('exclusions', index, value),
-              ),
-              const SizedBox(height: 16),
-
-              // Things to Carry Card
-              _buildTripDetailListSection(
-                field: 'thingsToCarry',
-                title: 'Things to Carry',
-                defaults: TripDetailDefaults.thingsToCarry,
-              ),
-              const SizedBox(height: 16),
-
-              _buildTripDetailListSection(
-                field: 'perfectFor',
-                title: 'Perfect For',
-                defaults: TripDetailDefaults.perfectFor,
-              ),
-              const SizedBox(height: 16),
-
-              // Website display preferences do not alter trip or PDF content.
-              TripSectionSettingsEditor(
-                key: const ValueKey('website-section-display'),
-                expandedSections: TripSectionSettings.expandedFor(_tripData),
-                onChanged: (sections) => setState(() {
-                  _tripData['expandedSections'] = sections;
-                }),
-              ),
-              const SizedBox(height: 16),
-
-              // Boarding Locations Card
-              _buildBoardingLocationsSection(),
-              const SizedBox(height: 16),
-
-              // Gallery Images Card
-              _buildGallerySection(),
-              const SizedBox(height: 16),
-
-              // Optional card controls follow every existing editor section.
-              _buildWebsiteCardEditor(),
-              const SizedBox(height: 32),
-
-              // Save Button
-              ElevatedButton.icon(
-                onPressed: _saveTrip,
-                icon: const Icon(Icons.save),
-                label: Text(isEditing ? 'Update Trip' : 'Create Trip'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.all(16),
                 ),
               ),
-              const SizedBox(height: 16),
-            ],
+            ),
           ),
         ),
       ),
@@ -651,6 +671,23 @@ class _TripEditScreenState extends State<TripEditScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _responsivePair(Widget first, Widget second) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 640) {
+          return Column(children: [first, const SizedBox(height: 16), second]);
+        }
+        return Row(
+          children: [
+            Expanded(child: first),
+            const SizedBox(width: 16),
+            Expanded(child: second),
+          ],
+        );
+      },
     );
   }
 

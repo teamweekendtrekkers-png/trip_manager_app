@@ -44,19 +44,31 @@ These use `thingsToCarry` and the optional `perfectFor` string lists in the
 website's trip data. Deploy the matching website renderer before expecting
 custom labels to appear. Existing trips and unrelated fields are preserved.
 
-## Download Android and iOS builds
+## Phone and Windows desktop workspace
 
-The `Build iOS & Android` GitHub Actions workflow runs automatically after a
-push to `main` and can also be started manually from the Actions tab.
+The same Flutter application now adapts to the available screen:
+
+- Phones use a touch-friendly navigation drawer and compact status overview.
+- Desktop windows use a persistent labelled sidebar, wider editing workspace,
+  and keyboard shortcuts: `Ctrl+F` search, `Ctrl+N` new trip and `Ctrl+S`
+  publish.
+- Windows uses the same settings and safe GitHub publication flow as Android
+  and iOS.
+
+## Download mobile and Windows desktop builds
+
+The `Build Mobile & Windows Desktop` GitHub Actions workflow runs automatically
+after a push to `main` and can also be started manually from the Actions tab.
 
 1. Open **Actions** in the GitHub repository.
-2. Select **Build iOS & Android**.
+2. Select **Build Mobile & Windows Desktop**.
 3. Open a successful run, or select **Run workflow** to create fresh builds.
 4. Download the required file from the run's **Artifacts** section:
 
    - `trip-manager-android-apk` — APK for direct Android installation.
    - `trip-manager-android-aab` — Android App Bundle for Play Console.
    - `trip-manager-ios-unsigned-ipa` — unsigned iOS IPA for later Apple signing.
+   - `trip-manager-windows-x64` — portable Windows desktop build.
 
 Artifacts are retained by GitHub Actions for 90 days. The iOS IPA is not
 directly installable until it is signed with an Apple Developer certificate
