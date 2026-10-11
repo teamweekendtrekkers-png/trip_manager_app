@@ -24,30 +24,6 @@ jobs:
           channel: 'stable'
       - name: Install dependencies
         run: flutter pub get
-      - name: Prepare intentional visual changes for review
-        if: github.event_name == 'pull_request'
-        run: |
-          dart format lib test
-          flutter test --no-pub --update-goldens
-      - name: Export changed visual snapshots for review
-        if: always() && github.event_name == 'pull_request'
-        run: |
-          python3 - <<'PY'
-          import base64, json, pathlib, subprocess
-          paths = subprocess.check_output(['git', 'diff', '--name-only', '--', 'test/goldens']).decode().splitlines()
-          snapshots = {name: base64.b64encode(pathlib.Path(name).read_bytes()).decode() for name in paths if name.endswith('.png')}
-          print('VISUAL_REVIEW_BASE64:' + json.dumps(snapshots))
-          PY
-      - name: Upload reviewed-source candidates
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: visual-review-candidates
-          path: |
-            test/goldens/
-            lib/
-            test/windows_editing_test.dart
-          retention-days: 7
       - name: Run tests
         run: flutter test --no-pub
 
