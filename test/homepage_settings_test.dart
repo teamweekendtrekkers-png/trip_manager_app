@@ -512,7 +512,7 @@ void main() {
         finder,
         400,
         scrollable: find.byType(Scrollable).first,
-        maxScrolls: 80,
+        maxScrolls: 150,
       );
     }
     await tester.ensureVisible(finder);

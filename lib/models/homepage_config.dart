@@ -28,7 +28,7 @@ class HomepageConfig {
       'backgroundImage': 'images/wix/hero1.jpg',
       'title': 'Explore. Travel. Experience.',
       'tagline': '🧗 Trips | Tours | Unique Experiences 🏕️',
-      'description': 'A Travel community for the travellers, By the travellers',
+      'description': 'A travel community for travellers, by travellers',
     },
     'upcomingBatches': {
       'enabled': true,

@@ -11,6 +11,8 @@ import 'package:trip_manager_app/theme/app_theme.dart';
 
 void main() {
   testWidgets('Windows mouse focus, selection and keyboard edits survive preview rebuilds and save', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -50,7 +52,7 @@ void main() {
     await tester.tap(about, kind: PointerDeviceKind.mouse);
     await tester.enterText(about, 'Updated description on Windows');
     await tester.pump();
-    await tester.tap(find.byIcon(Icons.save));
+    await tester.tap(find.descendant(of: find.byType(AppBar), matching: find.byIcon(Icons.save)));
     await tester.pumpAndSettle();
     expect(trips.trips.single['title'], 'Updated desktop trip');
     expect(trips.trips.single['about'], 'Updated description on Windows');

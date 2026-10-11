@@ -914,12 +914,12 @@ const commonCancellationPolicy = [
         color: "#22c55e"  // Green - least penalty
     },
     {
-        days: "4 days before departure",
+        days: "4–5 days before departure",
         refund: "50%",
         color: "#f59e0b"  // Orange - medium penalty
     },
     {
-        days: "< 3 days before departure",
+        days: "0–3 days before departure",
         refund: "100%",
         color: "#ef4444"  // Red - full penalty (no refund)
     }
@@ -1009,7 +1009,7 @@ const commonFAQs = [
     },
     {
         q: "What if I need to cancel my booking?",
-        a: "You can cancel through WhatsApp. Cancellation fees apply: 25% fee (6+ days before departure), 50% fee (4 days before departure), and 100% fee (< 3 days before departure). Refunds are processed within 5-7 business days."
+        a: "You can cancel through WhatsApp. Cancellation fees apply: 25% fee (6+ days before departure), 50% fee (4–5 days before departure), and 100% fee (0–3 days before departure). Refunds are processed within 5-7 business days."
     },
     {
         q: "What if the trip gets cancelled due to weather?",
