@@ -668,7 +668,7 @@ class TripsParser {
       final aliases = trip['previousSlugs'];
       final paths = <Object?>[id, trip['publicSlug'] ?? id, if (aliases is List) ...aliases];
       for (final raw in paths) {
-        if (raw is! String || !RegExp(r'^[a-z0-9][a-z0-9_-]*$').hasMatch(raw) || ['constructor', 'prototype', '__proto__'].contains(raw)) { errors.add('Trip ' + id + ' has an invalid URL slug.'); continue; }
+        if (raw is! String || (raw != id && (!RegExp(r'^[a-z0-9][a-z0-9_-]*$').hasMatch(raw) || ['constructor', 'prototype', '__proto__'].contains(raw)))) { errors.add('Trip ' + id + ' has an invalid URL slug.'); continue; }
         if (owners.containsKey(raw) && owners[raw] != id) errors.add('URL slug collision: ' + raw);
         owners[raw] = id;
       }
