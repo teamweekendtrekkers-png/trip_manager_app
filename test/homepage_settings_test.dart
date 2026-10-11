@@ -739,13 +739,12 @@ void main() {
         provider.settings.copyWith(branch: 'different'),
       );
       await tester.pumpAndSettle();
-      await showKey(tester, 'homepage-publish');
-      expect(
-        tester
-            .widget<FilledButton>(find.byKey(const Key('homepage-publish')))
-            .onPressed,
-        isNull,
-      );
+      // The disabled button may be outside the lazy viewport. Inspect the
+      // configured child directly; this test checks authorization, not scrolling.
+      final list = tester.widget<ListView>(find.byType(ListView));
+      final children = (list.childrenDelegate as SliverChildListDelegate).children;
+      final button = children.firstWhere((child) => child.key == const Key('homepage-publish')) as FilledButton;
+      expect(button.onPressed, isNull);
       expect(github.calls, isEmpty);
     },
   );
