@@ -11,6 +11,7 @@ import '../providers/trips_provider.dart';
 import '../services/github_service.dart';
 import '../services/homepage_settings_service.dart';
 import '../services/image_upload_service.dart';
+import '../services/photo_advice.dart';
 import '../services/trip_date_utils.dart';
 import 'deployment_status_screen.dart';
 import '../widgets/homepage_sections_editor.dart';
@@ -218,7 +219,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
     }
   }
 
-  Future<void> _upload() async {
+  Future<void> _upload({String group = 'hero', String field = 'backgroundImage'}) async {
     if (_busy || !_targetMatches) return;
     setState(() {
       _busy = true;
@@ -231,8 +232,6 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
       } else {
         final image = await ImagePicker().pickImage(
           source: ImageSource.gallery,
-          maxWidth: 2400,
-          imageQuality: 85,
         );
         if (image != null) {
           if (!mounted || !_targetMatches) {
@@ -251,19 +250,23 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
           final result = await ImageUploadService(settings: _target)
               .uploadImage(
                 imageFile: File(image.path),
-                tripId: 'homepage',
+                tripId: field == 'heroMobileImage' ? 'homepage_mobile' : 'homepage',
                 isMainImage: true,
               );
           if (!result.success) {
             throw StateError(result.error ?? 'Image upload failed.');
           }
           path = result.imagePath;
+          final advice = await photoResolutionAdvice(File(image.path), minWidth: 1600);
+          if (advice != null && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(advice)));
+          }
         }
       }
       if (path != null && mounted) {
         setState(() {
-          _hero['backgroundImage'] = path;
-          _controllers['hero.backgroundImage']?.text = path!;
+          _draft![group][field] = path;
+          _controllers['$group.$field']?.text = path!;
         });
       }
     } catch (error) {
@@ -321,6 +324,26 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
             ),
           ),
     );
+  }
+
+  Widget _cropPreview(String path, double ratio, String label, double width) {
+    final url = path.startsWith('https://') ? path : 'https://raw.githubusercontent.com/' + _target.repositoryOwner + '/' + _target.repositoryName + '/' + _target.branch + '/' + path;
+    final focus = _draft!['presentation']['heroFocalPoint'];
+    final alignment = switch (focus) {
+      'top' => Alignment.topCenter,
+      'bottom' => Alignment.bottomCenter,
+      'left' => Alignment.centerLeft,
+      'right' => Alignment.centerRight,
+      _ => Alignment.center,
+    };
+    return SizedBox(width: width, child: Column(children: [
+      Text(label),
+      AspectRatio(aspectRatio: ratio, child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: widget.imagePreviewBuilder?.call(url) ?? Image.network(url, fit: BoxFit.cover, alignment: alignment,
+          errorBuilder: (_, _, _) => const Center(child: Icon(Icons.broken_image))),
+      )),
+    ]));
   }
 
   void _toggleTrip(String id, bool selected) => setState(() {
@@ -441,6 +464,50 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
                     _text('hero', 'title', 'Headline', lines: 3),
                     _text('hero', 'tagline', 'Tagline', lines: 3),
                     _text('hero', 'description', 'Description', lines: 3),
+                    ExpansionTile(
+                      title: const Text('Website appearance and hero photos'),
+                      children: [
+                        DropdownButtonFormField<String>(
+                          key: const Key('homepage-presentation-preset'),
+                          initialValue: _draft!['presentation']['preset'] as String,
+                          decoration: const InputDecoration(labelText: 'Colour palette'),
+                          items: [for (final preset in ['forest', 'ocean', 'earth']) DropdownMenuItem(value: preset, child: Text(preset))],
+                          onChanged: (value) => setState(() => _draft!['presentation']['preset'] = value),
+                        ),
+                        const SizedBox(height: 12),
+                        _text('presentation', 'heroMobileImage', 'Mobile hero photo (optional path or HTTPS URL)'),
+                        OutlinedButton.icon(
+                          onPressed: _busy ? null : () => _upload(group: 'presentation', field: 'heroMobileImage'),
+                          icon: const Icon(Icons.add_photo_alternate),
+                          label: const Text('Upload mobile hero photo'),
+                        ),
+                        DropdownButtonFormField<String>(
+                          initialValue: _draft!['presentation']['heroFocalPoint'] as String,
+                          decoration: const InputDecoration(labelText: 'Hero photo focus'),
+                          items: [for (final focus in ['center', 'top', 'bottom', 'left', 'right']) DropdownMenuItem(value: focus, child: Text(focus))],
+                          onChanged: (value) => setState(() => _draft!['presentation']['heroFocalPoint'] = value),
+                        ),
+                        TextFormField(
+                          key: const Key('homepage-hero-slides'),
+                          initialValue: (_draft!['presentation']['heroSlides'] as List).join('\n'),
+                          minLines: 2,
+                          maxLines: 3,
+                          decoration: const InputDecoration(labelText: 'Additional hero photos (up to 2, one path per line)'),
+                          onChanged: (value) => setState(() => _draft!['presentation']['heroSlides'] = value.split('\n').map((line) => line.trim()).where((line) => line.isNotEmpty).toList()),
+                        ),
+                        SwitchListTile(
+                          title: const Text('Slow hero photo crossfade'),
+                          subtitle: const Text('One pass only. Text stays still; reduced motion uses one photo.'),
+                          value: _draft!['presentation']['heroMotion'] as bool,
+                          onChanged: (value) => setState(() => _draft!['presentation']['heroMotion'] = value),
+                        ),
+                        const Text('Use a landscape hero for desktop and a portrait crop for mobile. Original photos are retained.'),
+                        Wrap(spacing: 12, runSpacing: 12, children: [
+                          _cropPreview(_hero['backgroundImage'] as String, 16 / 7, 'Desktop hero', 300),
+                          _cropPreview((_draft!['presentation']['heroMobileImage'] as String).isEmpty ? _hero['backgroundImage'] as String : _draft!['presentation']['heroMobileImage'] as String, 4 / 5, 'Mobile hero', 160),
+                        ]),
+                      ],
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       'Upcoming Batches',

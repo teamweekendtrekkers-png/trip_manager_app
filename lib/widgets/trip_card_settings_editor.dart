@@ -177,6 +177,23 @@ class _TripCardSettingsEditorState extends State<TripCardSettingsEditor> {
                   widget.onChanged('experience', value == '' ? null : value),
             ),
             const SizedBox(height: 16),
+            ExpansionTile(
+              title: const Text('Photo crops and focus'),
+              children: [
+                for (final field in ['cardFocalPoint', 'imageFocalPoint'])
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: DropdownButtonFormField<String>(
+                      key: ValueKey('trip-card-$field'),
+                      initialValue: ['center', 'top', 'bottom', 'left', 'right'].contains(widget.trip[field]) ? widget.trip[field] as String : 'center',
+                      decoration: InputDecoration(labelText: field == 'cardFocalPoint' ? 'Card photo focus (16:9)' : 'Gallery photo focus (4:3 on mobile)'),
+                      items: [for (final focus in ['center', 'top', 'bottom', 'left', 'right']) DropdownMenuItem(value: focus, child: Text(focus))],
+                      onChanged: (value) => widget.onChanged(field, value),
+                    ),
+                  ),
+                const Text('Keep the subject clear in the centre or choose its position. Original uploads are retained; the website generates smaller WebP photos when published.'),
+              ],
+            ),
             const Text('Unsaved mobile card preview'),
             const SizedBox(height: 8),
             TripCardPreview(
@@ -243,7 +260,7 @@ class TripCardPreview extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (cover.isNotEmpty && imagePreviewBuilder != null)
-                imagePreviewBuilder!(cover)
+                AspectRatio(aspectRatio: 16 / 9, child: imagePreviewBuilder!(cover))
               else
                 const SizedBox(
                   height: 140,

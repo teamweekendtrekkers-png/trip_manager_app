@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../providers/trips_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/image_upload_service.dart';
+import '../services/photo_advice.dart';
 import '../services/trips_parser.dart';
 import '../services/trip_date_utils.dart';
 import '../services/trip_detail_defaults.dart';
@@ -188,7 +189,8 @@ class _TripEditScreenState extends State<TripEditScreen> {
               _saveTrip,
         },
         child: Focus(
-          autofocus: true,
+          canRequestFocus: false,
+          skipTraversal: true,
           child: Form(
             key: _formKey,
             child: Center(
@@ -217,6 +219,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
                         title: 'Basic Information',
                         children: [
                           TextFormField(
+                            key: const ValueKey('trip-name'),
                             controller: _nameController,
                             decoration: const InputDecoration(
                               labelText: 'Trip Name *',
@@ -228,6 +231,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
+                            key: const ValueKey('trip-destination'),
                             controller: _destinationController,
                             decoration: const InputDecoration(
                               labelText: 'Destination *',
@@ -246,6 +250,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
                         title: 'About This Trip',
                         children: [
                           TextFormField(
+                            key: const ValueKey('trip-about'),
                             controller: _descriptionController,
                             decoration: const InputDecoration(
                               labelText: 'Trip Description / About',
@@ -642,9 +647,16 @@ class _TripEditScreenState extends State<TripEditScreen> {
         widget.cardImagePreviewBuilder ??
         (path) => Image.network(
           _getImageUrl(path),
-          height: 150,
           width: double.infinity,
+          height: 200,
           fit: BoxFit.cover,
+          alignment: switch (_tripData['cardFocalPoint']) {
+            'top' => Alignment.topCenter,
+            'bottom' => Alignment.bottomCenter,
+            'left' => Alignment.centerLeft,
+            'right' => Alignment.centerRight,
+            _ => Alignment.center,
+          },
           errorBuilder: (_, _, _) => const SizedBox(
             height: 150,
             child: Center(child: Icon(Icons.broken_image, size: 48)),
@@ -1201,8 +1213,6 @@ class _TripEditScreenState extends State<TripEditScreen> {
 
     final file = await ImagePicker().pickImage(
       source: ImageSource.gallery,
-      maxWidth: 1600,
-      imageQuality: 85,
     );
     if (file == null) return null;
     if (!mounted || !targetMatches()) {
@@ -1230,6 +1240,10 @@ class _TripEditScreenState extends State<TripEditScreen> {
       throw StateError(
         'GitHub settings changed. The uploaded asset was not applied to this trip.',
       );
+    }
+    final advice = await photoResolutionAdvice(File(file.path), minWidth: 960);
+    if (advice != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(advice)));
     }
     return result.imagePath;
   }

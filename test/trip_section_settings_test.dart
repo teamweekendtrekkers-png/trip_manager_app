@@ -29,7 +29,7 @@ void main() {
     () {
       const source = '// prefix\nconst tripsData = {};\n// keep helpers\n';
       final keys = TripSectionSettings.titles.keys.toList();
-      for (var mask = 0; mask < 8; mask++) {
+      for (var mask = 0; mask < (1 << keys.length); mask++) {
         final expanded = [
           for (var index = 0; index < keys.length; index++)
             if ((mask & (1 << index)) != 0) keys[index],
@@ -253,6 +253,7 @@ void main() {
         await tester.tap(find.text('Open editor'));
         await tester.pumpAndSettle();
         await toggle(tester, 'highlights');
+        await toggle(tester, 'thingsToCarry');
         await tester.tap(
           find.descendant(
             of: find.byType(AppBar),
@@ -260,7 +261,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(provider.trips.single['expandedSections'], ['highlights']);
+        expect(provider.trips.single['expandedSections'], ['highlights', 'thingsToCarry']);
         expect(provider.hasUnsavedChanges, isTrue);
         await tester.tap(find.text('Open editor'));
         await tester.pumpAndSettle();
@@ -271,6 +272,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.widget<SwitchListTile>(target).value, isTrue);
         await toggle(tester, 'highlights');
+        await toggle(tester, 'thingsToCarry');
         await tester.tap(
           find.descendant(
             of: find.byType(AppBar),

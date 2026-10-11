@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 /// Shared visual language for phone, tablet, and desktop builds.
@@ -121,15 +119,8 @@ abstract final class AppTheme {
   }
 }
 
-/// Enables mouse/stylus dragging for horizontally scrollable controls on
-/// desktop without changing touch behavior on mobile.
+/// Keep mouse gestures available for text selection in desktop forms.
+/// Scrollbars and the mouse wheel retain the standard Flutter behavior.
 class ManagerScrollBehavior extends MaterialScrollBehavior {
   const ManagerScrollBehavior();
-
-  @override
-  Set<PointerDeviceKind> get dragDevices => <PointerDeviceKind>{
-    ...super.dragDevices,
-    PointerDeviceKind.mouse,
-    PointerDeviceKind.stylus,
-  };
 }

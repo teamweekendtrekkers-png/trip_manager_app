@@ -1,4 +1,4 @@
-name: Build Mobile & Windows Desktop
+name: Build Android & Windows Desktop
 
 on:
   push:
@@ -59,36 +59,6 @@ jobs:
           path: build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 90
-  build-ios:
-    needs: test
-    runs-on: macos-latest
-    timeout-minutes: 30
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.38.5'
-          channel: 'stable'
-      - name: Install dependencies
-        run: flutter pub get
-      - name: Build unsigned iOS app
-        run: flutter build ios --release --no-codesign
-      - name: Package unsigned iOS IPA
-        run: |
-          mkdir -p build/ios/ipa/Payload
-          cp -R build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
-          cd build/ios/ipa
-          zip -qry ../trip-manager-ios-unsigned.ipa Payload
-      - name: Upload unsigned iOS IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: trip-manager-ios-unsigned-ipa
-          path: build/ios/trip-manager-ios-unsigned.ipa
-          if-no-files-found: error
-          retention-days: 90
-
   build-windows:
     needs: test
     # Flutter 3.38 and its notification plugin target the stable VS 2022
@@ -106,6 +76,8 @@ jobs:
           channel: 'stable'
       - name: Install dependencies
         run: flutter pub get
+      - name: Test Windows text input
+        run: flutter test test/windows_editing_test.dart
       - name: Build Windows desktop app
         run: flutter build windows --release
       - name: Package Windows desktop app

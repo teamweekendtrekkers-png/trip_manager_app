@@ -122,9 +122,9 @@ void main() {
 
       expect(generated, contains('days: "6+ days before departure"'));
       expect(generated, contains('refund: "25%"'));
-      expect(generated, contains('days: "4 days before departure"'));
+      expect(generated, contains('days: "4–5 days before departure"'));
       expect(generated, contains('refund: "50%"'));
-      expect(generated, contains('days: "< 3 days before departure"'));
+      expect(generated, contains('days: "0–3 days before departure"'));
       expect(generated, contains('refund: "100%"'));
       expect(
         generated,

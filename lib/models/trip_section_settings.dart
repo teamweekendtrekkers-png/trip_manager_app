@@ -6,6 +6,7 @@ class TripSectionSettings {
     'about': 'About This Trip',
     'highlights': 'What Makes It Special',
     'includes': "What's Included & Excluded",
+    'thingsToCarry': 'Things to Carry',
   };
 
   static List<String> expandedFor(Map<String, dynamic> trip) {
@@ -16,7 +17,7 @@ class TripSectionSettings {
 
   static String? validationError(Object? value) {
     if (value is! List || value.any((key) => !titles.containsKey(key))) {
-      return 'expandedSections must be a list containing only about, highlights, or includes.';
+      return 'expandedSections must be a list containing only about, highlights, includes, or thingsToCarry.';
     }
     if (value.toSet().length != value.length) {
       return 'expandedSections must not contain duplicates.';
