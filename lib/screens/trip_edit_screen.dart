@@ -73,7 +73,6 @@ class _TripEditScreenState extends State<TripEditScreen> {
   void initState() {
     super.initState();
     _tripData = Map<String, dynamic>.from(widget.trip ?? _getDefaultTrip());
-    _loadSharedContent();
 
     _slugController = TextEditingController(text: _tripData['publicSlug']?.toString() ?? _tripData['id']?.toString() ?? '');
     _departureTimeController = TextEditingController(text: TripDateUtils.departureClock(_tripData));
@@ -630,7 +629,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
                       const SizedBox(height: 32),
 
                       if (_sharedContent != null) TripContentEditor(value: Map<String,dynamic>.from(_tripData['contentSections'] as Map? ?? {}), defaults:_sharedContent!, trip:{..._tripData,'duration':_durationController.text,'location':_destinationController.text,'distance':_distanceController.text,'groupSize':_groupSizeController.text,'elevation':_elevationController.text,'bestTime':_bestTimeController.text}, onChanged:(v)=>setState(()=>_tripData['contentSections']=v)),
-                      if (_sharedContent == null) ListTile(title:const Text('Customisable trip sections'),subtitle:Text(_contentError ?? 'Loading shared content…'),trailing:IconButton(onPressed:_loadSharedContent,icon:const Icon(Icons.refresh))),
+                      if (_sharedContent == null) ListTile(title:const Text('Customisable trip sections'),subtitle:Text(_contentError ?? 'Load shared content to customise this trip’s sections.'),trailing:IconButton(onPressed:_loadSharedContent,icon:const Icon(Icons.refresh))),
                       const SizedBox(height:16),
                       // Save Button
                       FilledButton.icon(
