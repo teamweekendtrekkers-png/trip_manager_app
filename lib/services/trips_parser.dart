@@ -5,6 +5,7 @@ import '../models/trip_card_settings.dart';
 /// Handles object format: const tripsData = { tripId: {...}, tripId2: {...} }
 class TripsParser {
   static const Set<String> _supportedSourceTripFields = {
+    'publicSlug', 'previousSlugs', 'departureTime',
     'title',
     'location',
     'badge',
@@ -191,6 +192,7 @@ class TripsParser {
       );
     }
 
+    errors.addAll(_validateRoutes(trips));
     final document = TripsDataDocument._(
       source: jsContent,
       objectStart: declaration.valueStart,
@@ -216,6 +218,7 @@ class TripsParser {
       ).map((error) => 'Trip "$tripId": $error'),
     );
     const stringFields = {
+      'publicSlug', 'departureTime',
       'title',
       'location',
       'badge',
@@ -232,6 +235,7 @@ class TripsParser {
     };
     const booleanFields = {'featured', 'isActive'};
     const stringListFields = {
+      'previousSlugs',
       'availableDates',
       'highlights',
       'includes',
@@ -349,6 +353,7 @@ class TripsParser {
   ) {
     final result = <String, dynamic>{'id': tripId};
     const directlyRepresentedFields = {
+      'publicSlug', 'previousSlugs', 'departureTime',
       'title',
       'location',
       'badge',
@@ -437,7 +442,7 @@ class TripsParser {
       return SourcePreservingWriteResult.failure(parsed.errors);
     }
 
-    final inputErrors = _validateAppTrips(trips);
+    final inputErrors = [..._validateAppTrips(trips), ..._validateRoutes(trips)];
     if (inputErrors.isNotEmpty) {
       return SourcePreservingWriteResult.failure(inputErrors);
     }
@@ -506,7 +511,7 @@ class TripsParser {
 
   /// Generate trips-data.js content from trip maps (maintains object format)
   static String generateTripsDataJs(List<Map<String, dynamic>> trips) {
-    final validationErrors = _validateAppTrips(trips);
+    final validationErrors = [..._validateAppTrips(trips), ..._validateRoutes(trips)];
     if (validationErrors.isNotEmpty) {
       throw FormatException(validationErrors.join('\n'));
     }
@@ -550,6 +555,9 @@ class TripsParser {
         );
       }
 
+      writeStringField('publicSlug', const ['publicSlug']);
+      writeStringField('departureTime', const ['departureTime']);
+      writeStringListField('previousSlugs', const ['previousSlugs']);
       writeStringField('title', const ['title', 'name']);
       writeStringField('location', const ['location', 'destination']);
       writeStringField('badge', const ['badge']);
@@ -653,12 +661,30 @@ class TripsParser {
   static List<dynamic> _activitiesFromDescription(String description) =>
       description.isEmpty ? <dynamic>[] : description.split('\n');
 
+  static List<String> _validateRoutes(List<Map<String, dynamic>> trips) {
+    final errors = <String>[]; final owners = <String, String>{};
+    for (final trip in trips) {
+      final id = trip['id']?.toString() ?? '';
+      final aliases = trip['previousSlugs'];
+      final paths = <Object?>[id, trip['publicSlug'] ?? id, if (aliases is List) ...aliases];
+      for (final raw in paths) {
+        if (raw is! String || (raw != id && (!RegExp(r'^[a-z0-9][a-z0-9_-]*$').hasMatch(raw) || ['constructor', 'prototype', '__proto__'].contains(raw)))) { errors.add('Trip ' + id + ' has an invalid URL slug.'); continue; }
+        if (owners.containsKey(raw) && owners[raw] != id) errors.add('URL slug collision: ' + raw);
+        owners[raw] = id;
+      }
+      final clock = trip['departureTime'];
+      if (clock != null && (clock is! String || !RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch(clock))) errors.add('Trip ' + id + ' has an invalid departure time.');
+    }
+    return errors;
+  }
+
   static List<String> _validateAppTrips(List<Map<String, dynamic>> trips) {
     final errors = <String>[];
     final seenIds = <String>{};
     final duplicateIds = <String>{};
 
     const stringFields = {
+      'publicSlug', 'departureTime',
       'title',
       'name',
       'location',
@@ -679,6 +705,7 @@ class TripsParser {
     const numberFields = {'priceNumeric', 'discountedPrice'};
     const booleanFields = {'featured', 'isActive'};
     const stringListFields = {
+      'previousSlugs',
       'availableDates',
       'highlights',
       'includes',

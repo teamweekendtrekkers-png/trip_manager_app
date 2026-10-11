@@ -160,7 +160,7 @@ void main() {
     },
   );
   test(
-    'ongoing selections expire at India midnight and removed dates stay absent',
+    'selections expire 24 hours after India departure time and removed dates stay absent',
     () {
       final selected = config((data) {
         data['upcomingBatches']['departureSelection'] = 'selected';
@@ -171,14 +171,14 @@ void main() {
       expect(
         selected.buildBatches(
           trips(),
-          referenceDate: DateTime.utc(2026, 8, 16, 18, 29, 59),
+          referenceDate: DateTime.utc(2026, 8, 15, 16, 29, 59),
         ),
         hasLength(1),
       );
       expect(
         selected.buildBatches(
           trips(),
-          referenceDate: DateTime.utc(2026, 8, 16, 18, 30),
+          referenceDate: DateTime.utc(2026, 8, 15, 16, 30),
         ),
         isEmpty,
       );

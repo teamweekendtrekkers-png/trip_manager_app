@@ -229,7 +229,7 @@ void main() {
       expect(() => ranges.add(ranges.first), throwsUnsupportedError);
     });
 
-    test('retains an ongoing range whose end is today', () {
+    test('omits departures whose 24-hour booking window has closed', () {
       final ranges = TripDateUtils.getUpcomingDateRanges(<String, dynamic>{
         'availableDates': <String>[
           'Aug 10-12, 2026',
@@ -239,7 +239,6 @@ void main() {
       }, referenceDate: august13India);
 
       expect(ranges.map((range) => range.key), <String>[
-        '2026-08-11/2026-08-13',
         '2026-08-13/2026-08-14',
       ]);
     });

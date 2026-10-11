@@ -21,6 +21,7 @@ class HomepageConfig {
       'preset': 'forest',
       'heroMobileImage': '',
       'heroFocalPoint': 'center',
+      'heroMobileFocalPoint': 'center',
       'heroSlides': <String>[],
       'heroMotion': false,
     },
@@ -119,6 +120,7 @@ class HomepageConfig {
     final presentation = data['presentation'] as Map<String, dynamic>;
     if (!['forest', 'ocean', 'earth'].contains(presentation['preset']) ||
         !['center', 'top', 'bottom', 'left', 'right'].contains(presentation['heroFocalPoint']) ||
+        !['center', 'top', 'bottom', 'left', 'right'].contains(presentation['heroMobileFocalPoint']) ||
         presentation['heroMotion'] is! bool ||
         presentation['heroMobileImage'] is! String ||
         (presentation['heroMobileImage'] != '' && !safeImage(presentation['heroMobileImage'] as String)) ||
