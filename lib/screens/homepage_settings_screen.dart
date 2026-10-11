@@ -340,8 +340,11 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
       Text(label),
       AspectRatio(aspectRatio: ratio, child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: widget.imagePreviewBuilder?.call(url) ?? Image.network(url, fit: BoxFit.cover, alignment: alignment,
-          errorBuilder: (_, _, _) => const Center(child: Icon(Icons.broken_image))),
+        child: Stack(fit: StackFit.expand, children: [
+          widget.imagePreviewBuilder?.call(url) ?? Image.network(url, fit: BoxFit.cover, alignment: alignment, errorBuilder: (_, _, _) => const Center(child: Icon(Icons.broken_image))),
+          const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black54]))),
+          const Positioned(left: 12, right: 12, bottom: 12, child: Text('Your next weekend starts here', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+        ]),
       )),
     ]));
   }
@@ -540,7 +543,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
                       key: const Key('homepage-batch-count'),
                       initialValue: _batches['maxBatches'] as int,
                       decoration: const InputDecoration(
-                        labelText: 'Maximum date groups',
+                        labelText: 'Initially visible date groups',
                       ),
                       items: [
                         for (var count = 1; count <= 12; count++)
