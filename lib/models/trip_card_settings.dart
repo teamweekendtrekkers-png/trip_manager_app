@@ -13,6 +13,7 @@ abstract final class TripCardSettings {
   };
 
   static const optionalFields = <String>{
+    'cardTitle',
     'cardImage',
     'cardFocalPoint',
     'imageFocalPoint',
@@ -49,6 +50,8 @@ abstract final class TripCardSettings {
         if (value.isNotEmpty && !HomepageConfig.safeImage(value)) {
           return 'Use an images/... path or a safe HTTPS image URL.';
         }
+      case 'cardTitle':
+        if(text.length>80) return 'Display title must be at most 80 characters.';
       case 'cardSummary':
         if (text.length > 160) {
           return 'Card summary must be at most 160 characters.';

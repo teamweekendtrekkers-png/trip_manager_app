@@ -8,6 +8,7 @@ import 'data_health_screen.dart';
 import 'deployment_status_screen.dart';
 import 'homepage_settings_screen.dart';
 import 'commerce_settings_screen.dart';
+import 'trip_content_settings_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -202,6 +203,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 16),
 
+                    ListTile(leading: const Icon(Icons.article_outlined), title: const Text('Shared Trip Content'), subtitle: const Text('Defaults for trip facts, cancellation, guidelines and FAQs'), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TripContentSettingsScreen()))),
                     ListTile(leading: const Icon(Icons.payments_outlined), title: const Text('Payment Settings & Coupons'), subtitle: const Text('UPI receiver, checkout visibility and coupon codes'), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CommerceSettingsScreen()))),
                     const SizedBox(height: 16),
                     // Contact Info Card with Sync Button
