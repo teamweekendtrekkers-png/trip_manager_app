@@ -67,7 +67,6 @@ after a push to `main` and can also be started manually from the Actions tab.
 
    - `trip-manager-android-apk` — APK for direct Android installation.
    - `trip-manager-android-aab` — Android App Bundle for Play Console.
-   - `trip-manager-ios-unsigned-ipa` — unsigned iOS IPA for later Apple signing.
    - `trip-manager-windows-x64` — portable Windows desktop build.
 
 Artifacts are retained by GitHub Actions for 90 days. The iOS IPA is not
@@ -86,3 +85,5 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+
+Supported releases: Android APK/AAB and Windows x64. iOS builds are disabled.

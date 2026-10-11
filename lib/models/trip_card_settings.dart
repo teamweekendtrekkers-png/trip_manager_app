@@ -14,6 +14,8 @@ abstract final class TripCardSettings {
 
   static const optionalFields = <String>{
     'cardImage',
+    'cardFocalPoint',
+    'imageFocalPoint',
     'cardSummary',
     'departureCity',
     'experience',
@@ -38,6 +40,11 @@ abstract final class TripCardSettings {
     if (value is! String) return '$field must be text.';
     final text = value.trim();
     switch (field) {
+      case 'cardFocalPoint':
+      case 'imageFocalPoint':
+        if (!['center', 'top', 'bottom', 'left', 'right'].contains(value)) {
+          return 'Choose a supported photo focus.';
+        }
       case 'cardImage':
         if (value.isNotEmpty && !HomepageConfig.safeImage(value)) {
           return 'Use an images/... path or a safe HTTPS image URL.';

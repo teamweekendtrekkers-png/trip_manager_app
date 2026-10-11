@@ -17,6 +17,13 @@ class HomepageConfig {
       'showExperienceFilter': true,
       'showWeekendFilter': true,
     },
+    'presentation': {
+      'preset': 'forest',
+      'heroMobileImage': '',
+      'heroFocalPoint': 'center',
+      'heroSlides': <String>[],
+      'heroMotion': false,
+    },
     'hero': {
       'backgroundImage': 'images/wix/hero1.jpg',
       'title': 'Explore. Travel. Experience.',
@@ -108,6 +115,17 @@ class HomepageConfig {
     FooterConfig.validate(data['footer'] as Map<String, dynamic>);
     if ((data['discovery'] as Map).values.any((value) => value is! bool)) {
       throw const FormatException('Discovery settings must be booleans.');
+    }
+    final presentation = data['presentation'] as Map<String, dynamic>;
+    if (!['forest', 'ocean', 'earth'].contains(presentation['preset']) ||
+        !['center', 'top', 'bottom', 'left', 'right'].contains(presentation['heroFocalPoint']) ||
+        presentation['heroMotion'] is! bool ||
+        presentation['heroMobileImage'] is! String ||
+        (presentation['heroMobileImage'] != '' && !safeImage(presentation['heroMobileImage'] as String)) ||
+        presentation['heroSlides'] is! List ||
+        (presentation['heroSlides'] as List).length > 2 ||
+        (presentation['heroSlides'] as List).any((image) => image is! String || !safeImage(image))) {
+      throw const FormatException('Choose an approved appearance, safe images and at most two additional hero photos.');
     }
     final hero = data['hero'] as Map<String, dynamic>;
     final batches = data['upcomingBatches'] as Map<String, dynamic>;

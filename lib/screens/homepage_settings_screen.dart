@@ -11,6 +11,7 @@ import '../providers/trips_provider.dart';
 import '../services/github_service.dart';
 import '../services/homepage_settings_service.dart';
 import '../services/image_upload_service.dart';
+import '../services/photo_advice.dart';
 import '../services/trip_date_utils.dart';
 import 'deployment_status_screen.dart';
 import '../widgets/homepage_sections_editor.dart';
@@ -231,8 +232,6 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
       } else {
         final image = await ImagePicker().pickImage(
           source: ImageSource.gallery,
-          maxWidth: 2400,
-          imageQuality: 85,
         );
         if (image != null) {
           if (!mounted || !_targetMatches) {
@@ -258,6 +257,10 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
             throw StateError(result.error ?? 'Image upload failed.');
           }
           path = result.imagePath;
+          final advice = await photoResolutionAdvice(File(image.path), minWidth: 1600);
+          if (advice != null && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(advice)));
+          }
         }
       }
       if (path != null && mounted) {
@@ -441,6 +444,41 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
                     _text('hero', 'title', 'Headline', lines: 3),
                     _text('hero', 'tagline', 'Tagline', lines: 3),
                     _text('hero', 'description', 'Description', lines: 3),
+                    ExpansionTile(
+                      title: const Text('Website appearance and hero photos'),
+                      children: [
+                        DropdownButtonFormField<String>(
+                          key: const Key('homepage-presentation-preset'),
+                          initialValue: _draft!['presentation']['preset'] as String,
+                          decoration: const InputDecoration(labelText: 'Colour palette'),
+                          items: [for (final preset in ['forest', 'ocean', 'earth']) DropdownMenuItem(value: preset, child: Text(preset))],
+                          onChanged: (value) => setState(() => _draft!['presentation']['preset'] = value),
+                        ),
+                        const SizedBox(height: 12),
+                        _text('presentation', 'heroMobileImage', 'Mobile hero photo (optional path or HTTPS URL)'),
+                        DropdownButtonFormField<String>(
+                          initialValue: _draft!['presentation']['heroFocalPoint'] as String,
+                          decoration: const InputDecoration(labelText: 'Hero photo focus'),
+                          items: [for (final focus in ['center', 'top', 'bottom', 'left', 'right']) DropdownMenuItem(value: focus, child: Text(focus))],
+                          onChanged: (value) => setState(() => _draft!['presentation']['heroFocalPoint'] = value),
+                        ),
+                        TextFormField(
+                          key: const Key('homepage-hero-slides'),
+                          initialValue: (_draft!['presentation']['heroSlides'] as List).join('\n'),
+                          minLines: 2,
+                          maxLines: 3,
+                          decoration: const InputDecoration(labelText: 'Additional hero photos (up to 2, one path per line)'),
+                          onChanged: (value) => setState(() => _draft!['presentation']['heroSlides'] = value.split('\n').map((line) => line.trim()).where((line) => line.isNotEmpty).toList()),
+                        ),
+                        SwitchListTile(
+                          title: const Text('Slow hero photo crossfade'),
+                          subtitle: const Text('One pass only. Text stays still; reduced motion uses one photo.'),
+                          value: _draft!['presentation']['heroMotion'] as bool,
+                          onChanged: (value) => setState(() => _draft!['presentation']['heroMotion'] = value),
+                        ),
+                        const Text('Use a landscape hero for desktop and a portrait crop for mobile. Original photos are retained.'),
+                      ],
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       'Upcoming Batches',
