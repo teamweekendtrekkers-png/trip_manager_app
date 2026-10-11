@@ -285,6 +285,27 @@ abstract final class TripDateUtils {
     return DateTime.utc(indiaClock.year, indiaClock.month, indiaClock.day);
   }
 
+  /// India departure clock: explicit value, first boarding time, then 22:00.
+  static String departureClock(Map<String, dynamic> trip) {
+    final explicit = trip['departureTime']?.toString() ?? '';
+    if (RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch(explicit)) return explicit;
+    for (final stop in trip['boardingLocations'] is List ? trip['boardingLocations'] as List : []) {
+      if (stop is! Map) continue;
+      final match = RegExp(r'^(\d{1,2}):(\d{2})\s*(AM|PM)$', caseSensitive: false).firstMatch(stop['time']?.toString().trim() ?? '');
+      if (match == null) continue;
+      final hour = int.parse(match[1]!); final minute = int.parse(match[2]!);
+      if (hour < 1 || hour > 12 || minute > 59) continue;
+      final converted = hour % 12 + (match[3]!.toUpperCase() == 'PM' ? 12 : 0);
+      return converted.toString().padLeft(2, '0') + ':' + minute.toString().padLeft(2, '0');
+    }
+    return '22:00';
+  }
+
+  static DateTime bookingCutoff(TripDateRange range, Map<String, dynamic> trip) {
+    final clock = departureClock(trip).split(':');
+    return range.start.add(Duration(minutes: int.parse(clock[0]) * 60 + int.parse(clock[1]) - 330)).add(const Duration(hours: 24));
+  }
+
   /// Returns unique, non-expired ranges for an active trip in start-date order.
   static List<TripDateRange> getUpcomingDateRanges(
     Map<String, dynamic> trip, {
@@ -294,7 +315,7 @@ abstract final class TripDateUtils {
       return const <TripDateRange>[];
     }
 
-    final today = indiaToday(referenceDate);
+    final instant = (referenceDate ?? DateTime.now()).toUtc();
     final seen = <String>{};
     final indexedRanges = <({int index, TripDateRange range})>[];
     final availableDates = trip['availableDates'] as List<dynamic>;
@@ -303,7 +324,7 @@ abstract final class TripDateUtils {
       final value = availableDates[index];
       if (value is! String) continue;
       final range = parse(value);
-      if (range == null || range.end.isBefore(today) || !seen.add(range.key)) {
+      if (range == null || !bookingCutoff(range, trip).isAfter(instant) || !seen.add(range.key)) {
         continue;
       }
       indexedRanges.add((index: index, range: range));

@@ -42,6 +42,8 @@ class _TripEditScreenState extends State<TripEditScreen> {
   late Map<String, dynamic> _tripData;
 
   // Controllers for text fields
+  late TextEditingController _slugController;
+  late TextEditingController _departureTimeController;
   late TextEditingController _nameController;
   late TextEditingController _destinationController;
   late TextEditingController _descriptionController;
@@ -64,6 +66,10 @@ class _TripEditScreenState extends State<TripEditScreen> {
   void initState() {
     super.initState();
     _tripData = Map<String, dynamic>.from(widget.trip ?? _getDefaultTrip());
+
+    _slugController = TextEditingController(text: _tripData['publicSlug']?.toString() ?? _tripData['id']?.toString() ?? '');
+    _departureTimeController = TextEditingController(text: TripDateUtils.departureClock(_tripData));
+    _slugController.addListener(_updateCardPreview);
 
     // Handle field name variations from parser (title/name, location/destination, about/description)
     _nameController = TextEditingController(
@@ -154,6 +160,8 @@ class _TripEditScreenState extends State<TripEditScreen> {
 
   @override
   void dispose() {
+    _slugController.dispose();
+    _departureTimeController.dispose();
     _nameController.dispose();
     _destinationController.dispose();
     _descriptionController.dispose();
@@ -245,6 +253,17 @@ class _TripEditScreenState extends State<TripEditScreen> {
                       ),
                       const SizedBox(height: 16),
 
+                      _buildSectionCard(
+                        title: 'Website URL & Booking Cutoff',
+                        children: [
+                          TextFormField(key: const Key('trip-public-slug'), controller: _slugController, decoration: const InputDecoration(labelText: 'Public URL slug', helperText: 'Lowercase words separated by hyphens; internal ID stays unchanged', border: OutlineInputBorder()), validator: (value) => RegExp(r'^[a-z0-9][a-z0-9_-]*$').hasMatch(value ?? '') && !['constructor', 'prototype', '__proto__'].contains(value) ? null : 'Enter a safe lowercase slug'),
+                          const SizedBox(height: 8),
+                          SelectableText('https://www.teamweekendtrekkers.com/trips/' + _slugController.text + '/'),
+                          const SizedBox(height: 16),
+                          TextFormField(key: const Key('trip-departure-time'), controller: _departureTimeController, decoration: const InputDecoration(labelText: 'Departure time in India (HH:mm)', helperText: 'Bookings close 24 hours after this time on the first departure day', border: OutlineInputBorder()), validator: (value) => RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch(value ?? '') ? null : 'Use 24-hour time, for example 22:00'),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
                       // About Trip Card
                       _buildSectionCard(
                         title: 'About This Trip',
@@ -426,7 +445,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
 
                       // Image Card
                       _buildSectionCard(
-                        title: 'Display Image',
+                        title: 'Display Image — card 16:9 (1200×675 px)',
                         children: [
                           Text(
                             'Recommended: 1800 × 1200 px (3:2). Keep the main subject near the centre so it also crops well on phones.',
@@ -957,7 +976,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
               children: [
                 const Expanded(
                   child: Text(
-                    'Gallery Images',
+                    'Gallery Photos — 4:3 (1200×900 px)',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -1855,7 +1874,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
             final range = TripDateUtils.parse(label);
             final invalid = range == null;
             final duplicate = range != null && rangeKeyCounts[range.key]! > 1;
-            final expired = range?.isExpired() == true;
+            final expired = range != null && !TripDateUtils.bookingCutoff(range, {..._tripData, 'departureTime': _departureTimeController.text}).isAfter((widget.referenceDate ?? DateTime.now()).toUtc());
             final status = invalid
                 ? 'Invalid — edit or remove before saving'
                 : duplicate
@@ -2046,6 +2065,16 @@ class _TripEditScreenState extends State<TripEditScreen> {
       if (_tripData[field] is String) {
         _tripData[field] = (_tripData[field] as String).trim();
       }
+    }
+
+    final originalSlug = widget.trip?['publicSlug']?.toString() ?? widget.trip?['id']?.toString();
+    final currentSlug = _slugController.text.trim();
+    _tripData['publicSlug'] = currentSlug;
+    _tripData['departureTime'] = _departureTimeController.text.trim();
+    if (originalSlug != null && originalSlug != currentSlug) {
+      final aliases = List<String>.from(_tripData['previousSlugs'] ?? []);
+      if (!aliases.contains(originalSlug)) aliases.add(originalSlug);
+      _tripData['previousSlugs'] = aliases;
     }
 
     // Ensure galleryImages and boardingLocations are preserved

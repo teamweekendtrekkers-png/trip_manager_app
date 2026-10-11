@@ -12,7 +12,7 @@ void main() {
     expect(config['presentation']['heroSlides'], isEmpty);
   });
   test('hero controls preserve safe photos and reject unsupported palettes and injected paths', () {
-    final valid = {'preset':'ocean', 'heroMobileImage':'images/mobile.jpg', 'heroFocalPoint':'top', 'heroMotion':true, 'heroSlides':['images/second.jpg','https://example.com/third.webp']};
+    final valid = {'preset':'ocean', 'heroMobileImage':'images/mobile.jpg', 'heroFocalPoint':'top', 'heroMobileFocalPoint':'bottom', 'heroMotion':true, 'heroSlides':['images/second.jpg','https://example.com/third.webp']};
     expect(HomepageConfig.parse(jsonEncode({'version':1, 'presentation':valid})).toJson()['presentation'], valid);
     for (final invalid in [
       {...valid,'preset':'custom-red'}, {...valid,'heroMobileImage':'images/../secret'},

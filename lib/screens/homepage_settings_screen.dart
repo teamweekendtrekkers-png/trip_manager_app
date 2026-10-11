@@ -328,7 +328,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
 
   Widget _cropPreview(String path, double ratio, String label, double width) {
     final url = path.startsWith('https://') ? path : 'https://raw.githubusercontent.com/' + _target.repositoryOwner + '/' + _target.repositoryName + '/' + _target.branch + '/' + path;
-    final focus = _draft!['presentation']['heroFocalPoint'];
+    final focus = _draft!['presentation'][ratio < 1 ? 'heroMobileFocalPoint' : 'heroFocalPoint'];
     final alignment = switch (focus) {
       'top' => Alignment.topCenter,
       'bottom' => Alignment.bottomCenter,
@@ -482,11 +482,20 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
                           label: const Text('Upload mobile hero photo'),
                         ),
                         DropdownButtonFormField<String>(
+                          key: ValueKey('desktop-focus-' + _draft!['presentation']['heroFocalPoint'].toString()),
                           initialValue: _draft!['presentation']['heroFocalPoint'] as String,
-                          decoration: const InputDecoration(labelText: 'Hero photo focus'),
+                          decoration: const InputDecoration(labelText: 'Desktop hero photo focus'),
                           items: [for (final focus in ['center', 'top', 'bottom', 'left', 'right']) DropdownMenuItem(value: focus, child: Text(focus))],
                           onChanged: (value) => setState(() => _draft!['presentation']['heroFocalPoint'] = value),
                         ),
+                        DropdownButtonFormField<String>(
+                          key: ValueKey('mobile-focus-' + _draft!['presentation']['heroMobileFocalPoint'].toString()),
+                          initialValue: _draft!['presentation']['heroMobileFocalPoint'] as String,
+                          decoration: const InputDecoration(labelText: 'Mobile hero photo focus'),
+                          items: [for (final focus in ['center', 'top', 'bottom', 'left', 'right']) DropdownMenuItem(value: focus, child: Text(focus))],
+                          onChanged: (value) => setState(() => _draft!['presentation']['heroMobileFocalPoint'] = value),
+                        ),
+                        TextButton(onPressed: () => setState(() { _draft!['presentation']['heroFocalPoint'] = 'center'; _draft!['presentation']['heroMobileFocalPoint'] = 'center'; }), child: const Text('Reset both crops to centre')),
                         TextFormField(
                           key: const Key('homepage-hero-slides'),
                           initialValue: (_draft!['presentation']['heroSlides'] as List).join('\n'),
@@ -501,7 +510,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
                           value: _draft!['presentation']['heroMotion'] as bool,
                           onChanged: (value) => setState(() => _draft!['presentation']['heroMotion'] = value),
                         ),
-                        const Text('Use a landscape hero for desktop and a portrait crop for mobile. Original photos are retained.'),
+                        const Text('Desktop hero 16:7 — 1920×840 px. Mobile hero 4:5 — 1080×1350 px. Trip cards 16:9 — 1200×675 px. Gallery 4:3 — 1200×900 px. Keep faces and text away from crop edges. Original photos are retained.'),
                         Wrap(spacing: 12, runSpacing: 12, children: [
                           _cropPreview(_hero['backgroundImage'] as String, 16 / 7, 'Desktop hero', 300),
                           _cropPreview((_draft!['presentation']['heroMobileImage'] as String).isEmpty ? _hero['backgroundImage'] as String : _draft!['presentation']['heroMobileImage'] as String, 4 / 5, 'Mobile hero', 160),
