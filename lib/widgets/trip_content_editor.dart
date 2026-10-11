@@ -27,11 +27,48 @@ class _TripContentEditorState extends State<TripContentEditor> {
     if(result==null||!mounted)return;
     update(key,(s){if(index==null)items.add(result);else items[index]=result;s['items']=items;});
   }
-  void preview(){showDialog<void>(context:context,builder:(ctx)=>AlertDialog(title:const Text('Website content preview'),content:SizedBox(width:900,child:SingleChildScrollView(child:LayoutBuilder(builder:(context,c)=>Column(children:[for(final width in [360.0,760.0])Padding(padding:const EdgeInsets.only(bottom:20),child:SizedBox(width:width.clamp(0,c.maxWidth),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(width==360?'Mobile':'Desktop',style:Theme.of(context).textTheme.titleMedium),for(final key in TripContentSettings.titles.keys)if(widget.value[key]?['mode']!='hidden')...[
-      Text(effective(key)['heading'] as String,style:Theme.of(context).textTheme.titleSmall),
-      for(final raw in effective(key)['items'] as List)Padding(padding:const EdgeInsets.symmetric(vertical:6),child:Text(key=='glance'?'${raw['label']}: ${raw['field']==null||raw['field']==''?raw['value']:widget.trip[raw['field']]??'(linked trip value)'}':key=='faqs'?'${raw['question']}\n${raw['answer']}':key=='guidelines'?'${raw['title']}\n${raw['description']}':'${raw['minDays']}–${raw['maxDays']??'∞'} days: ${raw['percent']}%')),
-      if(key=='cancellation')Text('${effective(key)['refundNote']??''}\n${effective(key)['changeNote']??''}'),const Divider(),
-    ]])))]))))),actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Close'))]));}
+  Widget previewSection(String key) {
+    final s = effective(key);
+    final rows = <Widget>[Text(s['heading'] as String, style: Theme.of(context).textTheme.titleSmall)];
+    for (final raw in s['items'] as List) {
+      final item = raw as Map;
+      String label;
+      if (key == 'glance') {
+        final value = item['field'] == null || item['field'] == '' ? item['value'] : widget.trip[item['field']] ?? '(linked trip value)';
+        label = '${item['label']}: $value';
+      } else if (key == 'faqs') {
+        label = '${item['question']}\n${item['answer']}';
+      } else if (key == 'guidelines') {
+        label = '${item['title']}\n${item['description']}';
+      } else { label = '${item['minDays']}–${item['maxDays'] ?? '∞'} days: ${item['percent']}%'; }
+      rows.add(Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Text(label)));
+    }
+    if (key == 'cancellation') rows.add(Text('${s['refundNote'] ?? ''}\n${s['changeNote'] ?? ''}'));
+    rows.add(const Divider());
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows);
+  }
+  void preview() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Website content preview'),
+        content: SizedBox(width: 900, child: SingleChildScrollView(child: LayoutBuilder(
+          builder: (context, constraints) => Column(children: [
+            for (final width in [360.0, 760.0])
+              Padding(padding: const EdgeInsets.only(bottom: 20), child: SizedBox(
+                width: width.clamp(0, constraints.maxWidth),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(width == 360 ? 'Mobile' : 'Desktop', style: Theme.of(context).textTheme.titleMedium),
+                  for (final key in TripContentSettings.titles.keys)
+                    if (widget.value[key]?['mode'] != 'hidden' && effective(key)['mode'] != 'hidden') previewSection(key),
+                ]),
+              )),
+          ]),
+        ))),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))],
+      ),
+    );
+  }
   @override Widget build(BuildContext context)=>Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
     Text(widget.shared?'Shared trip content':'Customisable website sections',style:Theme.of(context).textTheme.titleLarge),
     const Text('Linked fields follow trip edits. Empty custom lists stay empty. Shared settings apply only to trips using defaults.'),
