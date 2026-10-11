@@ -24,14 +24,6 @@ jobs:
           channel: 'stable'
       - name: Install dependencies
         run: flutter pub get
-      - name: Capture reviewed updated screen goldens
-        run: |
-          flutter test --no-pub --update-goldens test/regression_goldens_test.dart
-          python3 - <<'PY'
-          import base64,pathlib
-          for name in ["trip_editor_dates_invalid_light.png","settings_configuration_dark.png"]:
-              print("GOLDEN:"+name+":"+base64.b64encode(pathlib.Path("test/goldens",name).read_bytes()).decode())
-          PY
       - name: Run tests
         run: flutter test --no-pub
 
