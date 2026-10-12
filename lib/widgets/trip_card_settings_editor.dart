@@ -135,6 +135,7 @@ class _TripCardSettingsEditorState extends State<TripCardSettingsEditor> {
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             const SizedBox(height: 12),
+            _text('cardTitle', 'Short display title', 'Optional; full trip name remains on details'),
             _text(
               'cardSummary',
               'Short card highlight',
@@ -274,7 +275,7 @@ class TripCardPreview extends StatelessWidget {
                     if (category != 'other')
                       Text(TripCardSettings.experiences[category]!),
                     Text(
-                      '${trip['title'] ?? trip['name'] ?? 'Trip name'}',
+                      '${trip['cardTitle'] ?? trip['title'] ?? trip['name'] ?? 'Trip name'}',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     if (location.isNotEmpty) Text(location),

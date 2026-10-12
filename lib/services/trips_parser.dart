@@ -1,11 +1,13 @@
 import '../models/trip_section_settings.dart';
 import '../models/trip_card_settings.dart';
+import '../models/trip_content_settings.dart';
+import 'dart:convert';
 
 /// Parser for the trips-data.js JavaScript file
 /// Handles object format: const tripsData = { tripId: {...}, tripId2: {...} }
 class TripsParser {
   static const Set<String> _supportedSourceTripFields = {
-    'publicSlug', 'previousSlugs', 'departureTime',
+    'contentSections', 'publicSlug', 'previousSlugs', 'departureTime',
     'title',
     'location',
     'badge',
@@ -263,6 +265,7 @@ class TripsParser {
       }
     }
 
+    if (source.containsKey('contentSections')) { try { TripContentSettings.validate(source['contentSections'] as Map); } catch(e) {errors.add('Trip content: '+e.toString());} }
     final itinerary = source['itinerary'];
     if (source.containsKey('expandedSections')) {
       final error = TripSectionSettings.validationError(
@@ -353,7 +356,7 @@ class TripsParser {
   ) {
     final result = <String, dynamic>{'id': tripId};
     const directlyRepresentedFields = {
-      'publicSlug', 'previousSlugs', 'departureTime',
+      'contentSections', 'publicSlug', 'previousSlugs', 'departureTime',
       'title',
       'location',
       'badge',
@@ -598,6 +601,7 @@ class TripsParser {
       writeStringListField('thingsToCarry', const ['thingsToCarry']);
       writeStringListField('perfectFor', const ['perfectFor']);
       writeStringListField('expandedSections', const ['expandedSections']);
+      if (trip.containsKey('contentSections')) buffer.writeln('        contentSections: ${jsonEncode(trip['contentSections'])},');
 
       if (trip.containsKey('boardingLocations')) {
         final boardingLocations = trip['boardingLocations'] as List<dynamic>;
@@ -777,6 +781,7 @@ class TripsParser {
         }
       }
 
+      if (trip.containsKey('contentSections')) {try {TripContentSettings.validate(trip['contentSections'] as Map);} catch(e) {errors.add('Trip content: '+e.toString());}}
       if (trip.containsKey('expandedSections')) {
         final error = TripSectionSettings.validationError(
           trip['expandedSections'],

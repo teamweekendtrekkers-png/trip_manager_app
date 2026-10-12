@@ -8,6 +8,7 @@ import 'data_health_screen.dart';
 import 'deployment_status_screen.dart';
 import 'homepage_settings_screen.dart';
 import 'commerce_settings_screen.dart';
+import 'trip_content_settings_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -456,6 +457,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 24),
 
+                    ListTile(leading: const Icon(Icons.article_outlined), title: const Text('Shared Trip Content'), subtitle: const Text('Defaults for trip facts, cancellation, guidelines and FAQs'), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TripContentSettingsScreen()))),
+
                     // Save Button
                     ElevatedButton.icon(
                       onPressed: _saveSettings,
@@ -470,7 +473,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     // Version info
                     Center(
                       child: Text(
-                        'Trip Manager v1.0.0',
+                        'Trip Manager v1.2.0',
                         style: TextStyle(color: Colors.grey[500], fontSize: 12),
                       ),
                     ),

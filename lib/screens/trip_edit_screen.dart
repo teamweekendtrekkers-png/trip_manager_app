@@ -15,6 +15,10 @@ import '../models/trip_section_settings.dart';
 import '../models/trip_card_settings.dart';
 import '../widgets/trip_section_settings_editor.dart';
 import '../widgets/trip_card_settings_editor.dart';
+import '../widgets/trip_content_editor.dart';
+import '../models/trip_content_settings.dart';
+import '../services/trip_content_service.dart';
+import '../services/github_service.dart';
 import 'trip_brochure_screen.dart';
 
 class TripEditScreen extends StatefulWidget {
@@ -40,6 +44,10 @@ class TripEditScreen extends StatefulWidget {
 class _TripEditScreenState extends State<TripEditScreen> {
   final _formKey = GlobalKey<FormState>();
   late Map<String, dynamic> _tripData;
+  Map<String,dynamic>? _sharedContent;
+  String? _contentError;
+  bool _contentLoading=false;
+  Future<void> _loadSharedContent() async { if(_contentLoading)return;setState(()=>_contentLoading=true); try { final cfg = await TripContentService(GitHubService(settings:context.read<SettingsProvider>().settings)).load(); if(mounted)setState(()=>_sharedContent=Map<String,dynamic>.from(cfg['sections'] as Map)); } catch(e) {if(mounted)setState(()=>_contentError=e.toString());} finally {if(mounted)setState(()=>_contentLoading=false);} }
 
   // Controllers for text fields
   late TextEditingController _slugController;
@@ -118,6 +126,10 @@ class _TripEditScreenState extends State<TripEditScreen> {
       _destinationController,
       _priceController,
       _durationController,
+      _groupSizeController,
+      _distanceController,
+      _elevationController,
+      _bestTimeController,
       _imageController,
     ]) {
       controller.addListener(_updateCardPreview);
@@ -621,6 +633,9 @@ class _TripEditScreenState extends State<TripEditScreen> {
                       _buildWebsiteCardEditor(),
                       const SizedBox(height: 32),
 
+                      if (_sharedContent != null) TripContentEditor(value: Map<String,dynamic>.from(_tripData['contentSections'] as Map? ?? {}), defaults:_sharedContent!, trip:{..._tripData,'duration':_durationController.text,'location':_destinationController.text,'distance':_distanceController.text,'groupSize':_groupSizeController.text,'elevation':_elevationController.text,'bestTime':_bestTimeController.text}, onChanged:(v)=>setState(()=>_tripData['contentSections']=v)),
+                      if (_sharedContent == null) ListTile(title:const Text('Customisable trip sections'),subtitle:Text(_contentError ?? 'Load shared content to customise this trip’s sections.'),trailing:FilledButton(onPressed:_contentLoading?null:_loadSharedContent,child:Text(_contentLoading?'Loading…':'Open editor'))),
+                      const SizedBox(height:16),
                       // Save Button
                       FilledButton.icon(
                         onPressed: _saveTrip,
@@ -744,7 +759,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Shown on this trip’s website page. Leave empty to use defaults: '
+                'Shown on this trip’s website page. An empty list stays hidden. Use defaults to insert: '
                 '${defaults.join(', ')}.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
@@ -2033,6 +2048,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
         .toList();
 
     // Update trip data from controllers - use both field name variations for compatibility
+    try { TripContentSettings.validate(_tripData['contentSections'] as Map? ?? {}); } catch(e) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString()))); return; }
     _tripData['title'] = _nameController.text;
     _tripData['name'] = _nameController.text;
     _tripData['location'] = _destinationController.text;
