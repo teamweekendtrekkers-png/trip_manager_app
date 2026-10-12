@@ -961,7 +961,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 
   void _openBrochure() {
@@ -991,7 +991,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Unable to preview brochure: $error')),
-      ));
+      );
     }
   }
 
@@ -1113,7 +1113,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 
   Future<void> _pickAndUploadImage({bool fromCamera = false}) async {
@@ -1291,7 +1291,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
     if (!mounted || !targetMatches()) {
       throw StateError(
         'GitHub settings changed. The uploaded asset was not applied to this trip.',
-      ));
+      );
     }
     final advice = await photoResolutionAdvice(File(file.path), minWidth: 960);
     if (advice != null && mounted) {
@@ -1554,7 +1554,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 
   void _addBoardingLocation() async {
@@ -1851,7 +1851,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
           ),
         ],
       ),
-    ));
+    );
   }
 
   Widget _buildAvailableDatesEditor() {
