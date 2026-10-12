@@ -13,6 +13,7 @@ class TripContentService {
     if (!file.success) throw StateError(file.error ?? 'Cannot load shared trip content. Publish the website update first.');
     final config = Map<String, dynamic>.from(jsonDecode(file.content) as Map);
     if (config['version'] != 1 || config['sections'] is! Map) throw const FormatException('Unsupported shared content.');
+    (config['sections'] as Map).putIfAbsent('highlights', TripContentSettings.highlightsDefault);
     TripContentSettings.validate(config['sections'] as Map, shared: true);
     _sha = file.sha; _base = file.content;
     return config;

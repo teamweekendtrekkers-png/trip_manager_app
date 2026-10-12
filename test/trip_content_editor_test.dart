@@ -2,13 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trip_manager_app/widgets/trip_content_editor.dart';
 
-void main(){
   Map<String,dynamic> defaults()=>{
     'glance':{'mode':'default','heading':'Trip at a glance','expanded':true,'items':[{'label':'Location','field':'location','value':'','icon':'location'}]},
     'cancellation':{'mode':'default','heading':'Cancellation policy','expanded':false,'items':[{'minDays':0,'maxDays':null,'percent':100}],'refundNote':'Contact us','changeNote':'Contact us'},
     'guidelines':{'mode':'default','heading':'Guidelines','expanded':false,'items':[]},
     'faqs':{'mode':'default','heading':'FAQs','expanded':false,'items':[]},
   };
+
+void main(){
+  testWidgets('renaming highlights preserves trip text and visibility through hide/restore',(tester) async {
+    var value=<String,dynamic>{};
+    await tester.pumpWidget(MaterialApp(home:Scaffold(body:SingleChildScrollView(child:StatefulBuilder(builder:(context,set)=>TripContentEditor(value:value,defaults:defaults(),trip:const {'highlights':['Theyyam night','Coastal sunsets']},onChanged:(next)=>set(()=>value=next)))))));
+    await tester.ensureVisible(find.text('What Makes It Special'));await tester.tap(find.text('What Makes It Special'));await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('content-mode-highlights')));await tester.tap(find.byKey(const ValueKey('content-mode-highlights')));await tester.pumpAndSettle();await tester.tap(find.text('Customise this trip').last);await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('highlights-heading')));await tester.enterText(find.byKey(const ValueKey('highlights-heading')),'Why Choose Us');await tester.pumpAndSettle();
+    expect(value['highlights']['heading'],'Why Choose Us');expect(value['highlights']['items'][0]['description'],'Theyyam night');expect(value['highlights']['useTripHighlights'],false);
+    await tester.ensureVisible(find.byTooltip('Hide item').first);await tester.tap(find.byTooltip('Hide item').first);await tester.pumpAndSettle();expect(value['highlights']['items'][0]['enabled'],false);
+    await tester.ensureVisible(find.byKey(const ValueKey('content-mode-highlights')));await tester.tap(find.byKey(const ValueKey('content-mode-highlights')));await tester.pumpAndSettle();await tester.tap(find.text('Hide section').last);await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('content-mode-highlights')));await tester.pumpAndSettle();await tester.tap(find.text('Customise this trip').last);await tester.pumpAndSettle();expect(value['highlights']['heading'],'Why Choose Us');expect(value['highlights']['items'][0]['enabled'],false);expect(value['highlights']['items'][1]['description'],'Coastal sunsets');
+  });
+
+
   testWidgets('custom section editing preserves linked fields and stable input focus',(tester) async {
     var value=<String,dynamic>{};final inherited=defaults();
     await tester.pumpWidget(MaterialApp(home:Scaffold(body:SingleChildScrollView(child:StatefulBuilder(builder:(context,set)=>TripContentEditor(value:value,defaults:inherited,trip:const {'location':'Kannur'},onChanged:(next)=>set(()=>value=next)))))));
