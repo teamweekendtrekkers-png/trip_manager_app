@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../widgets/trip_editor_sections.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -27,6 +28,7 @@ class TripEditScreen extends StatefulWidget {
   final Future<String?> Function()? cardCoverUploader;
   final Widget Function(String path)? cardImagePreviewBuilder;
   final DateTime? referenceDate;
+  final TripEditorSection initialSection;
 
   const TripEditScreen({
     super.key,
@@ -35,6 +37,7 @@ class TripEditScreen extends StatefulWidget {
     this.cardCoverUploader,
     this.cardImagePreviewBuilder,
     this.referenceDate,
+    this.initialSection = TripEditorSection.all,
   });
 
   @override
@@ -43,6 +46,8 @@ class TripEditScreen extends StatefulWidget {
 
 class _TripEditScreenState extends State<TripEditScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _editorScroll=ScrollController();
+  TripEditorSection _editingSection = TripEditorSection.all;
   late Map<String, dynamic> _tripData;
   Map<String,dynamic>? _sharedContent;
   String? _contentError;
@@ -73,7 +78,8 @@ class _TripEditScreenState extends State<TripEditScreen> {
   @override
   void initState() {
     super.initState();
-    _tripData = Map<String, dynamic>.from(widget.trip ?? _getDefaultTrip());
+    _editingSection=widget.initialSection;
+    _tripData = TripContentSettings.copy(widget.trip ?? _getDefaultTrip());
 
     _slugController = TextEditingController(text: _tripData['publicSlug']?.toString() ?? _tripData['id']?.toString() ?? '');
     _departureTimeController = TextEditingController(text: TripDateUtils.departureClock(_tripData));
@@ -172,6 +178,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
 
   @override
   void dispose() {
+    _editorScroll.dispose();
     _slugController.dispose();
     _departureTimeController.dispose();
     _nameController.dispose();
@@ -195,6 +202,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(isEditing ? 'Edit Trip' : 'New Trip'),
+        bottom: PreferredSize(preferredSize: const Size.fromHeight(70), child: TripEditorSectionPicker(value:_editingSection,onChanged:(section){setState(()=>_editingSection=section);WidgetsBinding.instance.addPostFrameCallback((_){if(mounted&&_editorScroll.hasClients)_editorScroll.jumpTo(0);});})),
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
@@ -217,10 +225,11 @@ class _TripEditScreenState extends State<TripEditScreen> {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1080),
                 child: SingleChildScrollView(
+                  controller:_editorScroll,
                   padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
+                    children: visibleEditorChildren(_editingSection, [
                       Text(
                         isEditing ? 'Update trip details' : 'Create a new trip',
                         style: Theme.of(context).textTheme.headlineSmall
@@ -228,7 +237,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Work through each section, save the draft, then publish it from the trips workspace.',
+                        'Choose a section above, preview your draft, then save it to the workspace. Publish separately when ready.',
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
@@ -303,6 +312,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
                         children: [
                           _responsivePair(
                             TextFormField(
+                              key:const Key('trip-price'),
                               controller: _priceController,
                               decoration: const InputDecoration(
                                 labelText: 'Price (₹) *',
@@ -450,11 +460,13 @@ class _TripEditScreenState extends State<TripEditScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          _buildAvailableDatesEditor(),
+
                         ],
                       ),
                       const SizedBox(height: 16),
 
+                      _buildSectionCard(title:'Departure Dates',children:[_buildAvailableDatesEditor()]),
+                      const SizedBox(height:16),
                       // Image Card
                       _buildSectionCard(
                         title: 'Display Image — card 16:9 (1200×675 px)',
@@ -610,7 +622,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
                       const SizedBox(height: 16),
 
                       // Website display preferences do not alter trip or PDF content.
-                      TripSectionSettingsEditor(
+                      TripEditorPanel(section:TripEditorSection.website,child:TripSectionSettingsEditor(
                         key: const ValueKey('website-section-display'),
                         expandedSections: TripSectionSettings.expandedFor(
                           _tripData,
@@ -618,7 +630,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
                         onChanged: (sections) => setState(() {
                           _tripData['expandedSections'] = sections;
                         }),
-                      ),
+                      )),
                       const SizedBox(height: 16),
 
                       // Boarding Locations Card
@@ -633,8 +645,8 @@ class _TripEditScreenState extends State<TripEditScreen> {
                       _buildWebsiteCardEditor(),
                       const SizedBox(height: 32),
 
-                      if (_sharedContent != null) TripContentEditor(value: Map<String,dynamic>.from(_tripData['contentSections'] as Map? ?? {}), defaults:_sharedContent!, trip:{..._tripData,'duration':_durationController.text,'location':_destinationController.text,'distance':_distanceController.text,'groupSize':_groupSizeController.text,'elevation':_elevationController.text,'bestTime':_bestTimeController.text}, onChanged:(v)=>setState(()=>_tripData['contentSections']=v)),
-                      if (_sharedContent == null) ListTile(title:const Text('Customisable trip sections'),subtitle:Text(_contentError ?? 'Load shared content to customise this trip’s sections.'),trailing:FilledButton(onPressed:_contentLoading?null:_loadSharedContent,child:Text(_contentLoading?'Loading…':'Open editor'))),
+                      if (_sharedContent != null) TripEditorPanel(section:TripEditorSection.website,child:TripContentEditor(value: Map<String,dynamic>.from(_tripData['contentSections'] as Map? ?? {}), defaults:_sharedContent!, trip:{..._tripData,'duration':_durationController.text,'location':_destinationController.text,'distance':_distanceController.text,'groupSize':_groupSizeController.text,'elevation':_elevationController.text,'bestTime':_bestTimeController.text}, onChanged:(v)=>setState(()=>_tripData['contentSections']=v))),
+                      if (_sharedContent == null) TripEditorPanel(section:TripEditorSection.website,child:ListTile(title:const Text('Customisable trip sections'),subtitle:Text(_contentError ?? 'Load shared content to customise this trip’s sections.'),trailing:FilledButton(onPressed:_contentLoading?null:_loadSharedContent,child:Text(_contentLoading?'Loading…':'Open editor')))),
                       const SizedBox(height:16),
                       // Save Button
                       FilledButton.icon(
@@ -646,7 +658,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                    ],
+                    ]),
                   ),
                 ),
               ),
@@ -654,10 +666,11 @@ class _TripEditScreenState extends State<TripEditScreen> {
           ),
         ),
       ),
+      bottomNavigationBar: SafeArea(child: Padding(padding:const EdgeInsets.fromLTRB(16,8,16,12),child:Row(children:[Expanded(child:OutlinedButton.icon(onPressed:_previewDraft,icon:const Icon(Icons.preview_outlined),label:const Text('Preview draft'))),const SizedBox(width:12),Expanded(child:FilledButton.icon(key:const Key('editor-save-draft'),onPressed:_saveTrip,icon:const Icon(Icons.save_outlined),label:const Text('Save draft')))]))),
     );
   }
 
-  Widget _buildWebsiteCardEditor() => TripCardSettingsEditor(
+  Widget _buildWebsiteCardEditor() => TripEditorPanel(section:TripEditorSection.website,child:TripCardSettingsEditor(
     key: const Key('website-trip-card'),
     trip: {
       ..._tripData,
@@ -696,13 +709,21 @@ class _TripEditScreenState extends State<TripEditScreen> {
             child: Center(child: Icon(Icons.broken_image, size: 48)),
           ),
         ),
-  );
+  ));
+
+  void _previewDraft() {
+    final next={..._tripData,'title':_nameController.text,'location':_destinationController.text,'price':_priceController.text,'duration':_durationController.text,'availableDates':_availableDates,'departureTime':_departureTimeController.text};
+    final ranges=TripDateUtils.getUpcomingDateRanges(next,referenceDate:widget.referenceDate);
+    showDialog<void>(context:context,builder:(ctx)=>AlertDialog(title:const Text('Draft preview'),content:SizedBox(width:640,child:SingleChildScrollView(child:Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisSize:MainAxisSize.min,children:[
+      Text(_nameController.text,style:Theme.of(ctx).textTheme.titleLarge),const SizedBox(height:8),Text(_destinationController.text),const SizedBox(height:8),Text('Price per person: '+_priceController.text),Text('Duration: '+_durationController.text),Text('Difficulty: '+(_tripData['difficulty']?.toString()??'')),const Divider(),const Text('Eligible departures'),for(final date in ranges)Padding(padding:const EdgeInsets.symmetric(vertical:4),child:Text(date.fullLabel)),if(ranges.isEmpty)const Text('New dates coming soon'),const Divider(),Text(_descriptionController.text),const SizedBox(height:16),const Text('Content preview only. Saving and publishing are separate actions.'),
+    ]))),actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Close'))]));
+  }
 
   Widget _buildSectionCard({
     required String title,
     required List<Widget> children,
   }) {
-    return Card(
+    return TripEditorPanel(section:editorSectionFor(title),child:Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -717,7 +738,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 
   Widget _responsivePair(Widget first, Widget second) {
@@ -742,7 +763,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
     required String title,
     required List<String> defaults,
   }) {
-    return Column(
+    return TripEditorPanel(section:TripEditorSection.itinerary,child:Column(
       key: ValueKey('trip-detail-list-$field'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -775,7 +796,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
           ),
         ),
       ],
-    );
+    ));
   }
 
   Widget _buildListSection({
@@ -785,7 +806,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
     required Function(int) onRemove,
     required Function(int, String) onEdit,
   }) {
-    return Card(
+    return TripEditorPanel(section:TripEditorSection.itinerary,child:Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -856,7 +877,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildItinerarySection() {
@@ -864,7 +885,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
       _tripData['itinerary'] ?? [],
     );
 
-    return Card(
+    return TripEditorPanel(section:TripEditorSection.itinerary,child:Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -943,7 +964,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 
   void _openBrochure() {
@@ -980,7 +1001,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
   Widget _buildGallerySection() {
     final galleryImages = List<String>.from(_tripData['galleryImages'] ?? []);
 
-    return Card(
+    return TripEditorPanel(section:TripEditorSection.photos,child:Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -1095,7 +1116,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 
   Future<void> _pickAndUploadImage({bool fromCamera = false}) async {
@@ -1297,7 +1318,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
     final defaultPickupPoints = TripsParser.getDefaultPickupPoints();
     final hasCustomLocations = boardingLocations.isNotEmpty;
 
-    return Card(
+    return TripEditorPanel(section:TripEditorSection.dates,child:Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -1536,7 +1557,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 
   void _addBoardingLocation() async {
@@ -2002,6 +2023,8 @@ class _TripEditScreenState extends State<TripEditScreen> {
   }
 
   void _saveTrip() {
+    if(_editingSection!=TripEditorSection.all){setState(()=>_editingSection=TripEditorSection.all);WidgetsBinding.instance.addPostFrameCallback((_){if(mounted){if(_editorScroll.hasClients)_editorScroll.jumpTo(0);_saveTrip();}});return;}
+
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all required fields')),
@@ -2142,12 +2165,10 @@ class _TripEditScreenState extends State<TripEditScreen> {
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(isEditing ? 'Trip updated!' : 'Trip added!'),
+        content: Text(isEditing ? 'Draft saved to workspace. Publish when ready.' : 'New trip saved to workspace. Publish when ready.'),
         action: SnackBarAction(
-          label: 'Save to GitHub',
-          onPressed: () {
-            // This will be handled in the list screen
-          },
+          label: 'OK',
+          onPressed: () {},
         ),
       ),
     );

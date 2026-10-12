@@ -26,6 +26,14 @@ jobs:
         run: flutter pub get
       - name: Run tests
         run: flutter test --no-pub
+      - name: Upload manager review previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: manager-review-previews
+          path: build/reviews/*.png
+          if-no-files-found: warn
+          retention-days: 30
 
   build-android:
     needs: test
