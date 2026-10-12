@@ -99,22 +99,3 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 # Windows is the supported desktop target for this application.
-
-  review-goldens:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.38.5'
-          channel: 'stable'
-      - run: flutter pub get
-      - name: Render updated screens for visual review
-        run: flutter test --update-goldens test/regression_goldens_test.dart
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: manager-golden-review
-          path: test/goldens/*.png
-          if-no-files-found: error
