@@ -20,6 +20,7 @@ void main(){
     await tester.ensureVisible(find.byTooltip('Hide item'));await tester.tap(find.byTooltip('Hide item'));await tester.pumpAndSettle();expect(value['glance']['items'][0]['enabled'],false);expect(value['glance']['items'][0]['field'],'location');
     await tester.ensureVisible(find.byKey(const ValueKey('content-mode-glance')));
     await tester.tap(find.byKey(const ValueKey('content-mode-glance')));await tester.pumpAndSettle();await tester.tap(find.text('Hide section').last);await tester.pumpAndSettle();expect(value['glance']['mode'],'hidden');
+    await tester.tap(find.byKey(const ValueKey('content-mode-glance')));await tester.pumpAndSettle();await tester.tap(find.text('Customise this trip').last);await tester.pumpAndSettle();expect(value['glance']['heading'],'Coastal trip facts');expect(value['glance']['items'][0]['enabled'],false);
   });
   testWidgets('content preview displays both mobile and desktop linked values',(tester) async {
     await tester.pumpWidget(MaterialApp(home:Scaffold(body:SingleChildScrollView(child:TripContentEditor(value:const {},defaults:defaults(),trip:const {'location':'Kannur'},onChanged:(_){})))));

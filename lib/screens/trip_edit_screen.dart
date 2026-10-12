@@ -126,6 +126,10 @@ class _TripEditScreenState extends State<TripEditScreen> {
       _destinationController,
       _priceController,
       _durationController,
+      _groupSizeController,
+      _distanceController,
+      _elevationController,
+      _bestTimeController,
       _imageController,
     ]) {
       controller.addListener(_updateCardPreview);

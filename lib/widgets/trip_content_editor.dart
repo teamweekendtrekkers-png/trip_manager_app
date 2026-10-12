@@ -10,7 +10,7 @@ class TripContentEditor extends StatefulWidget {
 }
 class _TripContentEditorState extends State<TripContentEditor> {
   Map<String,dynamic> draft()=>TripContentSettings.copy(widget.value);
-  Map<String,dynamic> effective(String key)=>TripContentSettings.copy(widget.value[key] is Map && (widget.shared || widget.value[key]['mode']=='custom') ? widget.value[key] as Map : widget.defaults[key] as Map);
+  Map<String,dynamic> effective(String key)=>TripContentSettings.copy(widget.value[key] is Map && (widget.shared || (['custom','hidden'].contains(widget.value[key]['mode']) && widget.value[key]['items'] is List)) ? widget.value[key] as Map : widget.defaults[key] as Map);
   void update(String key, void Function(Map<String,dynamic>) change){final next=draft();final section=effective(key);section['mode']=widget.shared?'default':'custom';change(section);next[key]=section;widget.onChanged(next);}
   Future<void> editItem(String key,{int? index}) async {
     final section=effective(key),items=List<dynamic>.from(effective(key)['items'] as List);
