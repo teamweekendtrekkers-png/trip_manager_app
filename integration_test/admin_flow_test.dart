@@ -190,6 +190,7 @@ void registerAdminFlowTests() {
       await tester.tap(find.text('Beta Trek'));
       await tester.pumpAndSettle();
       expect(find.text('Edit Trip'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('editor-section-picker')));await tester.pumpAndSettle();await tester.tap(find.text('All sections').last);await tester.pumpAndSettle();
 
       // Exercise the production calendar editor: replace the legacy value
       // with a newly selected range before saving the trip.
@@ -350,7 +351,7 @@ void registerAdminFlowTests() {
       // atomic commit call production makes, but performs no external request.
       await tester.tap(find.byIcon(Icons.cloud_upload));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Push'));
+      await tester.tap(find.text('Publish to website'));
       // A full pumpAndSettle advances through the five-second snackbar and
       // removes the success evidence before the assertion can observe it.
       await tester.pump();
@@ -399,7 +400,7 @@ void registerAdminFlowTests() {
 
     await tester.tap(find.byIcon(Icons.cloud_upload));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Push'));
+    await tester.tap(find.text('Publish to website'));
     await tester.pumpAndSettle();
 
     expect(find.text('Conflict Detected'), findsWidgets);

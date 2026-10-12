@@ -221,7 +221,7 @@ class ManagerNavigationDrawer extends StatelessWidget {
           NavigationDrawerDestination(
             icon: Icon(destination.icon),
             selectedIcon: Icon(destination.selectedIcon),
-            label: Text(destination.label),
+            label: SizedBox(width:160,child:Text(destination.label,maxLines:2,overflow:TextOverflow.ellipsis)),
           ),
       ],
     );

@@ -37,6 +37,7 @@ void main() {
     expect(find.text('Website content'), findsOneWidget);
     expect(find.text('Payments & coupons'), findsOneWidget);
     expect(find.text('Shared trip content'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Data health'),120,scrollable:find.descendant(of:find.byKey(const Key('manager-desktop-navigation')),matching:find.byType(Scrollable)).first);
     expect(find.text('Data health'), findsOneWidget);
     expect(find.text('Publishing status'), findsOneWidget);
     expect(find.text('2 Trips'), findsNothing);
@@ -70,7 +71,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('manager-mobile-navigation')), findsOneWidget);
-    expect(find.text('Homepage'), findsOneWidget);
+    expect(find.text('Website content'), findsOneWidget);
     expect(find.text('Departures'), findsWidgets);
     expect(find.text('Settings'), findsOneWidget);
     expect(tester.takeException(), isNull);
