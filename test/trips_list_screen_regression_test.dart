@@ -324,7 +324,7 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.cloud_upload));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Push'));
+    await tester.tap(find.text('Publish to website'));
     await tester.pumpAndSettle();
     expect(find.text('Conflict Detected'), findsWidgets);
     expect(provider.trips.single['title'], 'Local Trek');

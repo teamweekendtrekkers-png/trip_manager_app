@@ -48,6 +48,17 @@ void main() {
     matching: find.byIcon(Icons.save),
   );
 
+  testWidgets('switching sections retains draft fields and saving validates the complete trip',(tester) async {
+    final source=tripWithDates(['Jan 1-2, 2099']);final provider=TripsProvider(AppSettings())..addTrip(source);provider.markChangesSaved();
+    await tester.pumpWidget(buildSubject(provider,source));
+    await tester.enterText(find.byKey(const ValueKey('trip-name')),'Updated weekend');
+    await tester.tap(find.byKey(const Key('editor-section-picker')));await tester.pumpAndSettle();await tester.tap(find.text('Dates & price').last);await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('trip-name')),findsNothing);expect(find.byKey(const Key('trip-price')),findsOneWidget);
+    await tester.enterText(find.byKey(const Key('trip-price')),'4999');
+    await tester.tap(find.byKey(const Key('editor-save-draft')));await tester.pumpAndSettle();
+    expect(provider.trips.single['title'],'Updated weekend');expect(provider.trips.single['price'],'₹4999');expect(provider.trips.single['highlights'],source['highlights']);expect(provider.hasUnsavedChanges,true);
+  });
+
   testWidgets('keeps an invalid legacy date visible and blocks saving', (
     tester,
   ) async {

@@ -6,6 +6,8 @@ enum ManagerDestination {
   trips,
   homepage,
   batches,
+  payments,
+  sharedContent,
   health,
   deployment,
   settings,
@@ -14,10 +16,12 @@ enum ManagerDestination {
 extension ManagerDestinationDetails on ManagerDestination {
   String get label => switch (this) {
     ManagerDestination.trips => 'Trips',
-    ManagerDestination.homepage => 'Homepage',
-    ManagerDestination.batches => 'Upcoming batches',
+    ManagerDestination.homepage => 'Website content',
+    ManagerDestination.batches => 'Departures',
+    ManagerDestination.payments => 'Payments & coupons',
+    ManagerDestination.sharedContent => 'Shared trip content',
     ManagerDestination.health => 'Data health',
-    ManagerDestination.deployment => 'Deployment',
+    ManagerDestination.deployment => 'Publishing status',
     ManagerDestination.settings => 'Settings',
   };
 
@@ -25,6 +29,8 @@ extension ManagerDestinationDetails on ManagerDestination {
     ManagerDestination.trips => 'Manage every trip',
     ManagerDestination.homepage => 'Edit website content',
     ManagerDestination.batches => 'Preview departures',
+    ManagerDestination.payments => 'UPI and discount codes',
+    ManagerDestination.sharedContent => 'FAQs, policies and trip highlights',
     ManagerDestination.health => 'Check website data',
     ManagerDestination.deployment => 'Monitor publishing',
     ManagerDestination.settings => 'Repository and contact',
@@ -34,6 +40,8 @@ extension ManagerDestinationDetails on ManagerDestination {
     ManagerDestination.trips => Icons.route_outlined,
     ManagerDestination.homepage => Icons.web_outlined,
     ManagerDestination.batches => Icons.calendar_month_outlined,
+    ManagerDestination.payments => Icons.payments_outlined,
+    ManagerDestination.sharedContent => Icons.article_outlined,
     ManagerDestination.health => Icons.health_and_safety_outlined,
     ManagerDestination.deployment => Icons.rocket_launch_outlined,
     ManagerDestination.settings => Icons.settings_outlined,
@@ -43,6 +51,8 @@ extension ManagerDestinationDetails on ManagerDestination {
     ManagerDestination.trips => Icons.route,
     ManagerDestination.homepage => Icons.web,
     ManagerDestination.batches => Icons.calendar_month,
+    ManagerDestination.payments => Icons.payments,
+    ManagerDestination.sharedContent => Icons.article,
     ManagerDestination.health => Icons.health_and_safety,
     ManagerDestination.deployment => Icons.rocket_launch,
     ManagerDestination.settings => Icons.settings,
@@ -107,13 +117,13 @@ class ManagerSideNavigation extends StatelessWidget {
               ),
               const Divider(),
               const SizedBox(height: 8),
-              for (final destination in ManagerDestination.values)
+              Expanded(child: ListView(children:[for (final destination in ManagerDestination.values)
                 _SideDestination(
                   destination: destination,
                   selected: destination == selected,
                   onTap: () => onSelected(destination),
                 ),
-              const Spacer(),
+              ])),
               Padding(
                 padding: const EdgeInsets.all(18),
                 child: Container(
