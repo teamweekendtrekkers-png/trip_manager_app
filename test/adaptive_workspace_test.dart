@@ -45,6 +45,7 @@ void main() {
     expect(find.text('Shared trip content'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Data health'),120,scrollable:find.descendant(of:find.byKey(const Key('manager-desktop-navigation')),matching:find.byType(Scrollable)).first);
     expect(find.text('Data health'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Publishing status'),100,scrollable:find.descendant(of:find.byKey(const Key('manager-desktop-navigation')),matching:find.byType(Scrollable)).first);
     expect(find.text('Publishing status'), findsOneWidget);
     expect(find.text('2 Trips'), findsNothing);
     expect(find.text('2'), findsWidgets);
