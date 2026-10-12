@@ -228,6 +228,15 @@ class _TripsListScreenState extends State<TripsListScreen> {
     }
   }
 
+  Widget _buildPublishBar(TripsProvider provider) {
+    final status=Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisSize:MainAxisSize.min,children:[
+      Text(_publishing?'Publishing…':provider.isLoading?'Loading…':provider.error!=null?'Needs attention':provider.hasUnsavedChanges?'Draft changes':!provider.hasCompleteRemoteSnapshot?'Load trips first':_publishedCommitSha!=null?'Saved · check deployment':'Synced with GitHub',key:const Key('workspace-publish-state'),style:const TextStyle(fontWeight:FontWeight.w600)),
+      Text(_publishFailure??(provider.hasUnsavedChanges?'Draft edits are in this workspace; publish when ready.':_publishedCommitSha!=null?'Open publishing status to verify the live website.':'Workspace edits are not live until published.'),maxLines:2,overflow:TextOverflow.ellipsis,style:Theme.of(context).textTheme.bodySmall),
+    ]);
+    final action=FilledButton.icon(key:const Key('workspace-publish'),onPressed:provider.isLoading||_publishing||!provider.hasTrips?null:()=>_saveTrips(provider),icon:const Icon(Icons.cloud_upload),label:const Text('Review & publish'));
+    return Padding(padding:const EdgeInsets.fromLTRB(16,8,16,8),child:LayoutBuilder(builder:(context,constraints)=>constraints.maxWidth<600?Column(crossAxisAlignment:CrossAxisAlignment.stretch,mainAxisSize:MainAxisSize.min,children:[status,const SizedBox(height:8),action]):Row(children:[Expanded(child:status),const SizedBox(width:12),action])));
+  }
+
   void _showMoreTools(){
     showModalBottomSheet<void>(context:context,isScrollControlled:true,builder:(ctx)=>SafeArea(child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
       const Padding(padding:EdgeInsets.all(16),child:Text('More tools',style:TextStyle(fontSize:20,fontWeight:FontWeight.w600))),
@@ -359,12 +368,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
         ],
       ),
       bottomNavigationBar: SafeArea(child:Column(mainAxisSize:MainAxisSize.min,children:[
-        Padding(padding:const EdgeInsets.fromLTRB(16,8,16,8),child:Row(children:[
-          Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-            Text(_publishing?'Publishing…':provider.isLoading?'Loading…':provider.error!=null?'Needs attention':provider.hasUnsavedChanges?'Draft changes':!provider.hasCompleteRemoteSnapshot?'Load trips first':_publishedCommitSha!=null?'Saved · check deployment':'Synced with GitHub',key:const Key('workspace-publish-state'),style:const TextStyle(fontWeight:FontWeight.w600)),
-            Text(_publishFailure??(provider.hasUnsavedChanges?'Draft edits are in this workspace; publish when ready.':_publishedCommitSha!=null?'Open publishing status to verify the live website.':'Workspace edits are not live until published.'),maxLines:2,overflow:TextOverflow.ellipsis,style:Theme.of(context).textTheme.bodySmall),
-          ])),const SizedBox(width:12),FilledButton.icon(key:const Key('workspace-publish'),onPressed:provider.isLoading||_publishing||!provider.hasTrips?null:()=>_saveTrips(provider),icon:const Icon(Icons.cloud_upload),label:const Text('Review & publish')),
-        ])),
+        _buildPublishBar(provider),
         if(!isDesktop)NavigationBar(key:const Key('manager-bottom-navigation'),selectedIndex:0,onDestinationSelected:(index){if(index==1)_openDestination(ManagerDestination.batches);if(index==2)_openDestination(ManagerDestination.homepage);if(index==3)_showMoreTools();},destinations:const [NavigationDestination(icon:Icon(Icons.route_outlined),label:'Trips'),NavigationDestination(icon:Icon(Icons.calendar_month_outlined),label:'Departures'),NavigationDestination(icon:Icon(Icons.web_outlined),label:'Website'),NavigationDestination(icon:Icon(Icons.more_horiz),label:'More')]),
       ])),
       body: CallbackShortcuts(

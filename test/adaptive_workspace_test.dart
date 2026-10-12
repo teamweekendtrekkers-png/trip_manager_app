@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/material.dart';
@@ -16,8 +17,13 @@ import 'package:trip_manager_app/theme/app_theme.dart';
 void main() {
   for(final size in [const Size(390,844),const Size(1440,900)]) {
     testWidgets('manager usability preview at '+size.width.toInt().toString(),(tester) async {
-      await _setSize(tester,size);final providers=await _providers();
-      const key=Key('manager-usability-preview');await tester.pumpWidget(RepaintBoundary(key:key,child:_app(providers)));await tester.pumpAndSettle();expect(tester.takeException(),isNull);
+      await _setSize(tester,size);await tester.runAsync(() async {
+        final sdk=Platform.environment['FLUTTER_ROOT'];if(sdk==null)return;
+        for(final entry in {'Roboto':'Roboto-Regular.ttf','MaterialIcons':'MaterialIcons-Regular.otf'}.entries){
+          final file=File(sdk+'/bin/cache/artifacts/material_fonts/'+entry.value);if(!file.existsSync())continue;final data=file.readAsBytesSync();final loader=FontLoader(entry.key)..addFont(Future.value(ByteData.sublistView(data)));await loader.load();
+        }
+      });final providers=await _providers();
+      const key=Key('manager-usability-preview');await tester.pumpWidget(RepaintBoundary(key:key,child:_app(providers,previewFonts:true)));await tester.pumpAndSettle();expect(tester.takeException(),isNull);
       await tester.runAsync(() async {final boundary=tester.renderObject<RenderRepaintBoundary>(find.byKey(key));final image=await boundary.toImage(pixelRatio:1);final bytes=await image.toByteData(format:ui.ImageByteFormat.png);image.dispose();
       final directory=Directory('build/reviews')..createSync(recursive:true);File(directory.path+'/manager-'+size.width.toInt().toString()+'.png').writeAsBytesSync(bytes!.buffer.asUint8List());});
     });
@@ -98,14 +104,14 @@ Future<({TripsProvider trips, SettingsProvider settings})> _providers() async {
   );
 }
 
-Widget _app(({TripsProvider trips, SettingsProvider settings}) providers) {
+Widget _app(({TripsProvider trips, SettingsProvider settings}) providers,{bool previewFonts=false}) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider.value(value: providers.trips),
       ChangeNotifierProvider.value(value: providers.settings),
     ],
     child: MaterialApp(
-      theme: AppTheme.light(),
+      theme: previewFonts?AppTheme.light().copyWith(textTheme:AppTheme.light().textTheme.apply(fontFamily:'Roboto'),appBarTheme:AppTheme.light().appBarTheme.copyWith(titleTextStyle:AppTheme.light().appBarTheme.titleTextStyle?.copyWith(fontFamily:'Roboto'))):AppTheme.light(),
       darkTheme: AppTheme.dark(),
       scrollBehavior: const ManagerScrollBehavior(),
       home: const TripsListScreen(),
