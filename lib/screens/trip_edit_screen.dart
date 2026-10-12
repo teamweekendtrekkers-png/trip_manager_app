@@ -46,6 +46,7 @@ class TripEditScreen extends StatefulWidget {
 
 class _TripEditScreenState extends State<TripEditScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _editorScroll=ScrollController();
   TripEditorSection _editingSection = TripEditorSection.all;
   late Map<String, dynamic> _tripData;
   Map<String,dynamic>? _sharedContent;
@@ -177,6 +178,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
 
   @override
   void dispose() {
+    _editorScroll.dispose();
     _slugController.dispose();
     _departureTimeController.dispose();
     _nameController.dispose();
@@ -200,7 +202,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(isEditing ? 'Edit Trip' : 'New Trip'),
-        bottom: PreferredSize(preferredSize: const Size.fromHeight(70), child: TripEditorSectionPicker(value:_editingSection,onChanged:(section)=>setState(()=>_editingSection=section))),
+        bottom: PreferredSize(preferredSize: const Size.fromHeight(70), child: TripEditorSectionPicker(value:_editingSection,onChanged:(section){setState(()=>_editingSection=section);WidgetsBinding.instance.addPostFrameCallback((_){if(mounted&&_editorScroll.hasClients)_editorScroll.jumpTo(0);});})),
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
@@ -223,6 +225,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1080),
                 child: SingleChildScrollView(
+                  controller:_editorScroll,
                   padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2020,7 +2023,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
   }
 
   void _saveTrip() {
-    if(_editingSection!=TripEditorSection.all){setState(()=>_editingSection=TripEditorSection.all);WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)_saveTrip();});return;}
+    if(_editingSection!=TripEditorSection.all){setState(()=>_editingSection=TripEditorSection.all);WidgetsBinding.instance.addPostFrameCallback((_){if(mounted){if(_editorScroll.hasClients)_editorScroll.jumpTo(0);_saveTrip();}});return;}
 
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
