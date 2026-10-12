@@ -3,10 +3,10 @@ class TripDetailDefaults {
   const TripDetailDefaults._();
 
   static const thingsToCarry = <String>[
-    'Trekking shoes',
-    '2L water bottle',
-    'Torch/Headlamp',
-    'Warm jacket',
+    'Comfortable walking shoes',
+    'Water bottle',
+    'Phone charger',
+    'Weather-appropriate clothes',
     'ID proof (original)',
     'Energy bars/snacks',
     'Personal medicines',

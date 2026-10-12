@@ -754,7 +754,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Shown on this trip’s website page. Leave empty to use defaults: '
+                'Shown on this trip’s website page. An empty list stays hidden. Use defaults to insert: '
                 '${defaults.join(', ')}.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),

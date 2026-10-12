@@ -115,7 +115,7 @@ void main() {
     'empty/inactive trips retain defaults and never advertise stale departures',
     () {
       expect(content(brochure({})), contains('Detailed itinerary coming soon'));
-      expect(content(brochure({})), contains('Trekking shoes'));
+      expect(content(brochure({})), contains('Comfortable walking shoes'));
       expect(
         content(
           brochure({

@@ -133,7 +133,7 @@ class TripBrochure {
       'perfectFor': ('Perfect for', TripDetailDefaults.perfectFor),
     }.entries) {
       final custom = _items(trip[entry.key]);
-      final values = custom.isEmpty ? entry.value.$2 : custom;
+      final values = trip[entry.key] is List ? custom : entry.value.$2;
       section(
         entry.value.$1,
         entry.key == 'thingsToCarry'
@@ -141,7 +141,7 @@ class TripBrochure {
             : values,
       );
     }
-    final id = _text(trip['id']);
+    final id = _text(trip['publicSlug'] ?? trip['id']);
     final bookingUrl = RegExp(r'^[a-z0-9][a-z0-9_-]*$').hasMatch(id)
         ? 'https://www.teamweekendtrekkers.com/trips/$id/'
         : 'https://www.teamweekendtrekkers.com/trips.html';
