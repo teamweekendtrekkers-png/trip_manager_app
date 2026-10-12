@@ -46,7 +46,8 @@ class _TripEditScreenState extends State<TripEditScreen> {
   late Map<String, dynamic> _tripData;
   Map<String,dynamic>? _sharedContent;
   String? _contentError;
-  Future<void> _loadSharedContent() async { try { final cfg = await TripContentService(GitHubService(settings:context.read<SettingsProvider>().settings)).load(); if(mounted)setState(()=>_sharedContent=Map<String,dynamic>.from(cfg['sections'] as Map)); } catch(e) {if(mounted)setState(()=>_contentError=e.toString());} }
+  bool _contentLoading=false;
+  Future<void> _loadSharedContent() async { if(_contentLoading)return;setState(()=>_contentLoading=true); try { final cfg = await TripContentService(GitHubService(settings:context.read<SettingsProvider>().settings)).load(); if(mounted)setState(()=>_sharedContent=Map<String,dynamic>.from(cfg['sections'] as Map)); } catch(e) {if(mounted)setState(()=>_contentError=e.toString());} finally {if(mounted)setState(()=>_contentLoading=false);} }
 
   // Controllers for text fields
   late TextEditingController _slugController;
@@ -629,7 +630,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
                       const SizedBox(height: 32),
 
                       if (_sharedContent != null) TripContentEditor(value: Map<String,dynamic>.from(_tripData['contentSections'] as Map? ?? {}), defaults:_sharedContent!, trip:{..._tripData,'duration':_durationController.text,'location':_destinationController.text,'distance':_distanceController.text,'groupSize':_groupSizeController.text,'elevation':_elevationController.text,'bestTime':_bestTimeController.text}, onChanged:(v)=>setState(()=>_tripData['contentSections']=v)),
-                      if (_sharedContent == null) ListTile(title:const Text('Customisable trip sections'),subtitle:Text(_contentError ?? 'Load shared content to customise this trip’s sections.'),trailing:IconButton(onPressed:_loadSharedContent,icon:const Icon(Icons.refresh))),
+                      if (_sharedContent == null) ListTile(title:const Text('Customisable trip sections'),subtitle:Text(_contentError ?? 'Load shared content to customise this trip’s sections.'),trailing:FilledButton(onPressed:_contentLoading?null:_loadSharedContent,child:Text(_contentLoading?'Loading…':'Open editor'))),
                       const SizedBox(height:16),
                       // Save Button
                       FilledButton.icon(

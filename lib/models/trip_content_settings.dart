@@ -27,6 +27,7 @@ abstract final class TripContentSettings {
       } else {
         for (final raw in items) {
           if (raw is! Map) throw const FormatException('Section items must be objects.');
+          if(raw['enabled'] != null && raw['enabled'] is! bool) throw const FormatException('Item visibility must be true or false.');
           final required = entry.key == 'glance' ? ['label'] : entry.key == 'faqs' ? ['question', 'answer'] : ['title', 'description'];
           for (final field in required) {if (raw[field] is! String || (raw[field] as String).trim().isEmpty) throw FormatException('$field cannot be blank.');}
           if (entry.key == 'glance' && (!fields.contains(raw['field'] ?? '') || (raw['field'] == '' && (raw['value'] is! String || (raw['value'] as String).trim().isEmpty)))) throw const FormatException('Choose a linked trip field or enter a value.');
