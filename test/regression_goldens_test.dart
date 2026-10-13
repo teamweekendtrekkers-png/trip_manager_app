@@ -1,3 +1,4 @@
+import 'golden_platform.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -29,7 +30,7 @@ void main() {
 
   Future<void> expectGolden(WidgetTester tester, String name) => expectLater(
     find.byKey(_goldenKey),
-    matchesGoldenFile('goldens/$name.png'),
+    platformGolden('goldens/$name.png'),
   );
 
   group('mandatory screen goldens', () {

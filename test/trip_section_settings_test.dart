@@ -1,3 +1,4 @@
+import 'golden_platform.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -249,6 +250,8 @@ void main() {
         expect(provider.hasUnsavedChanges, isFalse);
         await tester.tap(find.byType(BackButton));
         await tester.pumpAndSettle();
+        await tester.tap(find.text('Discard'));
+        await tester.pumpAndSettle();
         expect(provider.trips.single.containsKey('expandedSections'), isFalse);
         await tester.tap(find.text('Open editor'));
         await tester.pumpAndSettle();
@@ -261,7 +264,10 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(provider.trips.single['expandedSections'], ['highlights', 'thingsToCarry']);
+        expect(provider.trips.single['expandedSections'], [
+          'highlights',
+          'thingsToCarry',
+        ]);
         expect(provider.hasUnsavedChanges, isTrue);
         await tester.tap(find.text('Open editor'));
         await tester.pumpAndSettle();
@@ -308,7 +314,7 @@ void main() {
       );
       await expectLater(
         find.byType(Scaffold),
-        matchesGoldenFile(
+        platformGolden(
           'goldens/trip_sections_${dark ? "dark" : "light"}.png',
         ),
       );

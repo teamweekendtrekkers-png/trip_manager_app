@@ -1,3 +1,11 @@
+import '../widgets/local_draft.dart';
+import '../widgets/change_review.dart';
+import '../services/workspace_changes.dart';
+import '../services/draft_store.dart';
+import '../widgets/departure_selection_editor.dart';
+import '../widgets/draft_preview.dart';
+import 'manager_tools_screen.dart';
+import '../widgets/manager_navigation.dart';
 import 'dart:convert';
 import 'dart:io';
 import '../widgets/footer_settings_editor.dart';
@@ -36,7 +44,113 @@ class HomepageSettingsScreen extends StatefulWidget {
   State<HomepageSettingsScreen> createState() => _HomepageSettingsScreenState();
 }
 
-class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
+class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
+    with LocalDraft<HomepageSettingsScreen> {
+  @override
+  String get localScope => DraftStore.scope(_target);
+  @override
+  String get localSlot => 'homepage';
+  @override
+  Map<String, dynamic>? get currentDocument => _draft;
+  @override
+  bool get draftBusy => _busy;
+  @override
+  void applyDocument(Map<String, dynamic> value) {
+    _draft = copyDocument(value);
+    _sectionsRevision++;
+    for (final entry in _controllers.entries) {
+      final parts = entry.key.split('.');
+      entry.value.text =
+          (_draft![parts.first] as Map)[parts.last]?.toString() ?? '';
+    }
+  }
+
+  String _group = 'All';
+  final _anchors = <String, GlobalKey>{};
+  final _fieldFocus = <String, FocusNode>{};
+  Future<void> _searchFields() async {
+    final choices = {
+      'Desktop cover': 'Hero|hero.backgroundImage',
+      'Headline': 'Hero|hero.title',
+      'Tagline': 'Hero|hero.tagline',
+      'Description': 'Hero|hero.description',
+      'Mobile cover and crop': 'Hero|presentation.heroMobileImage',
+      'Upcoming trips and date selection': 'Upcoming Batches',
+      'Trip discovery and Featured visibility': 'Destinations',
+      'Statistics, How it works, Why choose us': 'Information',
+      'Google Reviews and rating': 'Reviews',
+      'Footer, contact, social links, UPI visibility': 'Footer',
+    };
+    String query = '';
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, set) => AlertDialog(
+          title: const Text('Find a website field'),
+          content: SizedBox(
+            width: 550,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  autofocus: true,
+                  decoration: const InputDecoration(labelText: 'Search fields'),
+                  onChanged: (v) => set(() => query = v),
+                ),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final entry in choices.entries.where(
+                        (e) =>
+                            e.key.toLowerCase().contains(query.toLowerCase()),
+                      ))
+                        ListTile(
+                          title: Text(entry.key),
+                          onTap: () => Navigator.pop(ctx, entry.value),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    final parts = choice.split('|');
+    setState(() => _group = parts.first);
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    if (!mounted || !_homeScroll.hasClients) return;
+    _homeScroll.jumpTo(0);
+    if (parts.length < 2) return;
+    for (var i = 0; i < 30 && mounted && _group == parts.first; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      if (!mounted || !_homeScroll.hasClients) return;
+      final ctx = _anchors[parts.last]?.currentContext;
+      if (ctx != null) {
+        await Scrollable.ensureVisible(ctx);
+        _fieldFocus[parts.last]?.requestFocus();
+        return;
+      }
+      final next = (_homeScroll.offset + 160).clamp(
+        0.0,
+        _homeScroll.position.maxScrollExtent,
+      );
+      if (next == _homeScroll.offset) return;
+      _homeScroll.jumpTo(next);
+    }
+  }
+
+  final _homeScroll = ScrollController();
+
   late HomepageSettingsService _service;
   late AppSettings _target;
   Map<String, dynamic>? _draft;
@@ -87,6 +201,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
       setState(() {
         _draft = config.toJson();
         _saved = jsonEncode(_draft);
+        startLocalDraft(_draft!);
         _sectionsRevision++;
       });
     } catch (error) {
@@ -98,6 +213,8 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
 
   @override
   void dispose() {
+    _homeScroll.dispose();
+    for (final node in _fieldFocus.values) node.dispose();
     for (final controller in _controllers.values) {
       controller.dispose();
     }
@@ -106,30 +223,10 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
 
   Future<void> _leave() async {
     if (_busy) return;
-    final discard = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Discard homepage edits?'),
-        content: const Text(
-          'These changes have not been published. Your trip edits are separate and will not be discarded.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep editing'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Discard'),
-          ),
-        ],
-      ),
-    );
-    if (discard != true || !mounted) return;
-    setState(() => _allowExit = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) Navigator.pop(context);
-    });
+    if (await leaveLocalDraft() && mounted) {
+      setState(() => _allowExit = true);
+      Navigator.pop(context);
+    }
   }
 
   Future<void> _reload() async {
@@ -159,11 +256,32 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
     await _load();
   }
 
+  Map<String, dynamic> _publicationDocument() {
+    if (_group == 'All') return copyDocument(_draft!);
+    final result = copyDocument(jsonDecode(_saved!) as Map);
+    final keys = switch (_group) {
+      'Hero' => ['hero', 'presentation'],
+      'Upcoming Batches' => ['upcomingBatches'],
+      'Destinations' => ['discovery'],
+      'Footer' => ['footer'],
+      _ => <String>[],
+    };
+    for (final key in keys) result[key] = copyDocument(_draft!)[key];
+    if (_group == 'Information' || _group == 'Reviews') {
+      for (final key
+          in _group == 'Reviews'
+              ? ['reviews']
+              : ['stats', 'howItWorks', 'whyChooseUs', 'cta'])
+        result['sections'][key] = copyDocument(_draft!)['sections'][key];
+    }
+    return result;
+  }
+
   Future<void> _publish() async {
     if (_busy || !_targetMatches || _draft == null) return;
     HomepageConfig config;
     try {
-      config = HomepageConfig.parse(jsonEncode(_draft));
+      config = HomepageConfig.parse(jsonEncode(_publicationDocument()));
     } catch (error) {
       setState(() => _error = error.toString());
       return;
@@ -172,8 +290,23 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Publish homepage?'),
-        content: Text(
-          'Publish homepage settings to ${_target.repositoryOwner}/${_target.repositoryName} (${_target.branch})? Trip data, booking links and payment settings are not changed.',
+        content: SizedBox(
+          width: 650,
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                ChangeReview(
+                  changes: WorkspaceChanges.diff(
+                    jsonDecode(_saved!),
+                    _publicationDocument(),
+                  ),
+                ),
+                Text(
+                  'Publish homepage settings to ${_target.repositoryOwner}/${_target.repositoryName} (${_target.branch})? Trip data, booking links and payment settings are not changed.',
+                ),
+              ],
+            ),
+          ),
         ),
         actions: [
           TextButton(
@@ -192,13 +325,16 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
       _busy = true;
       _error = null;
     });
+    final previous = copyDocument(jsonDecode(_saved!) as Map);
+    final retained = copyDocument(_draft!);
     final result = await _service.save(config);
     if (!mounted) return;
     setState(() {
       _busy = false;
       if (result.success) {
-        _draft = _service.savedConfig!.toJson();
-        _saved = jsonEncode(_draft);
+        final published = _service.savedConfig!.toJson();
+        _saved = jsonEncode(published);
+        _draft = recoverDocument(previous, retained, published);
         _sectionsRevision++;
         _savedCommit = result.commitSha;
         for (final entry in _controllers.entries) {
@@ -216,10 +352,20 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Homepage settings published.')),
       );
+      await publishedLocalDraft(
+        previous,
+        Map<String, dynamic>.from(jsonDecode(_saved!) as Map),
+      );
+      await saveLocalDraft();
+      await DraftStore.recordPublication(localScope, _savedCommit);
+      if (!mounted) return;
     }
   }
 
-  Future<void> _upload({String group = 'hero', String field = 'backgroundImage'}) async {
+  Future<void> _upload({
+    String group = 'hero',
+    String field = 'backgroundImage',
+  }) async {
     if (_busy || !_targetMatches) return;
     setState(() {
       _busy = true;
@@ -250,16 +396,23 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
           final result = await ImageUploadService(settings: _target)
               .uploadImage(
                 imageFile: File(image.path),
-                tripId: field == 'heroMobileImage' ? 'homepage_mobile' : 'homepage',
+                tripId: field == 'heroMobileImage'
+                    ? 'homepage_mobile'
+                    : 'homepage',
                 isMainImage: true,
               );
           if (!result.success) {
             throw StateError(result.error ?? 'Image upload failed.');
           }
           path = result.imagePath;
-          final advice = await photoResolutionAdvice(File(image.path), minWidth: 1600);
+          final advice = await photoResolutionAdvice(
+            File(image.path),
+            minWidth: field == 'heroMobileImage' ? 1080 : 1600,
+          );
           if (advice != null && mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(advice)));
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(advice)));
           }
         }
       }
@@ -283,8 +436,10 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
       () => TextEditingController(text: values[field] as String),
     );
     return Padding(
+      key: _anchors.putIfAbsent('$group.$field', () => GlobalKey()),
       padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
+        focusNode: _fieldFocus.putIfAbsent('$group.$field', () => FocusNode()),
         key: ValueKey('homepage-$group-$field'),
         controller: controller,
         enabled: !_busy,
@@ -327,8 +482,20 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
   }
 
   Widget _cropPreview(String path, double ratio, String label, double width) {
-    final url = path.startsWith('https://') ? path : 'https://raw.githubusercontent.com/' + _target.repositoryOwner + '/' + _target.repositoryName + '/' + _target.branch + '/' + path;
-    final focus = _draft!['presentation'][ratio < 1 ? 'heroMobileFocalPoint' : 'heroFocalPoint'];
+    final url = path.startsWith('https://')
+        ? path
+        : 'https://raw.githubusercontent.com/' +
+              _target.repositoryOwner +
+              '/' +
+              _target.repositoryName +
+              '/' +
+              _target.branch +
+              '/' +
+              path;
+    final focus =
+        _draft!['presentation'][ratio < 1
+            ? 'heroMobileFocalPoint'
+            : 'heroFocalPoint'];
     final alignment = switch (focus) {
       'top' => Alignment.topCenter,
       'bottom' => Alignment.bottomCenter,
@@ -336,45 +503,55 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
       'right' => Alignment.centerRight,
       _ => Alignment.center,
     };
-    return SizedBox(width: width, child: Column(children: [
-      Text(label),
-      AspectRatio(aspectRatio: ratio, child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Stack(fit: StackFit.expand, children: [
-          widget.imagePreviewBuilder?.call(url) ?? Image.network(url, fit: BoxFit.cover, alignment: alignment, errorBuilder: (_, _, _) => const Center(child: Icon(Icons.broken_image))),
-          const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black54]))),
-          const Positioned(left: 12, right: 12, bottom: 12, child: Text('Your next weekend starts here', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-        ]),
-      )),
-    ]));
-  }
-
-  void _toggleTrip(String id, bool selected) => setState(() {
-    final ids = List<String>.from(_batches['tripIds'] as List);
-    selected ? ids.add(id) : ids.remove(id);
-    _batches['tripIds'] = ids.toSet().toList();
-  });
-
-  void _toggleDeparture(String id, TripDateRange range, bool selected) =>
-      setState(() {
-        final entries = List<Map<String, dynamic>>.from(
-          (_batches['departures'] as List).map(
-            (item) => Map<String, dynamic>.from(item as Map),
+    return SizedBox(
+      width: width,
+      child: Column(
+        children: [
+          Text(label),
+          AspectRatio(
+            aspectRatio: ratio,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  widget.imagePreviewBuilder?.call(url) ??
+                      Image.network(
+                        url,
+                        fit: BoxFit.cover,
+                        alignment: alignment,
+                        errorBuilder: (_, _, _) =>
+                            const Center(child: Icon(Icons.broken_image)),
+                      ),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Colors.black54],
+                      ),
+                    ),
+                  ),
+                  const Positioned(
+                    left: 12,
+                    right: 12,
+                    bottom: 12,
+                    child: Text(
+                      'Your next weekend starts here',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        );
-        entries.removeWhere(
-          (item) =>
-              item['tripId'] == id &&
-              TripDateUtils.parse(item['date'] as String)?.key == range.key,
-        );
-        if (selected) {
-          entries.add({
-            'tripId': id,
-            'date': TripDateUtils.formatCanonical(range),
-          });
-        }
-        _batches['departures'] = entries;
-      });
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -388,6 +565,11 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
         appBar: AppBar(
           title: const Text('Homepage Customization'),
           actions: [
+            IconButton(
+              onPressed: _busy ? null : _searchFields,
+              tooltip: 'Find a website field',
+              icon: const Icon(Icons.search),
+            ),
             IconButton(
               tooltip: 'Reload homepage',
               onPressed: _busy || !_targetMatches ? null : _reload,
@@ -420,8 +602,49 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
             : AbsorbPointer(
                 absorbing: _busy,
                 child: ListView(
+                  controller: _homeScroll,
                   padding: const EdgeInsets.all(16),
                   children: [
+                    localDraftBar(),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        for (final group in [
+                          'All',
+                          'Hero',
+                          'Upcoming Batches',
+                          'Destinations',
+                          'Information',
+                          'Reviews',
+                          'Footer',
+                        ])
+                          ChoiceChip(
+                            key: ValueKey('homepage-group-$group'),
+                            label: Text(group),
+                            selected: _group == group,
+                            onSelected: (_) => setState(() => _group = group),
+                          ),
+                      ],
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => Scaffold(
+                            appBar: AppBar(
+                              title: const Text('Draft website preview'),
+                            ),
+                            body: DraftPreview(
+                              settings: _target,
+                              homepage: _draft,
+                              trips: _trips,
+                            ),
+                          ),
+                        ),
+                      ),
+                      icon: const Icon(Icons.preview),
+                      label: const Text('Mobile & desktop website preview'),
+                    ),
                     if (_busy) const LinearProgressIndicator(),
                     const Text(
                       'Homepage-only settings. Trip records, featured trips, payments and booking links are unchanged. Image uploads add an asset; Publish applies it to the homepage.',
@@ -443,232 +666,320 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
                         ),
                       ),
                     const SizedBox(height: 20),
-                    Text(
-                      'Hero / Background',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 12),
-                    _text(
-                      'hero',
-                      'backgroundImage',
-                      'Background image path or HTTPS URL',
-                    ),
-                    if (HomepageConfig.safeImage(
-                      _hero['backgroundImage'] as String,
-                    ))
-                      _backgroundPreview(),
-                    OutlinedButton.icon(
-                      key: const Key('homepage-upload'),
-                      onPressed: _upload,
-                      icon: const Icon(Icons.add_photo_alternate),
-                      label: const Text('Upload background image'),
-                    ),
-                    const SizedBox(height: 12),
-                    _text('hero', 'title', 'Headline', lines: 3),
-                    _text('hero', 'tagline', 'Tagline', lines: 3),
-                    _text('hero', 'description', 'Description', lines: 3),
-                    ExpansionTile(
-                      title: const Text('Website appearance and hero photos'),
-                      children: [
-                        DropdownButtonFormField<String>(
-                          key: const Key('homepage-presentation-preset'),
-                          initialValue: _draft!['presentation']['preset'] as String,
-                          decoration: const InputDecoration(labelText: 'Colour palette'),
-                          items: [for (final preset in ['forest', 'ocean', 'earth']) DropdownMenuItem(value: preset, child: Text(preset))],
-                          onChanged: (value) => setState(() => _draft!['presentation']['preset'] = value),
-                        ),
-                        const SizedBox(height: 12),
-                        _text('presentation', 'heroMobileImage', 'Mobile hero photo (optional path or HTTPS URL)'),
-                        OutlinedButton.icon(
-                          onPressed: _busy ? null : () => _upload(group: 'presentation', field: 'heroMobileImage'),
-                          icon: const Icon(Icons.add_photo_alternate),
-                          label: const Text('Upload mobile hero photo'),
-                        ),
-                        DropdownButtonFormField<String>(
-                          key: ValueKey('desktop-focus-' + _draft!['presentation']['heroFocalPoint'].toString()),
-                          initialValue: _draft!['presentation']['heroFocalPoint'] as String,
-                          decoration: const InputDecoration(labelText: 'Desktop hero photo focus'),
-                          items: [for (final focus in ['center', 'top', 'bottom', 'left', 'right']) DropdownMenuItem(value: focus, child: Text(focus))],
-                          onChanged: (value) => setState(() => _draft!['presentation']['heroFocalPoint'] = value),
-                        ),
-                        DropdownButtonFormField<String>(
-                          key: ValueKey('mobile-focus-' + _draft!['presentation']['heroMobileFocalPoint'].toString()),
-                          initialValue: _draft!['presentation']['heroMobileFocalPoint'] as String,
-                          decoration: const InputDecoration(labelText: 'Mobile hero photo focus'),
-                          items: [for (final focus in ['center', 'top', 'bottom', 'left', 'right']) DropdownMenuItem(value: focus, child: Text(focus))],
-                          onChanged: (value) => setState(() => _draft!['presentation']['heroMobileFocalPoint'] = value),
-                        ),
-                        TextButton(onPressed: () => setState(() { _draft!['presentation']['heroFocalPoint'] = 'center'; _draft!['presentation']['heroMobileFocalPoint'] = 'center'; }), child: const Text('Reset both crops to centre')),
-                        TextFormField(
-                          key: const Key('homepage-hero-slides'),
-                          initialValue: (_draft!['presentation']['heroSlides'] as List).join('\n'),
-                          minLines: 2,
-                          maxLines: 3,
-                          decoration: const InputDecoration(labelText: 'Additional hero photos (up to 2, one path per line)'),
-                          onChanged: (value) => setState(() => _draft!['presentation']['heroSlides'] = value.split('\n').map((line) => line.trim()).where((line) => line.isNotEmpty).toList()),
-                        ),
-                        SwitchListTile(
-                          title: const Text('Slow hero photo crossfade'),
-                          subtitle: const Text('One pass only. Text stays still; reduced motion uses one photo.'),
-                          value: _draft!['presentation']['heroMotion'] as bool,
-                          onChanged: (value) => setState(() => _draft!['presentation']['heroMotion'] = value),
-                        ),
-                        const Text('Desktop hero 16:7 — 1920×840 px. Mobile hero 4:5 — 1080×1350 px. Trip cards 16:9 — 1200×675 px. Gallery 4:3 — 1200×900 px. Keep faces and text away from crop edges. Original photos are retained.'),
-                        Wrap(spacing: 12, runSpacing: 12, children: [
-                          _cropPreview(_hero['backgroundImage'] as String, 16 / 7, 'Desktop hero', 300),
-                          _cropPreview((_draft!['presentation']['heroMobileImage'] as String).isEmpty ? _hero['backgroundImage'] as String : _draft!['presentation']['heroMobileImage'] as String, 4 / 5, 'Mobile hero', 160),
-                        ]),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Upcoming Batches',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    SwitchListTile(
-                      key: const Key('homepage-enabled'),
-                      title: const Text('Show Upcoming Batches'),
-                      value: _batches['enabled'] as bool,
-                      onChanged: (value) =>
-                          setState(() => _batches['enabled'] = value),
-                    ),
-                    _text('upcomingBatches', 'title', 'Section title'),
-                    _text(
-                      'upcomingBatches',
-                      'subtitle',
-                      'Section subtitle',
-                      lines: 3,
-                    ),
-                    DropdownButtonFormField<int>(
-                      key: const Key('homepage-batch-count'),
-                      initialValue: _batches['maxBatches'] as int,
-                      decoration: const InputDecoration(
-                        labelText: 'Initially visible date groups',
+                    if (_group == 'All' || _group == 'Hero') ...[
+                      Text(
+                        'Hero / Background',
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
-                      items: [
-                        for (var count = 1; count <= 12; count++)
-                          DropdownMenuItem(value: count, child: Text('$count')),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _batches['maxBatches'] = value);
-                        }
-                      },
-                    ),
-                    SwitchListTile(
-                      key: const Key('homepage-choose-trips'),
-                      title: const Text('Choose specific trips'),
-                      subtitle: const Text(
-                        'Off: automatically use all active trips. On with none selected: show an empty state.',
+                      const SizedBox(height: 12),
+                      _text(
+                        'hero',
+                        'backgroundImage',
+                        'Background image path or HTTPS URL',
                       ),
-                      value: _batches['tripSelection'] == 'selected',
-                      onChanged: (value) => setState(
-                        () => _batches['tripSelection'] = value
-                            ? 'selected'
-                            : 'all',
-                      ),
-                    ),
-                    if (_batches['tripSelection'] == 'selected') ...[
-                      for (final trip in _trips.where(
-                        (trip) => trip['isActive'] != false,
+                      if (HomepageConfig.safeImage(
+                        _hero['backgroundImage'] as String,
                       ))
-                        CheckboxListTile(
-                          key: ValueKey('homepage-trip-${trip['id']}'),
-                          title: Text('${trip['title'] ?? trip['id']}'),
-                          value: (_batches['tripIds'] as List).contains(
-                            trip['id'],
+                        _backgroundPreview(),
+                      OutlinedButton.icon(
+                        key: const Key('homepage-upload'),
+                        onPressed: _upload,
+                        icon: const Icon(Icons.add_photo_alternate),
+                        label: const Text('Upload desktop cover · 16:7'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton.icon(
+                        onPressed: () async {
+                          final photo = await Navigator.push<String>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ManagerToolsScreen(
+                                tool: ManagerDestination.library,
+                                choosePhoto: true,
+                              ),
+                            ),
+                          );
+                          if (photo != null && mounted)
+                            setState(() {
+                              _hero['backgroundImage'] = photo;
+                              _controllers['hero.backgroundImage']?.text =
+                                  photo;
+                            });
+                        },
+                        icon: const Icon(Icons.photo_library),
+                        label: const Text('Choose from photo library'),
+                      ),
+                      _text('hero', 'title', 'Headline', lines: 3),
+                      _text('hero', 'tagline', 'Tagline', lines: 3),
+                      _text('hero', 'description', 'Description', lines: 3),
+                      ExpansionTile(
+                        title: const Text('Website appearance and hero photos'),
+                        initiallyExpanded: _group == 'Hero',
+                        children: [
+                          SwitchListTile(
+                            title: const Text('Use desktop cover on mobile'),
+                            value:
+                                (_draft!['presentation']['heroMobileImage']
+                                        as String)
+                                    .isEmpty,
+                            onChanged: (v) {
+                              if (v) {
+                                setState(() {
+                                  _draft!['presentation']['heroMobileImage'] =
+                                      '';
+                                  _controllers['presentation.heroMobileImage']
+                                          ?.text =
+                                      '';
+                                });
+                              } else {
+                                _upload(
+                                  group: 'presentation',
+                                  field: 'heroMobileImage',
+                                );
+                              }
+                            },
                           ),
-                          onChanged: (value) =>
-                              _toggleTrip(trip['id'] as String, value == true),
-                        ),
-                      for (final id in (_batches['tripIds'] as List).where(
-                        (id) => !_trips.any(
-                          (trip) =>
-                              trip['id'] == id && trip['isActive'] != false,
-                        ),
-                      ))
-                        ListTile(
-                          title: Text('Unavailable selection: $id'),
-                          subtitle: const Text(
-                            'Ignored until this trip is active and available.',
+                          DropdownButtonFormField<String>(
+                            key: const Key('homepage-presentation-preset'),
+                            initialValue:
+                                _draft!['presentation']['preset'] as String,
+                            decoration: const InputDecoration(
+                              labelText: 'Colour palette',
+                            ),
+                            items: [
+                              for (final preset in ['forest', 'ocean', 'earth'])
+                                DropdownMenuItem(
+                                  value: preset,
+                                  child: Text(preset),
+                                ),
+                            ],
+                            onChanged: (value) => setState(
+                              () => _draft!['presentation']['preset'] = value,
+                            ),
                           ),
-                          trailing: IconButton(
-                            tooltip: 'Remove unavailable trip',
-                            icon: const Icon(Icons.close),
-                            onPressed: () => _toggleTrip(id as String, false),
+                          const SizedBox(height: 12),
+                          _text(
+                            'presentation',
+                            'heroMobileImage',
+                            'Mobile hero photo (optional path or HTTPS URL)',
                           ),
-                        ),
+                          OutlinedButton.icon(
+                            onPressed: _busy
+                                ? null
+                                : () => _upload(
+                                    group: 'presentation',
+                                    field: 'heroMobileImage',
+                                  ),
+                            icon: const Icon(Icons.add_photo_alternate),
+                            label: const Text('Upload mobile hero photo'),
+                          ),
+                          DropdownButtonFormField<String>(
+                            key: ValueKey(
+                              'desktop-focus-' +
+                                  _draft!['presentation']['heroFocalPoint']
+                                      .toString(),
+                            ),
+                            initialValue:
+                                _draft!['presentation']['heroFocalPoint']
+                                    as String,
+                            decoration: const InputDecoration(
+                              labelText: 'Desktop hero photo focus',
+                            ),
+                            items: [
+                              for (final focus in [
+                                'center',
+                                'top',
+                                'bottom',
+                                'left',
+                                'right',
+                              ])
+                                DropdownMenuItem(
+                                  value: focus,
+                                  child: Text(focus),
+                                ),
+                            ],
+                            onChanged: (value) => setState(
+                              () => _draft!['presentation']['heroFocalPoint'] =
+                                  value,
+                            ),
+                          ),
+                          DropdownButtonFormField<String>(
+                            key: ValueKey(
+                              'mobile-focus-' +
+                                  _draft!['presentation']['heroMobileFocalPoint']
+                                      .toString(),
+                            ),
+                            initialValue:
+                                _draft!['presentation']['heroMobileFocalPoint']
+                                    as String,
+                            decoration: const InputDecoration(
+                              labelText: 'Mobile hero photo focus',
+                            ),
+                            items: [
+                              for (final focus in [
+                                'center',
+                                'top',
+                                'bottom',
+                                'left',
+                                'right',
+                              ])
+                                DropdownMenuItem(
+                                  value: focus,
+                                  child: Text(focus),
+                                ),
+                            ],
+                            onChanged: (value) => setState(
+                              () =>
+                                  _draft!['presentation']['heroMobileFocalPoint'] =
+                                      value,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => setState(() {
+                              _draft!['presentation']['heroFocalPoint'] =
+                                  'center';
+                              _draft!['presentation']['heroMobileFocalPoint'] =
+                                  'center';
+                            }),
+                            child: const Text('Reset both crops to centre'),
+                          ),
+                          TextFormField(
+                            key: const Key('homepage-hero-slides'),
+                            initialValue:
+                                (_draft!['presentation']['heroSlides'] as List)
+                                    .join('\n'),
+                            minLines: 2,
+                            maxLines: 3,
+                            decoration: const InputDecoration(
+                              labelText:
+                                  'Additional hero photos (up to 2, one path per line)',
+                            ),
+                            onChanged: (value) => setState(
+                              () =>
+                                  _draft!['presentation']['heroSlides'] = value
+                                      .split('\n')
+                                      .map((line) => line.trim())
+                                      .where((line) => line.isNotEmpty)
+                                      .toList(),
+                            ),
+                          ),
+                          SwitchListTile(
+                            title: const Text('Slow hero photo crossfade'),
+                            subtitle: const Text(
+                              'One pass only. Text stays still; reduced motion uses one photo.',
+                            ),
+                            value:
+                                _draft!['presentation']['heroMotion'] as bool,
+                            onChanged: (value) => setState(
+                              () =>
+                                  _draft!['presentation']['heroMotion'] = value,
+                            ),
+                          ),
+                          const Text(
+                            'Desktop hero 16:7 — 1600×700 px. Mobile hero 4:5 — 1080×1350 px. Trip cards 16:9 — 1600×900 px. Gallery 4:3 — 1600×1200 px. Keep faces and text away from crop edges. Original photos are retained.',
+                          ),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: [
+                              _cropPreview(
+                                _hero['backgroundImage'] as String,
+                                16 / 7,
+                                'Desktop hero',
+                                300,
+                              ),
+                              _cropPreview(
+                                (_draft!['presentation']['heroMobileImage']
+                                            as String)
+                                        .isEmpty
+                                    ? _hero['backgroundImage'] as String
+                                    : _draft!['presentation']['heroMobileImage']
+                                          as String,
+                                4 / 5,
+                                'Mobile hero',
+                                160,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Upcoming Batches',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
                     ],
-                    SwitchListTile(
-                      key: const Key('homepage-choose-departures'),
-                      title: const Text('Choose specific departures'),
-                      subtitle: const Text(
-                        'Only matching current/upcoming dates appear. Expired dates and inactive trips are always excluded.',
+                    if (_group == 'All' || _group == 'Upcoming Batches') ...[
+                      SwitchListTile(
+                        key: const Key('homepage-enabled'),
+                        title: const Text('Show Upcoming Batches'),
+                        value: _batches['enabled'] as bool,
+                        onChanged: (value) =>
+                            setState(() => _batches['enabled'] = value),
                       ),
-                      value: _batches['departureSelection'] == 'selected',
-                      onChanged: (value) => setState(
-                        () => _batches['departureSelection'] = value
-                            ? 'selected'
-                            : 'all',
+                      _text('upcomingBatches', 'title', 'Section title'),
+                      _text(
+                        'upcomingBatches',
+                        'subtitle',
+                        'Section subtitle',
+                        lines: 3,
                       ),
-                    ),
-                    if (_batches['departureSelection'] == 'selected')
-                      ..._departureOptions(),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Visible card details',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const Text(
-                      'Trip name, date and the trip link always remain available.',
-                    ),
-                    for (final field in [
-                      'price',
-                      'status',
-                      'weekday',
-                      'location',
-                      'duration',
-                      'difficulty',
-                      'image',
-                    ])
-                      CheckboxListTile(
-                        key: ValueKey('homepage-field-$field'),
-                        title: Text(
-                          field[0].toUpperCase() + field.substring(1),
-                        ),
-                        value: (_batches['fields'] as Map)[field] as bool,
-                        onChanged: (value) => setState(
-                          () => (_batches['fields'] as Map)[field] =
-                              value == true,
+                      DepartureSelectionEditor(
+                        draft: _draft!,
+                        trips: _trips,
+                        referenceDate: widget.referenceDate,
+                        onChanged: () => setState(() {}),
+                      ),
+                    ],
+                    if (_group == 'All' || _group == 'Upcoming Batches')
+                      _preview(),
+                    if (_group == 'Destinations')
+                      const ListTile(
+                        title: Text('Explore Destinations'),
+                        subtitle: Text(
+                          'Open Trips → Website sections → Visibility to choose Featured trips. Active, Featured and Upcoming Batches selections are separate.',
                         ),
                       ),
                     const SizedBox(height: 16),
-                    _preview(),
+                    if (_group == 'All' || _group == 'Destinations')
+                      DiscoverySettingsEditor(
+                        discovery: _draft!['discovery'] as Map<String, dynamic>,
+                        onChanged: (field, value) => setState(() {
+                          (_draft!['discovery'] as Map)[field] = value;
+                        }),
+                      ),
                     const SizedBox(height: 16),
-                    DiscoverySettingsEditor(
-                      discovery: _draft!['discovery'] as Map<String, dynamic>,
-                      onChanged: (field, value) => setState(() {
-                        (_draft!['discovery'] as Map)[field] = value;
-                      }),
-                    ),
+                    if (_group == 'All' ||
+                        _group == 'Information' ||
+                        _group == 'Reviews')
+                      HomepageSectionsEditor(
+                        onlySections: _group == 'Reviews'
+                            ? {'reviews'}
+                            : _group == 'Information'
+                            ? {'stats', 'howItWorks', 'whyChooseUs', 'cta'}
+                            : null,
+                        key: ValueKey(_sectionsRevision),
+                        sections: _draft!['sections'] as Map<String, dynamic>,
+                        onChanged: () => setState(() {}),
+                      ),
                     const SizedBox(height: 16),
-                    HomepageSectionsEditor(
-                      key: ValueKey(_sectionsRevision),
-                      sections: _draft!['sections'] as Map<String, dynamic>,
-                      onChanged: () => setState(() {}),
-                    ),
-                    const SizedBox(height: 16),
-                    FooterSettingsEditor(
-                      key: ValueKey('footer-$_sectionsRevision'),
-                      footer: _draft!['footer'] as Map<String, dynamic>,
-                      onChanged: () => setState(() {}),
-                    ),
+                    if (_group == 'All' || _group == 'Footer')
+                      FooterSettingsEditor(
+                        key: ValueKey('footer-$_sectionsRevision'),
+                        footer: _draft!['footer'] as Map<String, dynamic>,
+                        initiallyExpanded: _group == 'Footer',
+                        onChanged: () => setState(() {}),
+                      ),
                     const SizedBox(height: 16),
                     FilledButton.icon(
                       key: const Key('homepage-publish'),
                       onPressed: _busy || !_targetMatches ? null : _publish,
                       icon: const Icon(Icons.cloud_upload),
-                      label: const Text('Publish homepage'),
+                      label: Text(
+                        _group == 'All'
+                            ? 'Review & publish homepage'
+                            : 'Review & publish $_group only',
+                      ),
                     ),
                     if (_savedCommit != null)
                       TextButton.icon(
@@ -690,68 +1001,14 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
     );
   }
 
-  List<Widget> _departureOptions() {
-    final valid = <String>{};
-    final widgets = <Widget>[];
-    for (final trip in _trips) {
-      for (final range in TripDateUtils.getUpcomingDateRanges(
-        trip,
-        referenceDate: widget.referenceDate,
-      )) {
-        final key = '${trip['id']}|${range.key}';
-        valid.add(key);
-        widgets.add(
-          CheckboxListTile(
-            key: ValueKey('homepage-departure-$key'),
-            title: Text('${trip['title']} — ${range.fullLabel}'),
-            value: (_batches['departures'] as List).any(
-              (item) =>
-                  item['tripId'] == trip['id'] &&
-                  TripDateUtils.parse(item['date'] as String)?.key == range.key,
-            ),
-            onChanged: (value) =>
-                _toggleDeparture(trip['id'] as String, range, value == true),
-          ),
-        );
-      }
-    }
-    for (final item in _batches['departures'] as List) {
-      final range = TripDateUtils.parse(item['date'] as String)!;
-      if (!valid.contains('${item['tripId']}|${range.key}')) {
-        widgets.add(
-          ListTile(
-            title: Text(
-              'Unavailable/expired: ${item['tripId']} — ${item['date']}',
-            ),
-            subtitle: const Text('Not shown on the website.'),
-            trailing: IconButton(
-              tooltip: 'Remove unavailable departure',
-              icon: const Icon(Icons.close),
-              onPressed: () =>
-                  _toggleDeparture(item['tripId'] as String, range, false),
-            ),
-          ),
-        );
-      }
-    }
-    if (widgets.isEmpty) {
-      widgets.add(
-        const Text(
-          'No current or upcoming dates. Add dates in the trip editor first.',
-        ),
-      );
-    }
-    return widgets;
-  }
-
   Widget _preview() {
     try {
       final config = HomepageConfig.parse(jsonEncode(_draft));
-      final batches = config.buildBatches(
-        _trips,
+      final batches = TripDateUtils.buildUpcomingBatches(
+        config.selectedTrips(_trips, referenceDate: widget.referenceDate),
         referenceDate: widget.referenceDate,
+        limit: 1000000,
       );
-      final fields = _batches['fields'] as Map;
       return Card(
         key: const Key('homepage-preview'),
         child: Padding(
@@ -786,19 +1043,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen> {
                     batch.dateLabel,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  if (fields['weekday'] == true) Text(batch.weekdayLabel),
-                  for (final trip in batch.trips) ...[
-                    Text(trip.title),
-                    if (fields['price'] == true) Text('${trip.price ?? ''}'),
-                    if (fields['status'] == true) const Text('Upcoming'),
-                    for (final field in ['location', 'duration', 'difficulty'])
-                      if (fields[field] == true)
-                        Text(
-                          '${_trips.firstWhere((item) => item['id'] == trip.id)[field] ?? ''}',
-                        ),
-                    if (fields['image'] == true)
-                      const Text('Trip thumbnail enabled'),
-                  ],
+                  for (final trip in batch.trips) Text(trip.title),
                 ],
               ],
             ],

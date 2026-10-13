@@ -1,3 +1,10 @@
+import '../models/homepage_config.dart';
+import '../services/homepage_settings_service.dart';
+import '../services/github_service.dart';
+import '../services/trip_visibility.dart';
+import '../services/draft_store.dart';
+import 'manager_tools_screen.dart';
+import '../widgets/change_review.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'commerce_settings_screen.dart';
@@ -30,9 +37,25 @@ class _TripsListScreenState extends State<TripsListScreen> {
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
   bool _showFeaturedOnly = false;
-  bool _publishing=false;
+  bool _publishing = false;
   String? _publishedCommitSha;
   String? _publishFailure;
+  HomepageConfig? _homepageSelection;
+  Future<void> _loadSelection() async {
+    final provider = context.read<TripsProvider>();
+    if (!provider.persistentDrafts) return;
+    final target = context.read<SettingsProvider>().settings.copyWith();
+    final scope = provider.draftScope;
+    try {
+      final config = await HomepageSettingsService(
+        GitHubService(settings: target),
+      ).load();
+      if (mounted && scope == provider.draftScope)
+        setState(() => _homepageSelection = config);
+    } catch (_) {
+      if (mounted) setState(() => _homepageSelection = null);
+    }
+  }
 
   @override
   void initState() {
@@ -53,6 +76,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
     tripsProvider.updateSettings(settingsProvider.settings);
     final refreshed = await tripsProvider.refreshTrips();
 
+    _loadSelection();
     debugPrint('Trips loaded: ${tripsProvider.tripCount}');
     if (tripsProvider.error != null) {
       debugPrint('Error: ${tripsProvider.error}');
@@ -200,21 +224,40 @@ class _TripsListScreenState extends State<TripsListScreen> {
 
   Future<void> _openDestination(ManagerDestination destination) async {
     if (destination == ManagerDestination.trips || !mounted) return;
+    final provider = context.read<TripsProvider>();
+    provider.lastPublishedCommit =
+        DraftStore.read(
+          provider.draftScope,
+          'publication',
+        )?['data']?['commit']?.toString() ??
+        provider.lastPublishedCommit;
     final trips = context.read<TripsProvider>().trips;
     final route = switch (destination) {
+      ManagerDestination.dashboard ||
+      ManagerDestination.library ||
+      ManagerDestination.history => MaterialPageRoute<void>(
+        builder: (_) =>
+            ManagerToolsScreen(tool: destination, onNavigate: _openDestination),
+      ),
       ManagerDestination.homepage => MaterialPageRoute<void>(
         builder: (_) => const HomepageSettingsScreen(),
       ),
       ManagerDestination.batches => MaterialPageRoute<void>(
         builder: (_) => UpcomingBatchesScreen(trips: trips),
       ),
-      ManagerDestination.payments => MaterialPageRoute<void>(builder: (_) => const CommerceSettingsScreen()),
-      ManagerDestination.sharedContent => MaterialPageRoute<void>(builder: (_) => const TripContentSettingsScreen()),
+      ManagerDestination.payments => MaterialPageRoute<void>(
+        builder: (_) => const CommerceSettingsScreen(),
+      ),
+      ManagerDestination.sharedContent => MaterialPageRoute<void>(
+        builder: (_) => const TripContentSettingsScreen(),
+      ),
       ManagerDestination.health => MaterialPageRoute<void>(
         builder: (_) => const DataHealthScreen(),
       ),
       ManagerDestination.deployment => MaterialPageRoute<void>(
-        builder: (_) => const DeploymentStatusScreen(),
+        builder: (_) => DeploymentStatusScreen(
+          savedCommitSha: context.read<TripsProvider>().lastPublishedCommit,
+        ),
       ),
       ManagerDestination.settings => MaterialPageRoute<void>(
         builder: (_) => const SettingsScreen(),
@@ -223,34 +266,177 @@ class _TripsListScreenState extends State<TripsListScreen> {
     };
     if (route == null) return;
     await Navigator.push(context, route);
+    if (mounted && destination == ManagerDestination.homepage) _loadSelection();
     if (destination == ManagerDestination.settings && mounted) {
       await _confirmAndRefresh();
     }
   }
 
   Widget _buildPublishBar(TripsProvider provider) {
-    final status=Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisSize:MainAxisSize.min,children:[
-      Text(_publishing?'Publishing…':provider.isLoading?'Loading…':provider.error!=null?'Needs attention':provider.hasUnsavedChanges?'Draft changes':!provider.hasCompleteRemoteSnapshot?'Load trips first':_publishedCommitSha!=null?'Saved · check deployment':'Synced with GitHub',key:const Key('workspace-publish-state'),style:const TextStyle(fontWeight:FontWeight.w600)),
-      Text(_publishFailure!=null?'Publish failed — your draft is retained.':(provider.hasUnsavedChanges?'Draft edits are in this workspace; publish when ready.':_publishedCommitSha!=null?'Open publishing status to verify the live website.':'Workspace edits are not live until published.'),maxLines:2,overflow:TextOverflow.ellipsis,style:Theme.of(context).textTheme.bodySmall),
-    ]);
-    final action=FilledButton.icon(key:const Key('workspace-publish'),onPressed:provider.isLoading||_publishing||!provider.hasTrips?null:()=>_saveTrips(provider),icon:const Icon(Icons.cloud_upload),label:const Text('Review & publish'));
-    return Padding(padding:const EdgeInsets.fromLTRB(16,8,16,8),child:LayoutBuilder(builder:(context,constraints)=>constraints.maxWidth<600?Column(crossAxisAlignment:CrossAxisAlignment.stretch,mainAxisSize:MainAxisSize.min,children:[status,const SizedBox(height:8),action]):Row(children:[Expanded(child:status),const SizedBox(width:12),action])));
+    final status = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          _publishing
+              ? 'Publishing…'
+              : provider.isLoading
+              ? 'Loading…'
+              : provider.error != null
+              ? 'Needs attention'
+              : provider.hasUnsavedChanges
+              ? 'Draft changes'
+              : !provider.hasCompleteRemoteSnapshot
+              ? 'Load trips first'
+              : _publishedCommitSha != null
+              ? 'Saved · check deployment'
+              : 'Synced with GitHub',
+          key: const Key('workspace-publish-state'),
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        Text(
+          _publishFailure != null
+              ? 'Publish failed — your draft is retained.'
+              : (provider.hasUnsavedChanges
+                    ? provider.draftError ??
+                          (provider.lastDraftSaved == null
+                              ? 'Draft changes: local saving in progress.'
+                              : 'Local draft saved ${provider.lastDraftSaved!.toLocal().toString().split('.').first}. Publish when ready.')
+                    : _publishedCommitSha != null
+                    ? 'Open publishing status to verify the live website.'
+                    : 'Workspace edits are not live until published.'),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+    );
+    final action = FilledButton.icon(
+      key: const Key('workspace-publish'),
+      onPressed: provider.isLoading || _publishing || !provider.hasTrips
+          ? null
+          : () => _saveTrips(provider),
+      icon: const Icon(Icons.cloud_upload),
+      label: const Text('Review & publish'),
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: LayoutBuilder(
+        builder: (context, constraints) => constraints.maxWidth < 600
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [status, const SizedBox(height: 8), action],
+              )
+            : Row(
+                children: [
+                  Expanded(child: status),
+                  const SizedBox(width: 12),
+                  action,
+                ],
+              ),
+      ),
+    );
   }
 
-  void _showMoreTools(){
-    showModalBottomSheet<void>(context:context,isScrollControlled:true,builder:(ctx)=>SafeArea(child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
-      const Padding(padding:EdgeInsets.all(16),child:Text('More tools',style:TextStyle(fontSize:20,fontWeight:FontWeight.w600))),
-      for(final destination in [ManagerDestination.payments,ManagerDestination.sharedContent,ManagerDestination.deployment,ManagerDestination.health,ManagerDestination.settings]) ListTile(leading:Icon(destination.icon),title:Text(destination.label),subtitle:Text(destination.description),onTap:(){Navigator.pop(ctx);_openDestination(destination);}),
-    ]))));
+  void _showMoreTools() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'More tools',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.undo),
+                title: const Text('Undo last workspace edit'),
+                onTap: context.read<TripsProvider>().canUndo
+                    ? () {
+                        Navigator.pop(ctx);
+                        context.read<TripsProvider>().undo();
+                      }
+                    : null,
+              ),
+              for (final destination in [
+                ManagerDestination.dashboard,
+                ManagerDestination.library,
+                ManagerDestination.history,
+                ManagerDestination.payments,
+                ManagerDestination.sharedContent,
+                ManagerDestination.deployment,
+                ManagerDestination.health,
+                ManagerDestination.settings,
+              ])
+                ListTile(
+                  leading: Icon(destination.icon),
+                  title: Text(destination.label),
+                  subtitle: Text(destination.description),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _openDestination(destination);
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
-  String _targetKey(){final settings=context.read<SettingsProvider>().settings;return [settings.repositoryOwner,settings.repositoryName,settings.branch,settings.tripsDataPath].join('|');}
+
+  String _targetKey() {
+    final settings = context.read<SettingsProvider>().settings;
+    return [
+      settings.repositoryOwner,
+      settings.repositoryName,
+      settings.branch,
+      settings.tripsDataPath,
+    ].join('|');
+  }
+
   Future<void> _quickEditTrip(String id) async {
-    final provider=context.read<TripsProvider>();final original=provider.getTripById(id);if(original==null||provider.isLoading)return;
-    final initial=Map<String,dynamic>.from(jsonDecode(jsonEncode(original)) as Map);final target=_targetKey();
-    final edited=await showDialog<Map<String,dynamic>>(context:context,builder:(_)=>QuickTripEditor(trip:initial));if(edited==null||!mounted)return;
-    final current=provider.getTripById(id),index=provider.getTripIndexById(id);
-    if(target!=_targetKey()||provider.isLoading||current==null||index==null){_showTripUnavailable();return;}
-    try {provider.updateTrip(index,mergeQuickTripEdit(current,initial,edited));ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Draft saved to workspace. Review & publish when ready.')));}catch(e){ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e is StateError?e.message:e.toString())));}
+    final provider = context.read<TripsProvider>();
+    final original = provider.getTripById(id);
+    if (original == null || provider.isLoading) return;
+    final initial = Map<String, dynamic>.from(
+      jsonDecode(jsonEncode(original)) as Map,
+    );
+    final target = _targetKey();
+    final edited = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => QuickTripEditor(trip: initial),
+    );
+    if (edited == null || !mounted) return;
+    final current = provider.getTripById(id),
+        index = provider.getTripIndexById(id);
+    if (target != _targetKey() ||
+        provider.isLoading ||
+        current == null ||
+        index == null) {
+      _showTripUnavailable();
+      return;
+    }
+    try {
+      provider.updateTrip(index, mergeQuickTripEdit(current, initial, edited));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Draft saved to workspace. Review & publish when ready.',
+          ),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e is StateError ? e.message : e.toString())),
+      );
+    }
   }
 
   void _toggleFeaturedFilter() {
@@ -278,6 +464,18 @@ class _TripsListScreenState extends State<TripsListScreen> {
           ],
         ),
         actions: [
+          if (isDesktop)
+            IconButton(
+              onPressed: () => _openDestination(ManagerDestination.dashboard),
+              tooltip: 'Daily dashboard',
+              icon: const Icon(Icons.dashboard_outlined),
+            ),
+          if (isDesktop)
+            IconButton(
+              onPressed: provider.canUndo ? provider.undo : null,
+              tooltip: 'Undo workspace edit',
+              icon: const Icon(Icons.undo),
+            ),
           if (provider.hasUnsavedChanges)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
@@ -367,10 +565,42 @@ class _TripsListScreenState extends State<TripsListScreen> {
           const SizedBox(width: 6),
         ],
       ),
-      bottomNavigationBar: SafeArea(child:Column(mainAxisSize:MainAxisSize.min,children:[
-        _buildPublishBar(provider),
-        if(!isDesktop)NavigationBar(key:const Key('manager-bottom-navigation'),selectedIndex:0,onDestinationSelected:(index){if(index==1)_openDestination(ManagerDestination.batches);if(index==2)_openDestination(ManagerDestination.homepage);if(index==3)_showMoreTools();},destinations:const [NavigationDestination(icon:Icon(Icons.route_outlined),label:'Trips'),NavigationDestination(icon:Icon(Icons.calendar_month_outlined),label:'Departures'),NavigationDestination(icon:Icon(Icons.web_outlined),label:'Website'),NavigationDestination(icon:Icon(Icons.more_horiz),label:'More')]),
-      ])),
+      bottomNavigationBar: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildPublishBar(provider),
+            if (!isDesktop)
+              NavigationBar(
+                key: const Key('manager-bottom-navigation'),
+                selectedIndex: 0,
+                onDestinationSelected: (index) {
+                  if (index == 1) _openDestination(ManagerDestination.batches);
+                  if (index == 2) _openDestination(ManagerDestination.homepage);
+                  if (index == 3) _showMoreTools();
+                },
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.route_outlined),
+                    label: 'Trips',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.calendar_month_outlined),
+                    label: 'Departures',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.web_outlined),
+                    label: 'Website',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.more_horiz),
+                    label: 'More',
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
       body: CallbackShortcuts(
         bindings: <ShortcutActivator, VoidCallback>{
           const SingleActivator(LogicalKeyboardKey.keyF, control: true): () =>
@@ -713,11 +943,24 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                       ),
                                       child: _TripCard(
                                         trip: trip,
+                                        upcomingLabel: TripVisibility.upcoming(
+                                          trip,
+                                          _homepageSelection,
+                                        ),
                                         onTap: () => _editTrip(tripId),
                                         onDelete: () => _deleteTrip(tripId),
                                         onToggleFeatured: () =>
                                             _toggleFeatured(tripId),
-                                        onQuickEdit: () => _quickEditTrip(tripId),
+                                        onQuickEdit: () =>
+                                            _quickEditTrip(tripId),
+                                        draftChanged: provider.changes
+                                            .containsKey(tripId),
+                                        onDuplicate: () {
+                                          final id = provider.duplicateTrip(
+                                            tripId,
+                                          );
+                                          if (id != null) _editTrip(id);
+                                        },
                                       ),
                                     );
                                   },
@@ -753,7 +996,10 @@ class _TripsListScreenState extends State<TripsListScreen> {
   void _addNewTrip() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const TripEditScreen(initialSection:TripEditorSection.basics)),
+      MaterialPageRoute(
+        builder: (_) =>
+            const TripEditScreen(initialSection: TripEditorSection.basics),
+      ),
     );
   }
 
@@ -768,7 +1014,11 @@ class _TripsListScreenState extends State<TripsListScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => TripEditScreen(trip: trip, index: index,initialSection:TripEditorSection.basics),
+        builder: (_) => TripEditScreen(
+          trip: trip,
+          index: index,
+          initialSection: TripEditorSection.basics,
+        ),
       ),
     );
   }
@@ -829,53 +1079,106 @@ class _TripsListScreenState extends State<TripsListScreen> {
   }
 
   Future<void> _saveTrips(TripsProvider provider) async {
-    if(provider.isLoading||_publishing)return;
-    // Review the workspace before publishing.
-    final controller=TextEditingController(text:'Update trips via Trip Manager');
+    if (provider.isLoading || _publishing) return;
+    // Review actual changed fields and choose only ready trips.
+    final selected = provider.changes.keys.toSet();
+    final controller = TextEditingController(
+      text: 'Update trips via Trip Manager',
+    );
     final action = await showDialog<String>(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: const Text('Review & publish'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Trips in this publication: '+provider.tripCount.toString()),
-              if(provider.intentionalDeletedIds.isNotEmpty)Text('Trips to remove: '+provider.intentionalDeletedIds.length.toString()),
-              const SizedBox(height:12),
-              // Info box explaining the process
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue[200]!),
-                ),
-                child: Row(
+          content: SizedBox(
+            width: 650,
+            child: SingleChildScrollView(
+              child: StatefulBuilder(
+                builder: (ctx, set) => Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Publish the workspace to GitHub, then wait for website deployment. Existing conflict checks stay enabled.',
-                        style: TextStyle(fontSize: 12, color: Colors.blue[800]),
+                    if (provider.orderChanged)
+                      const Text(
+                        'Trip order changed: publish the complete workspace to preserve ordering.',
                       ),
+                    if (!provider.orderChanged)
+                      for (final entry in provider.changes.entries)
+                        CheckboxListTile(
+                          title: Text(
+                            provider
+                                    .getTripById(entry.key)?['title']
+                                    ?.toString() ??
+                                'Remove ${entry.key}',
+                          ),
+                          subtitle: Text(
+                            '${entry.value.length} changed fields',
+                          ),
+                          value: selected.contains(entry.key),
+                          onChanged: (v) => set(() {
+                            if (v == true)
+                              selected.add(entry.key);
+                            else
+                              selected.remove(entry.key);
+                          }),
+                        ),
+                    for (final entry in provider.changes.entries)
+                      ExpansionTile(
+                        title: Text(entry.key),
+                        children: [ChangeReview(changes: entry.value)],
+                      ),
+                    Text(
+                      'Trips in this publication: ' +
+                          provider.tripCount.toString(),
+                    ),
+                    if (provider.intentionalDeletedIds.isNotEmpty)
+                      Text(
+                        'Trips to remove: ' +
+                            provider.intentionalDeletedIds.length.toString(),
+                      ),
+                    const SizedBox(height: 12),
+                    // Info box explaining the process
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue[200]!),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: Colors.blue[700],
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Publish the workspace to GitHub, then wait for website deployment. Existing conflict checks stay enabled.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.blue[800],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: controller,
+                      decoration: const InputDecoration(
+                        labelText: 'Change note',
+                        border: OutlineInputBorder(),
+                        hintText: 'Describe your changes...',
+                      ),
+                      maxLines: 2,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: controller,
-                decoration: const InputDecoration(
-                  labelText: 'Change note',
-                  border: OutlineInputBorder(),
-                  hintText: 'Describe your changes...',
-                ),
-                maxLines: 2,
-              ),
-            ],
+            ),
           ),
           actions: [
             TextButton(
@@ -894,17 +1197,30 @@ class _TripsListScreenState extends State<TripsListScreen> {
 
     controller.dispose();
     if (action == null || !mounted || _publishing) return;
-    setState((){_publishing=true;_publishFailure=null;});
+    setState(() {
+      _publishing = true;
+      _publishFailure = null;
+    });
 
     // Perform the save
-    final result = await provider.saveTrips(commitMessage: action);
+    final result = await provider.saveTrips(
+      commitMessage: action,
+      selectedTripIds:
+          provider.orderChanged || selected.isEmpty && provider.changes.isEmpty
+          ? null
+          : selected,
+    );
 
     if (!mounted) return;
-    setState((){_publishing=false;_publishFailure=result.success?null:result.error;});
+    setState(() {
+      _publishing = false;
+      _publishFailure = result.success ? null : result.error;
+    });
 
     if (result.success) {
       _showPublicationSuccess(
-        message: 'Saved to GitHub. Check deployment to confirm the website is live.',
+        message:
+            'Saved to GitHub. Check deployment to confirm the website is live.',
         commitSha: result.commitSha,
       );
     } else if (result.hasConflict) {
@@ -1143,7 +1459,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
     required String? commitSha,
   }) {
     final exactSha = commitSha?.trim();
-    setState(()=>_publishedCommitSha=exactSha);
+    setState(() => _publishedCommitSha = exactSha);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -1343,6 +1659,9 @@ class _TripCard extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onToggleFeatured;
   final VoidCallback onQuickEdit;
+  final VoidCallback onDuplicate;
+  final bool draftChanged;
+  final String upcomingLabel;
 
   const _TripCard({
     required this.trip,
@@ -1350,6 +1669,9 @@ class _TripCard extends StatelessWidget {
     required this.onDelete,
     required this.onToggleFeatured,
     required this.onQuickEdit,
+    required this.onDuplicate,
+    this.draftChanged = false,
+    this.upcomingLabel = 'Upcoming Batches: check Website content',
   });
 
   @override
@@ -1408,6 +1730,15 @@ class _TripCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Text(upcomingLabel, style: const TextStyle(fontSize: 12)),
+                      if (draftChanged)
+                        const Text(
+                          'Unpublished draft',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       Row(
                         children: [
                           Expanded(
@@ -1524,16 +1855,34 @@ class _TripCard extends StatelessWidget {
                 // Actions
                 PopupMenuButton<String>(
                   onSelected: (value) {
-                    if(value=='quick'){onQuickEdit();}
-                    else if (value == 'delete') {
+                    if (value == 'duplicate') {
+                      onDuplicate();
+                    } else if (value == 'quick') {
+                      onQuickEdit();
+                    } else if (value == 'delete') {
                       onDelete();
                     } else if (value == 'featured') {
                       onToggleFeatured();
                     }
                   },
-                  tooltip:'Trip actions',
+                  tooltip: 'Trip actions',
                   itemBuilder: (context) => [
-                    const PopupMenuItem(value:'quick',child:ListTile(contentPadding:EdgeInsets.zero,leading:Icon(Icons.edit_calendar_outlined),title:Text('Quick edit dates & price'))),
+                    const PopupMenuItem(
+                      value: 'duplicate',
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.copy),
+                        title: Text('Duplicate as draft'),
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'quick',
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.edit_calendar_outlined),
+                        title: Text('Quick edit dates & price'),
+                      ),
+                    ),
                     PopupMenuItem(
                       value: 'featured',
                       child: Row(

@@ -1,3 +1,4 @@
+import 'golden_platform.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -257,7 +258,7 @@ void main() {
         if (!Platform.isAndroid) {
           await expectLater(
             find.byType(Scaffold),
-            matchesGoldenFile('goldens/footer_${dark ? 'dark' : 'light'}.png'),
+            platformGolden('goldens/footer_${dark ? 'dark' : 'light'}.png'),
           );
         }
         for (final entry in {

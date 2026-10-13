@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 const double managerDesktopBreakpoint = 1100;
 
 enum ManagerDestination {
+  dashboard,
+  library,
+  history,
   trips,
   homepage,
   batches,
@@ -15,6 +18,9 @@ enum ManagerDestination {
 
 extension ManagerDestinationDetails on ManagerDestination {
   String get label => switch (this) {
+    ManagerDestination.dashboard => 'Dashboard',
+    ManagerDestination.library => 'Photo library',
+    ManagerDestination.history => 'Version history',
     ManagerDestination.trips => 'Trips',
     ManagerDestination.homepage => 'Website content',
     ManagerDestination.batches => 'Departures',
@@ -26,6 +32,9 @@ extension ManagerDestinationDetails on ManagerDestination {
   };
 
   String get description => switch (this) {
+    ManagerDestination.dashboard => 'Daily tasks and missing dates',
+    ManagerDestination.library => 'Reuse photos and manage tags',
+    ManagerDestination.history => 'Restore earlier versions as drafts',
     ManagerDestination.trips => 'Manage every trip',
     ManagerDestination.homepage => 'Edit website content',
     ManagerDestination.batches => 'Preview departures',
@@ -37,6 +46,9 @@ extension ManagerDestinationDetails on ManagerDestination {
   };
 
   IconData get icon => switch (this) {
+    ManagerDestination.dashboard => Icons.dashboard_outlined,
+    ManagerDestination.library => Icons.photo_library_outlined,
+    ManagerDestination.history => Icons.history,
     ManagerDestination.trips => Icons.route_outlined,
     ManagerDestination.homepage => Icons.web_outlined,
     ManagerDestination.batches => Icons.calendar_month_outlined,
@@ -48,6 +60,9 @@ extension ManagerDestinationDetails on ManagerDestination {
   };
 
   IconData get selectedIcon => switch (this) {
+    ManagerDestination.dashboard => Icons.dashboard,
+    ManagerDestination.library => Icons.photo_library,
+    ManagerDestination.history => Icons.history,
     ManagerDestination.trips => Icons.route,
     ManagerDestination.homepage => Icons.web,
     ManagerDestination.batches => Icons.calendar_month,
@@ -117,13 +132,18 @@ class ManagerSideNavigation extends StatelessWidget {
               ),
               const Divider(),
               const SizedBox(height: 8),
-              Expanded(child: ListView(children:[for (final destination in ManagerDestination.values)
-                _SideDestination(
-                  destination: destination,
-                  selected: destination == selected,
-                  onTap: () => onSelected(destination),
+              Expanded(
+                child: ListView(
+                  children: [
+                    for (final destination in ManagerDestination.values)
+                      _SideDestination(
+                        destination: destination,
+                        selected: destination == selected,
+                        onTap: () => onSelected(destination),
+                      ),
+                  ],
                 ),
-              ])),
+              ),
               Padding(
                 padding: const EdgeInsets.all(18),
                 child: Container(
@@ -221,7 +241,14 @@ class ManagerNavigationDrawer extends StatelessWidget {
           NavigationDrawerDestination(
             icon: Icon(destination.icon),
             selectedIcon: Icon(destination.selectedIcon),
-            label: SizedBox(width:160,child:Text(destination.label,maxLines:2,overflow:TextOverflow.ellipsis)),
+            label: SizedBox(
+              width: 160,
+              child: Text(
+                destination.label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ),
       ],
     );

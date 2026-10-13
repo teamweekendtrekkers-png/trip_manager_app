@@ -1,3 +1,4 @@
+import 'golden_platform.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -227,7 +228,7 @@ void main() {
         if (!Platform.isAndroid) {
           await expectLater(
             find.byType(Scaffold),
-            matchesGoldenFile(
+            platformGolden(
               'goldens/homepage_reviews_${dark ? "dark" : "light"}.png',
             ),
           );

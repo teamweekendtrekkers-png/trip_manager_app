@@ -1,3 +1,4 @@
+import 'golden_platform.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -729,7 +730,7 @@ void main() {
         await tester.pumpAndSettle();
         await expectLater(
           find.byType(Scaffold),
-          matchesGoldenFile('goldens/trip_card_${dark ? 'dark' : 'light'}.png'),
+          platformGolden('goldens/trip_card_${dark ? 'dark' : 'light'}.png'),
         );
       });
     }

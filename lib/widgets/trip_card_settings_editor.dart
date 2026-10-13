@@ -9,6 +9,7 @@ class TripCardSettingsEditor extends StatefulWidget {
     required this.trip,
     required this.onChanged,
     this.onUploadCover,
+    this.onChooseCover,
     this.imagePreviewBuilder,
     this.referenceDate,
   });
@@ -16,6 +17,7 @@ class TripCardSettingsEditor extends StatefulWidget {
   final Map<String, dynamic> trip;
   final void Function(String field, String? value) onChanged;
   final Future<String?> Function()? onUploadCover;
+  final VoidCallback? onChooseCover;
   final Widget Function(String path)? imagePreviewBuilder;
   final DateTime? referenceDate;
 
@@ -39,10 +41,15 @@ class _TripCardSettingsEditorState extends State<TripCardSettingsEditor> {
   @override
   void didUpdateWidget(covariant TripCardSettingsEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    for (final entry in _controllers.entries) {
-      final next = '${widget.trip[entry.key] ?? ''}';
-      if (entry.value.text != next) entry.value.text = next;
-    }
+    // Synchronizing a controller during Form layout can mark its ancestor
+    // dirty while the child is building. Use the latest value after the frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      for (final entry in _controllers.entries) {
+        final next = '${widget.trip[entry.key] ?? ''}';
+        if (entry.value.text != next) entry.value.text = next;
+      }
+    });
   }
 
   Widget _text(String field, String label, String hint, {int lines = 1}) {
@@ -120,6 +127,12 @@ class _TripCardSettingsEditorState extends State<TripCardSettingsEditor> {
               'Card cover path or HTTPS URL',
               'Optional. Leave blank to use the display image.',
             ),
+            if (widget.onChooseCover != null)
+              TextButton.icon(
+                onPressed: widget.onChooseCover,
+                icon: const Icon(Icons.photo_library),
+                label: const Text('Choose from photo library'),
+              ),
             if (widget.onUploadCover != null)
               OutlinedButton.icon(
                 key: const Key('trip-card-upload'),
@@ -135,7 +148,11 @@ class _TripCardSettingsEditorState extends State<TripCardSettingsEditor> {
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             const SizedBox(height: 12),
-            _text('cardTitle', 'Short display title', 'Optional; full trip name remains on details'),
+            _text(
+              'cardTitle',
+              'Short display title',
+              'Optional; full trip name remains on details',
+            ),
             _text(
               'cardSummary',
               'Short card highlight',
@@ -181,18 +198,52 @@ class _TripCardSettingsEditorState extends State<TripCardSettingsEditor> {
             ExpansionTile(
               title: const Text('Photo crops and focus'),
               children: [
+                TextButton(
+                  onPressed: () {
+                    widget.onChanged('cardFocalPoint', 'center');
+                    widget.onChanged('imageFocalPoint', 'center');
+                  },
+                  child: const Text('Reset crops to centre'),
+                ),
+                const Text(
+                  'Card: 16:9 · 1600×900 px. Gallery: 4:3 · 1600×1200 px. Original photographs remain fully viewable.',
+                ),
                 for (final field in ['cardFocalPoint', 'imageFocalPoint'])
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: DropdownButtonFormField<String>(
                       key: ValueKey('trip-card-$field'),
-                      initialValue: ['center', 'top', 'bottom', 'left', 'right'].contains(widget.trip[field]) ? widget.trip[field] as String : 'center',
-                      decoration: InputDecoration(labelText: field == 'cardFocalPoint' ? 'Card photo focus (16:9)' : 'Gallery photo focus (4:3 on mobile)'),
-                      items: [for (final focus in ['center', 'top', 'bottom', 'left', 'right']) DropdownMenuItem(value: focus, child: Text(focus))],
+                      initialValue:
+                          [
+                            'center',
+                            'top',
+                            'bottom',
+                            'left',
+                            'right',
+                          ].contains(widget.trip[field])
+                          ? widget.trip[field] as String
+                          : 'center',
+                      decoration: InputDecoration(
+                        labelText: field == 'cardFocalPoint'
+                            ? 'Card photo focus (16:9)'
+                            : 'Gallery photo focus (4:3 on mobile)',
+                      ),
+                      items: [
+                        for (final focus in [
+                          'center',
+                          'top',
+                          'bottom',
+                          'left',
+                          'right',
+                        ])
+                          DropdownMenuItem(value: focus, child: Text(focus)),
+                      ],
                       onChanged: (value) => widget.onChanged(field, value),
                     ),
                   ),
-                const Text('Keep the subject clear in the centre or choose its position. Original uploads are retained; the website generates smaller WebP photos when published.'),
+                const Text(
+                  'Keep the subject clear in the centre or choose its position. Original uploads are retained; the website generates smaller WebP photos when published.',
+                ),
               ],
             ),
             const Text('Unsaved mobile card preview'),
@@ -261,7 +312,10 @@ class TripCardPreview extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (cover.isNotEmpty && imagePreviewBuilder != null)
-                AspectRatio(aspectRatio: 16 / 9, child: imagePreviewBuilder!(cover))
+                AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: imagePreviewBuilder!(cover),
+                )
               else
                 const SizedBox(
                   height: 140,

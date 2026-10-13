@@ -6,9 +6,11 @@ class HomepageSectionsEditor extends StatelessWidget {
     super.key,
     required this.sections,
     required this.onChanged,
+    this.onlySections,
   });
   final Map<String, dynamic> sections;
   final VoidCallback onChanged;
+  final Set<String>? onlySections;
 
   Widget _text(
     Map values,
@@ -39,17 +41,22 @@ class HomepageSectionsEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      for (final entry in {
-        'stats': 'Statistics',
-        'howItWorks': 'How It Works',
-        'whyChooseUs': 'Why Thousands Choose Us',
-        'reviews': 'Google Reviews',
-        'cta': 'Bottom Call to Action',
-      }.entries)
+      for (final entry
+          in {
+            'stats': 'Statistics',
+            'howItWorks': 'How It Works',
+            'whyChooseUs': 'Why Thousands Choose Us',
+            'reviews': 'Google Reviews',
+            'cta': 'Bottom Call to Action',
+          }.entries.where(
+            (entry) =>
+                onlySections == null || onlySections!.contains(entry.key),
+          ))
         Card(
           child: ExpansionTile(
             key: ValueKey('homepage-section-${entry.key}'),
             title: Text(entry.value),
+            initiallyExpanded: onlySections != null,
             subtitle: Text(
               sections[entry.key]['enabled'] == true
                   ? 'Visible on website'

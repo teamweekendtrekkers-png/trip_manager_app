@@ -5,6 +5,7 @@ import 'providers/trips_provider.dart';
 import 'screens/trips_list_screen.dart';
 import 'models/app_settings.dart';
 import 'theme/app_theme.dart';
+import 'services/draft_store.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,16 +13,19 @@ void main() async {
   // Initialize settings
   final settingsProvider = SettingsProvider();
   await settingsProvider.init();
+  await DraftStore.init();
 
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: settingsProvider),
         ChangeNotifierProxyProvider<SettingsProvider, TripsProvider>(
-          create: (context) => TripsProvider(AppSettings()),
+          create: (context) =>
+              TripsProvider(AppSettings(), persistentDrafts: true),
           update: (context, settings, previous) {
             previous?.updateSettings(settings.settings);
-            return previous ?? TripsProvider(settings.settings);
+            return previous ??
+                TripsProvider(settings.settings, persistentDrafts: true);
           },
         ),
       ],

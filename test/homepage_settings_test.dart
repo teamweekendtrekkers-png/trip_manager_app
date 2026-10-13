@@ -1,3 +1,4 @@
+import 'golden_platform.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -536,10 +537,14 @@ void main() {
     'phone editor changes background/copy and publishes only homepage settings',
     (tester) async {
       final github = await openEditor(tester);
+      await showKey(tester, 'homepage-hero-backgroundImage');
+      await showKey(tester, 'homepage-hero-backgroundImage');
       await tester.enterText(
         find.byKey(const ValueKey('homepage-hero-backgroundImage')),
         'images/new.jpg',
       );
+      await showKey(tester, 'homepage-hero-title');
+      await showKey(tester, 'homepage-hero-title');
       await tester.enterText(
         find.byKey(const ValueKey('homepage-hero-title')),
         'New adventures',
@@ -554,18 +559,70 @@ void main() {
       expect(find.text('Homepage settings published.'), findsOneWidget);
     },
   );
+  testWidgets('publishing Hero retains unfinished Upcoming Batches edits', (
+    tester,
+  ) async {
+    final github = await openEditor(tester);
+    await showKey(tester, 'homepage-hero-title');
+    await tester.enterText(
+      find.byKey(const ValueKey('homepage-hero-title')),
+      'New hero',
+    );
+    await showKey(tester, 'homepage-upcomingBatches-subtitle');
+    await tester.enterText(
+      find.byKey(const ValueKey('homepage-upcomingBatches-subtitle')),
+      'Unfinished departures copy',
+    );
+    tester
+        .state<ScrollableState>(find.byType(Scrollable).first)
+        .position
+        .jumpTo(0);
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'homepage-group-Hero');
+    await publish(tester);
+    final saved = HomepageConfig.parse(
+      github.calls.single.values.single,
+    ).toJson();
+    expect(saved['hero']['title'], 'New hero');
+    expect(
+      saved['upcomingBatches']['subtitle'],
+      config().toJson()['upcomingBatches']['subtitle'],
+    );
+    tester
+        .state<ScrollableState>(find.byType(Scrollable).first)
+        .position
+        .jumpTo(0);
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'homepage-group-Upcoming Batches');
+    await showKey(tester, 'homepage-upcomingBatches-subtitle');
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('homepage-upcomingBatches-subtitle')),
+          )
+          .controller!
+          .text,
+      'Unfinished departures copy',
+    );
+    expect(tester.takeException(), isNull);
+  });
   testWidgets(
-    'phone controls select exact departures and preview chosen card fields',
+    'phone controls select only chosen trips and dates for compact departures',
     (tester) async {
       final github = await openEditor(tester);
-      await tapKey(tester, 'homepage-choose-trips');
+      await tapKey(tester, 'homepage-trip-selection');
+      await tester.tap(find.text('Only selected trips').last);
+      await tester.pumpAndSettle();
+      await showKey(tester, 'selection-trip-a');
+      await tester.tap(find.byKey(const ValueKey('selection-trip-a')));
+      await tester.pumpAndSettle();
       await tapKey(tester, 'homepage-trip-a');
-      await tapKey(tester, 'homepage-choose-departures');
+      await tapKey(tester, 'homepage-date-selection');
+      await tester.tap(find.text('Only selected departure dates').last);
+      await tester.pumpAndSettle();
       await tapKey(tester, 'homepage-departure-a|2026-08-21/2026-08-23');
-      await tapKey(tester, 'homepage-field-price');
-      await tapKey(tester, 'homepage-field-location');
-      final preview = find.byKey(const Key('homepage-preview'));
-      await showKey(tester, 'homepage-preview');
+      final preview = find.byKey(const Key('homepage-selection-preview'));
+      await showKey(tester, 'homepage-selection-preview');
       expect(
         find.descendant(of: preview, matching: find.text('Alpha')),
         findsOneWidget,
@@ -580,7 +637,7 @@ void main() {
       );
       expect(
         find.descendant(of: preview, matching: find.text('Hill')),
-        findsOneWidget,
+        findsNothing,
       );
       await publish(tester);
       expect(
@@ -623,6 +680,7 @@ void main() {
       final github = await openEditor(tester);
       await tapKey(tester, 'homepage-section-reviews');
       await showKey(tester, 'section-reviews-googleMapsUrl');
+      await showKey(tester, 'section-reviews-googleMapsUrl');
       await tester.enterText(
         find.byKey(const ValueKey('section-reviews-googleMapsUrl')),
         'https://maps.app.goo.gl/newBusiness',
@@ -657,6 +715,7 @@ void main() {
       final github = await openEditor(tester);
       await tapKey(tester, 'homepage-section-reviews');
       await showKey(tester, 'section-reviews-googleMapsUrl');
+      await showKey(tester, 'section-reviews-googleMapsUrl');
       await tester.enterText(
         find.byKey(const ValueKey('section-reviews-googleMapsUrl')),
         'https://evil.test/maps',
@@ -674,6 +733,7 @@ void main() {
     (tester) async {
       final github = await openEditor(tester);
       await tapKey(tester, 'homepage-section-reviews');
+      await showKey(tester, 'section-reviews-rating');
       await showKey(tester, 'section-reviews-rating');
       await tester.enterText(
         find.byKey(const ValueKey('section-reviews-rating')),
@@ -698,6 +758,7 @@ void main() {
       tester,
       remote: config((data) => data['hero']['title'] = 'Remote'),
     );
+    await showKey(tester, 'homepage-hero-title');
     await tester.enterText(
       find.byKey(const ValueKey('homepage-hero-title')),
       'Local',
@@ -719,6 +780,7 @@ void main() {
     tester,
   ) async {
     final github = await openEditor(tester);
+    await showKey(tester, 'homepage-hero-backgroundImage');
     await tester.enterText(
       find.byKey(const ValueKey('homepage-hero-backgroundImage')),
       'javascript:alert(1)',
@@ -742,8 +804,13 @@ void main() {
       // The disabled button may be outside the lazy viewport. Inspect the
       // configured child directly; this test checks authorization, not scrolling.
       final list = tester.widget<ListView>(find.byType(ListView));
-      final children = (list.childrenDelegate as SliverChildListDelegate).children;
-      final button = children.firstWhere((child) => child.key == const Key('homepage-publish')) as FilledButton;
+      final children =
+          (list.childrenDelegate as SliverChildListDelegate).children;
+      final button =
+          children.firstWhere(
+                (child) => child.key == const Key('homepage-publish'),
+              )
+              as FilledButton;
       expect(button.onPressed, isNull);
       expect(github.calls, isEmpty);
     },
@@ -755,6 +822,7 @@ void main() {
       tester,
       remote: config((data) => data['hero']['title'] = 'Remote'),
     );
+    await showKey(tester, 'homepage-hero-title');
     await tester.enterText(
       find.byKey(const ValueKey('homepage-hero-title')),
       'Local',
@@ -809,7 +877,9 @@ void main() {
     'dark editor previews empty manual selections and hidden section',
     (tester) async {
       await openEditor(tester, dark: true);
-      await tapKey(tester, 'homepage-choose-trips');
+      await tapKey(tester, 'homepage-trip-selection');
+      await tester.tap(find.text('Only selected trips').last);
+      await tester.pumpAndSettle();
       final preview = find.byKey(const Key('homepage-preview'));
       await showKey(tester, 'homepage-preview');
       expect(
@@ -888,6 +958,7 @@ void main() {
       await tapKey(tester, 'website-footer-editor');
       await tapKey(tester, 'footer-showUpi');
       await showKey(tester, 'footer-brandName');
+      await showKey(tester, 'footer-brandName');
       await tester.enterText(
         find.byKey(const ValueKey('footer-brandName')),
         'Weekend Crew',
@@ -942,7 +1013,7 @@ void main() {
         await openEditor(tester, dark: dark);
         await expectLater(
           find.byType(Scaffold),
-          matchesGoldenFile(
+          platformGolden(
             'goldens/homepage_editor_${dark ? 'dark' : 'light'}.png',
           ),
         );

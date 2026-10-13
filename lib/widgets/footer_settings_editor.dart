@@ -6,9 +6,11 @@ class FooterSettingsEditor extends StatelessWidget {
     super.key,
     required this.footer,
     required this.onChanged,
+    this.initiallyExpanded = false,
   });
   final Map<String, dynamic> footer;
   final VoidCallback onChanged;
+  final bool initiallyExpanded;
 
   Widget text(
     Map values,
@@ -39,6 +41,7 @@ class FooterSettingsEditor extends StatelessWidget {
     child: ExpansionTile(
       key: const ValueKey('website-footer-editor'),
       title: const Text('Website Footer (all pages)'),
+      initiallyExpanded: initiallyExpanded,
       subtitle: Text(
         footer['showUpi'] == true
             ? 'Footer UPI shown • checkout unchanged'

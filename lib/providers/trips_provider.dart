@@ -1,3 +1,7 @@
+import '../services/trip_date_utils.dart';
+import 'dart:async';
+import '../services/draft_store.dart';
+import '../services/workspace_changes.dart';
 import 'package:flutter/foundation.dart';
 import '../services/github_service.dart';
 import '../services/trip_merge_service.dart';
@@ -18,6 +22,147 @@ class TripsProvider extends ChangeNotifier {
   GitHubService? _githubService;
   bool _hasUnsavedChanges = false;
   bool _hasConflict = false;
+  final bool persistentDrafts;
+  Timer? _draftTimer;
+  bool _disposed = false;
+  DateTime? lastDraftSaved;
+  String? draftError;
+  bool _draftRecoveryBlocked = false;
+  String? lastPublishedCommit;
+  final List<Map<String, dynamic>> _undo = [];
+  bool get canUndo => _undo.isNotEmpty && !_isLoading;
+  Map<String, List<FieldChange>> get changes =>
+      WorkspaceChanges.trips(_baseTrips, _trips);
+  bool get orderChanged => WorkspaceChanges.reordered(_baseTrips, _trips);
+  List<Map<String, dynamic>> get baseTrips => _copyTrips(_baseTrips);
+  String get draftScope => DraftStore.scope(_settings);
+  Map<String, dynamic> _snapshot() => {
+    'trips': _copyTrips(_trips),
+    'base': _copyTrips(_baseTrips),
+    'deleted': _intentionalDeletedIds.toList(),
+  };
+  void _checkpoint() {
+    _undo.add(_snapshot());
+    if (_undo.length > 20) _undo.removeAt(0);
+  }
+
+  void undo() {
+    if (!canUndo) return;
+    final state = _undo.removeLast();
+    _trips = _copyTrips((state['trips'] as List).cast<Map<String, dynamic>>());
+    _intentionalDeletedIds
+      ..clear()
+      ..addAll((state['deleted'] as List).cast<String>());
+    _hasUnsavedChanges = changes.isNotEmpty || orderChanged;
+    notifyListeners();
+  }
+
+  void restoreVersion(List<Map<String, dynamic>> trips) {
+    if (_isLoading) return;
+    _checkpoint();
+    _draftRecoveryBlocked = false;
+    _trips = _copyTrips(trips);
+    _intentionalDeletedIds
+      ..clear()
+      ..addAll(
+        _baseTrips
+            .map((t) => t['id'].toString())
+            .where((id) => !_trips.any((t) => t['id'] == id)),
+      );
+    _hasUnsavedChanges = true;
+    notifyListeners();
+  }
+
+  Future<void> flushDraft() async {
+    _draftTimer?.cancel();
+    if (!persistentDrafts ||
+        !DraftStore.available ||
+        _isLoading ||
+        !hasCompleteRemoteSnapshot ||
+        _draftRecoveryBlocked)
+      return;
+    final scope = draftScope, snapshot = _snapshot();
+    try {
+      if (_hasUnsavedChanges) {
+        await DraftStore.write(scope, 'workspace', snapshot);
+        lastDraftSaved = DateTime.now();
+      } else {
+        await DraftStore.remove(scope, 'workspace');
+      }
+      draftError = null;
+    } catch (e) {
+      draftError = 'Local draft could not be saved: $e';
+    }
+    if (!_disposed) super.notifyListeners();
+  }
+
+  @override
+  void notifyListeners() {
+    if (persistentDrafts &&
+        DraftStore.available &&
+        !_isLoading &&
+        hasCompleteRemoteSnapshot) {
+      _draftTimer?.cancel();
+      _draftTimer = Timer(const Duration(milliseconds: 400), flushDraft);
+    }
+    super.notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    if (persistentDrafts &&
+        DraftStore.available &&
+        _hasUnsavedChanges &&
+        hasCompleteRemoteSnapshot &&
+        !_draftRecoveryBlocked) {
+      unawaited(
+        DraftStore.write(
+          draftScope,
+          'workspace',
+          _snapshot(),
+        ).catchError((Object _) {}),
+      );
+    }
+    _disposed = true;
+    _draftTimer?.cancel();
+    super.dispose();
+  }
+
+  void _recoverDraft() {
+    if (!persistentDrafts) return;
+    final record = DraftStore.read(draftScope, 'workspace');
+    if (record == null) return;
+    try {
+      final state = record['data'] as Map;
+      final local = (state['trips'] as List)
+          .map((t) => Map<String, dynamic>.from(t as Map))
+          .toList();
+      final base = (state['base'] as List)
+          .map((t) => Map<String, dynamic>.from(t as Map))
+          .toList();
+      final deleted = (state['deleted'] as List).cast<String>().toSet();
+      final merged = TripMergeService.merge(
+        base: base,
+        local: local,
+        remote: _trips,
+        intentionalDeletedIds: deleted,
+      );
+      if (!merged.success) {
+        _draftRecoveryBlocked = true;
+        draftError = 'Saved draft needs review: ${merged.conflicts.join('; ')}';
+        return;
+      }
+      _trips = _copyTrips(merged.trips);
+      _intentionalDeletedIds.addAll(deleted);
+      _hasUnsavedChanges = changes.isNotEmpty || orderChanged;
+      lastDraftSaved = DateTime.tryParse(record['savedAt'].toString());
+    } catch (e) {
+      _draftRecoveryBlocked = true;
+      draftError =
+          'Saved draft could not be restored. It is retained locally: $e';
+    }
+  }
+
   int _settingsEpoch = 0;
   final Set<String> _intentionalDeletedIds = {};
   final Set<String> _featuredDriftIds = {};
@@ -26,11 +171,16 @@ class TripsProvider extends ChangeNotifier {
   TripsProvider(
     this._settings, {
     GitHubService Function(AppSettings settings)? serviceFactory,
+    this.persistentDrafts = false,
   }) : _serviceFactory = serviceFactory {
     _initService();
   }
 
   void _initService() {
+    lastPublishedCommit = DraftStore.read(
+      draftScope,
+      'publication',
+    )?['data']?['commit']?.toString();
     _githubService =
         _serviceFactory?.call(_settings) ?? GitHubService(settings: _settings);
   }
@@ -104,6 +254,24 @@ class TripsProvider extends ChangeNotifier {
         _settings.tripsDataPath != settings.tripsDataPath;
     final connectionChanged =
         targetChanged || _settings.githubToken != settings.githubToken;
+    if (targetChanged) {
+      _draftTimer?.cancel();
+      if (persistentDrafts &&
+          DraftStore.available &&
+          _hasUnsavedChanges &&
+          hasCompleteRemoteSnapshot &&
+          !_draftRecoveryBlocked) {
+        unawaited(
+          DraftStore.write(
+            draftScope,
+            'workspace',
+            _snapshot(),
+          ).catchError((Object _) {}),
+        );
+      }
+      lastDraftSaved = null;
+      _undo.clear();
+    }
     _settings = settings;
     if (connectionChanged) {
       _settingsEpoch++;
@@ -147,6 +315,9 @@ class TripsProvider extends ChangeNotifier {
   /// so destructive reloads remain easy to identify and double-confirm in UI.
   Future<bool> reloadDiscardingLocalChanges() async {
     if (_isLoading) return false;
+    _draftTimer?.cancel();
+    if (persistentDrafts) await DraftStore.remove(draftScope, 'workspace');
+    _draftRecoveryBlocked = false;
     await _loadTripsFromCurrentTarget();
     return _error == null && !_hasUnsavedChanges;
   }
@@ -199,6 +370,7 @@ class TripsProvider extends ChangeNotifier {
       } else {
         _error = null;
       }
+      _recoverDraft();
       debugPrint('Parsed ${_trips.length} trips');
     } catch (e, stack) {
       if (operationEpoch != _settingsEpoch) return;
@@ -255,13 +427,22 @@ class TripsProvider extends ChangeNotifier {
   }
 
   /// Save trips to GitHub with conflict detection (acts as git push)
-  Future<SaveResult> saveTrips({String? commitMessage}) async {
+  Future<SaveResult> saveTrips({
+    String? commitMessage,
+    Set<String>? selectedTripIds,
+  }) async {
     if (_isLoading) {
       return SaveResult(
         success: false,
         error: 'Another operation is in progress.',
       );
     }
+    if (selectedTripIds != null && (selectedTripIds.isEmpty || orderChanged))
+      return SaveResult(
+        success: false,
+        error:
+            'Choose changes to publish. Trip reordering must be published as a complete workspace.',
+      );
     final snapshotError = _snapshotError();
     if (snapshotError != null) {
       return SaveResult(success: false, error: snapshotError);
@@ -291,7 +472,17 @@ class TripsProvider extends ChangeNotifier {
       }
 
       return await _publishManagedFiles(
-        trips: merge.trips,
+        trips: selectedTripIds == null
+            ? merge.trips
+            : WorkspaceChanges.select(
+                latest.tripsDocument!.trips,
+                merge.trips,
+                selectedTripIds,
+              ),
+        retainedDraft: selectedTripIds == null ? null : merge.trips,
+        retainedIds: selectedTripIds == null
+            ? null
+            : changes.keys.where((id) => !selectedTripIds.contains(id)).toSet(),
         latest: latest,
         target: target,
         commitMessage: commitMessage ?? 'Update trips via mobile app',
@@ -476,6 +667,8 @@ class TripsProvider extends ChangeNotifier {
     required _ManagedFilesSnapshot latest,
     required _ManagedTarget target,
     required String commitMessage,
+    List<Map<String, dynamic>>? retainedDraft,
+    Set<String>? retainedIds,
   }) async {
     if (!_isCurrentTarget(target)) return _cancelledSaveResult();
     final tripsWrite = TripsParser.replaceTripsDataObject(
@@ -538,8 +731,34 @@ class TripsProvider extends ChangeNotifier {
     final committedDocument = TripsParser.parseTripsDocument(
       tripsWrite.content!,
     );
-    _trips = _copyTrips(committedDocument.trips);
-    _baseTrips = _copyTrips(_trips);
+    if (persistentDrafts) {
+      try {
+        await DraftStore.remember(draftScope, 'workspace', {
+          'trips': _baseTrips,
+        }, 'Before publication');
+        if (!_isCurrentTarget(target)) return _cancelledSaveResult();
+        await DraftStore.remember(draftScope, 'workspace', {
+          'trips': committedDocument.trips,
+        }, 'Published ${result.commitSha ?? ''}');
+        if (!_isCurrentTarget(target)) return _cancelledSaveResult();
+        await DraftStore.recordPublication(draftScope, result.commitSha);
+      } catch (e) {
+        draftError =
+            'Published to GitHub, but local history could not be saved: $e';
+      }
+    }
+    _trips = _copyTrips(
+      retainedDraft == null
+          ? committedDocument.trips
+          : WorkspaceChanges.select(
+              committedDocument.trips,
+              retainedDraft,
+              retainedIds ?? {},
+            ),
+    );
+    _baseTrips = _copyTrips(committedDocument.trips);
+    lastPublishedCommit = result.commitSha;
+    _undo.clear();
     _tripsSource = tripsWrite.content;
     _featuredSource = featuredWrite.content;
     _currentSha = result.fileBlobShas[target.tripsPath];
@@ -550,9 +769,11 @@ class TripsProvider extends ChangeNotifier {
         'Save succeeded, but the new blob SHAs were unavailable. Reload before publishing again.',
       ];
     }
-    _intentionalDeletedIds.clear();
+    _intentionalDeletedIds.removeWhere(
+      (id) => !_baseTrips.any((t) => t['id'] == id),
+    );
     _featuredDriftIds.clear();
-    _hasUnsavedChanges = false;
+    _hasUnsavedChanges = changes.isNotEmpty || orderChanged;
     _hasConflict = false;
     _error = null;
     _isLoading = false;
@@ -654,6 +875,57 @@ class TripsProvider extends ChangeNotifier {
     return error.toString();
   }
 
+  void applyBulkDates(Set<String> ids, String label, {bool remove = false}) {
+    if (_isLoading) return;
+    final range = TripDateUtils.parse(label);
+    if (range == null) throw ArgumentError('Invalid departure range');
+    _checkpoint();
+    _trips = [
+      for (final trip in _trips)
+        if (!ids.contains(trip['id']))
+          trip
+        else
+          {
+            ...trip,
+            'availableDates': remove
+                ? (trip['availableDates'] as List? ?? [])
+                      .where(
+                        (d) =>
+                            TripDateUtils.parse(d.toString())?.key != range.key,
+                      )
+                      .toList()
+                : [
+                    ...(trip['availableDates'] as List? ?? []),
+                    if (!(trip['availableDates'] as List? ?? []).any(
+                      (d) =>
+                          TripDateUtils.parse(d.toString())?.key == range.key,
+                    ))
+                      label,
+                  ],
+          },
+    ];
+    _hasUnsavedChanges = true;
+    notifyListeners();
+  }
+
+  String? duplicateTrip(String id) {
+    if (_isLoading) return null;
+    final original = getTripById(id);
+    if (original == null) return null;
+    final copy = _copyTrips([original]).single;
+    final newId = 'trip_${DateTime.now().microsecondsSinceEpoch}';
+    copy
+      ..['id'] = newId
+      ..['publicSlug'] = newId
+      ..['title'] = '${original['title'] ?? 'Trip'} (copy)'
+      ..['featured'] = false
+      ..['isActive'] = false
+      ..['availableDates'] = <String>[];
+    copy.remove('previousSlugs');
+    copy.remove('date');
+    return addTrip(copy) == null ? newId : null;
+  }
+
   /// Add a new trip with duplicate ID validation
   /// Returns error message if duplicate found, null on success
   String? addTrip(Map<String, dynamic> trip) {
@@ -665,6 +937,7 @@ class TripsProvider extends ChangeNotifier {
         return 'Duplicate trip ID "$newId" already exists at position ${existingIndex + 1}. Please use a unique ID.';
       }
     }
+    _checkpoint();
     _trips.add(trip);
     if (newId != null) _intentionalDeletedIds.remove(newId);
     _hasUnsavedChanges = true;
@@ -675,6 +948,7 @@ class TripsProvider extends ChangeNotifier {
   void updateTrip(int index, Map<String, dynamic> trip) {
     if (_isLoading) return;
     if (index >= 0 && index < _trips.length) {
+      _checkpoint();
       _trips[index] = trip;
       _hasUnsavedChanges = true;
       notifyListeners();
@@ -684,6 +958,7 @@ class TripsProvider extends ChangeNotifier {
   void deleteTrip(int index) {
     if (_isLoading) return;
     if (index >= 0 && index < _trips.length) {
+      _checkpoint();
       final id = _trips[index]['id']?.toString();
       if (id != null && id.isNotEmpty) _intentionalDeletedIds.add(id);
       _trips.removeAt(index);
@@ -696,6 +971,7 @@ class TripsProvider extends ChangeNotifier {
   /// featured/active priority boundary. Returns false for a cross-tier move.
   bool reorderTrips(int oldIndex, int newIndex) {
     if (_isLoading) return false;
+    _checkpoint();
     final displayed = orderedTrips;
     if (oldIndex < 0 || oldIndex >= displayed.length) return false;
     if (newIndex > oldIndex) newIndex -= 1;
@@ -731,6 +1007,7 @@ class TripsProvider extends ChangeNotifier {
   void toggleFeatured(int index) {
     if (_isLoading) return;
     if (index >= 0 && index < _trips.length) {
+      _checkpoint();
       _trips[index]['featured'] = !(_trips[index]['featured'] ?? false);
       _hasUnsavedChanges = true;
       notifyListeners();

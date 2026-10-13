@@ -210,6 +210,33 @@ class GitHubService {
     }
   }
 
+  Future<GitHubFileResult> fetchFileAtRef(String filePath, String ref) async {
+    try {
+      final response = await _dio.get(
+        '$_repoPath/contents/$filePath',
+        queryParameters: {'ref': ref},
+      );
+
+      final content = utf8.decode(
+        base64.decode(response.data['content'].toString().replaceAll('\n', '')),
+      );
+
+      return GitHubFileResult(
+        content: content,
+        sha: response.data['sha'],
+        success: true,
+      );
+    } on DioException catch (e) {
+      return GitHubFileResult(
+        content: '',
+        sha: '',
+        success: false,
+        error: _getErrorMessage(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
   /// Update any file in the repository by path (no conflict check — caller handles it)
   Future<GitHubCommitResult> updateFile({
     required String filePath,
@@ -508,6 +535,29 @@ class GitHubService {
   }
 
   /// List images in the images/trips directory
+  Future<List<String>> listPhotoPaths() async {
+    final response = await _dio.get(
+      '$_repoPath/git/trees/${Uri.encodeComponent(settings.branch)}',
+      queryParameters: {'recursive': '1'},
+    );
+    if (response.data['truncated'] == true)
+      throw StateError(
+        'Photo list is incomplete. Narrow the repository image library before retrying.',
+      );
+    return (response.data['tree'] as List)
+        .where(
+          (e) =>
+              e['type'] == 'blob' &&
+              e['path'].toString().startsWith('images/') &&
+              RegExp(
+                r'\.(jpe?g|png|webp|avif)$',
+                caseSensitive: false,
+              ).hasMatch(e['path'].toString()),
+        )
+        .map((e) => e['path'].toString())
+        .toList();
+  }
+
   Future<List<String>> listTripImages() async {
     try {
       final response = await _dio.get(

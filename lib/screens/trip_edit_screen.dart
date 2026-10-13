@@ -1,3 +1,8 @@
+import '../widgets/local_draft.dart';
+import '../services/draft_store.dart';
+import '../widgets/draft_preview.dart';
+import 'manager_tools_screen.dart';
+import '../widgets/manager_navigation.dart';
 import 'dart:io';
 import '../widgets/trip_editor_sections.dart';
 import 'package:flutter/material.dart';
@@ -44,15 +49,75 @@ class TripEditScreen extends StatefulWidget {
   State<TripEditScreen> createState() => _TripEditScreenState();
 }
 
-class _TripEditScreenState extends State<TripEditScreen> {
+class _TripEditScreenState extends State<TripEditScreen>
+    with LocalDraft<TripEditScreen> {
+  bool _allowLeave = false;
+  bool _saving = false;
+  @override
+  bool get draftBusy => _saving;
+  late final String _scope;
+  final _sectionKeys = <String, GlobalKey>{};
+  @override
+  String get localScope => _scope;
+  @override
+  String get localSlot => 'trip:${widget.trip?['id'] ?? 'new'}';
+  Map<String, TextEditingController> get _textFields => {
+    'publicSlug': _slugController,
+    'departureTime': _departureTimeController,
+    'title': _nameController,
+    'location': _destinationController,
+    'about': _descriptionController,
+    'price': _priceController,
+    'discountedPrice': _discountedPriceController,
+    'groupSize': _groupSizeController,
+    'pickupPoint': _pickupPointController,
+    'image': _imageController,
+    'badge': _badgeController,
+    'distance': _distanceController,
+    'elevation': _elevationController,
+    'bestTime': _bestTimeController,
+    'duration': _durationController,
+  };
+  @override
+  Map<String, dynamic>? get currentDocument => {
+    ...TripContentSettings.copy(_tripData),
+    for (final entry in _textFields.entries) entry.key: entry.value.text,
+    'availableDates': List<String>.from(_availableDates),
+  };
+  @override
+  void applyDocument(Map<String, dynamic> value) {
+    _tripData = TripContentSettings.copy(value);
+    _availableDates = List<String>.from(value['availableDates'] ?? []);
+    for (final entry in _textFields.entries)
+      entry.value.text = value[entry.key]?.toString() ?? '';
+  }
+
   final _formKey = GlobalKey<FormState>();
-  final _editorScroll=ScrollController();
+  final _editorScroll = ScrollController();
   TripEditorSection _editingSection = TripEditorSection.all;
   late Map<String, dynamic> _tripData;
-  Map<String,dynamic>? _sharedContent;
+  Map<String, dynamic>? _sharedContent;
   String? _contentError;
-  bool _contentLoading=false;
-  Future<void> _loadSharedContent() async { if(_contentLoading)return;setState(()=>_contentLoading=true); try { final cfg = await TripContentService(GitHubService(settings:context.read<SettingsProvider>().settings)).load(); if(mounted)setState(()=>_sharedContent=Map<String,dynamic>.from(cfg['sections'] as Map)); } catch(e) {if(mounted)setState(()=>_contentError=e.toString());} finally {if(mounted)setState(()=>_contentLoading=false);} }
+  bool _contentLoading = false;
+  Future<void> _loadSharedContent() async {
+    if (_contentLoading) return;
+    setState(() => _contentLoading = true);
+    try {
+      final cfg = await TripContentService(
+        GitHubService(settings: context.read<SettingsProvider>().settings),
+      ).load();
+      if (mounted)
+        setState(
+          () => _sharedContent = Map<String, dynamic>.from(
+            cfg['sections'] as Map,
+          ),
+        );
+    } catch (e) {
+      if (mounted) setState(() => _contentError = e.toString());
+    } finally {
+      if (mounted) setState(() => _contentLoading = false);
+    }
+  }
 
   // Controllers for text fields
   late TextEditingController _slugController;
@@ -78,11 +143,19 @@ class _TripEditScreenState extends State<TripEditScreen> {
   @override
   void initState() {
     super.initState();
-    _editingSection=widget.initialSection;
+    _scope = DraftStore.scope(context.read<SettingsProvider>().settings);
+    _editingSection = widget.initialSection;
     _tripData = TripContentSettings.copy(widget.trip ?? _getDefaultTrip());
 
-    _slugController = TextEditingController(text: _tripData['publicSlug']?.toString() ?? _tripData['id']?.toString() ?? '');
-    _departureTimeController = TextEditingController(text: TripDateUtils.departureClock(_tripData));
+    _slugController = TextEditingController(
+      text:
+          _tripData['publicSlug']?.toString() ??
+          _tripData['id']?.toString() ??
+          '',
+    );
+    _departureTimeController = TextEditingController(
+      text: TripDateUtils.departureClock(_tripData),
+    );
     _slugController.addListener(_updateCardPreview);
 
     // Handle field name variations from parser (title/name, location/destination, about/description)
@@ -140,6 +213,15 @@ class _TripEditScreenState extends State<TripEditScreen> {
     ]) {
       controller.addListener(_updateCardPreview);
     }
+    for (final controller in [
+      _departureTimeController,
+      _descriptionController,
+      _discountedPriceController,
+      _pickupPointController,
+      _badgeController,
+    ])
+      controller.addListener(_updateCardPreview);
+    startLocalDraft(currentDocument!);
   }
 
   void _updateCardPreview() {
@@ -199,546 +281,853 @@ class _TripEditScreenState extends State<TripEditScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(isEditing ? 'Edit Trip' : 'New Trip'),
-        bottom: PreferredSize(preferredSize: const Size.fromHeight(70), child: TripEditorSectionPicker(value:_editingSection,onChanged:(section){setState(()=>_editingSection=section);WidgetsBinding.instance.addPostFrameCallback((_){if(mounted&&_editorScroll.hasClients)_editorScroll.jumpTo(0);});})),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.save),
-            onPressed: _saveTrip,
-            tooltip: isEditing ? 'Update trip' : 'Create trip',
+    return PopScope(
+      canPop: _allowLeave || !hasLocalEdits,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (!didPop && await leaveLocalDraft() && mounted) {
+          setState(() => _allowLeave = true);
+          Navigator.pop(context);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(isEditing ? 'Edit Trip' : 'New Trip'),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(70),
+            child: TripEditorSectionPicker(
+              value: _editingSection,
+              onChanged: (section) {
+                setState(() => _editingSection = section);
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted && _editorScroll.hasClients)
+                    _editorScroll.jumpTo(0);
+                });
+              },
+            ),
           ),
-        ],
-      ),
-      body: CallbackShortcuts(
-        bindings: <ShortcutActivator, VoidCallback>{
-          const SingleActivator(LogicalKeyboardKey.keyS, control: true):
-              _saveTrip,
-        },
-        child: Focus(
-          canRequestFocus: false,
-          skipTraversal: true,
-          child: Form(
-            key: _formKey,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1080),
-                child: SingleChildScrollView(
-                  controller:_editorScroll,
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: visibleEditorChildren(_editingSection, [
-                      Text(
-                        isEditing ? 'Update trip details' : 'Create a new trip',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Choose a section above, preview your draft, then save it to the workspace. Publish separately when ready.',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      // Basic Info Card
-                      _buildSectionCard(
-                        title: 'Basic Information',
-                        children: [
-                          TextFormField(
-                            key: const ValueKey('trip-name'),
-                            controller: _nameController,
-                            decoration: const InputDecoration(
-                              labelText: 'Trip Name *',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.title),
+          actions: [
+            IconButton(
+              onPressed: _findEditorField,
+              tooltip: 'Find an editor field',
+              icon: const Icon(Icons.search),
+            ),
+            IconButton(
+              icon: const Icon(Icons.save),
+              onPressed: _saveTrip,
+              tooltip: isEditing ? 'Update trip' : 'Create trip',
+            ),
+          ],
+        ),
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final editor = CallbackShortcuts(
+              bindings: <ShortcutActivator, VoidCallback>{
+                const SingleActivator(LogicalKeyboardKey.keyS, control: true):
+                    _saveTrip,
+              },
+              child: Focus(
+                canRequestFocus: false,
+                skipTraversal: true,
+                child: Form(
+                  key: _formKey,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1080),
+                      child: SingleChildScrollView(
+                        controller: _editorScroll,
+                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: visibleEditorChildren(_editingSection, [
+                            localDraftBar(),
+                            Text(
+                              isEditing
+                                  ? 'Update trip details'
+                                  : 'Create a new trip',
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(fontWeight: FontWeight.w800),
                             ),
-                            validator: (v) =>
-                                v?.isEmpty == true ? 'Required' : null,
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            key: const ValueKey('trip-destination'),
-                            controller: _destinationController,
-                            decoration: const InputDecoration(
-                              labelText: 'Destination *',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.location_on),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Choose a section above, preview your draft, then save it to the workspace. Publish separately when ready.',
+                              style: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
                             ),
-                            validator: (v) =>
-                                v?.isEmpty == true ? 'Required' : null,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
+                            const SizedBox(height: 20),
+                            // Basic Info Card
+                            _buildSectionCard(
+                              title: 'Basic Information',
+                              children: [
+                                TextFormField(
+                                  key: const ValueKey('trip-name'),
+                                  controller: _nameController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Trip Name *',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.title),
+                                  ),
+                                  validator: (v) =>
+                                      v?.isEmpty == true ? 'Required' : null,
+                                ),
+                                const SizedBox(height: 16),
+                                TextFormField(
+                                  key: const ValueKey('trip-destination'),
+                                  controller: _destinationController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Destination *',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.location_on),
+                                  ),
+                                  validator: (v) =>
+                                      v?.isEmpty == true ? 'Required' : null,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
 
-                      _buildSectionCard(
-                        title: 'Website URL & Booking Cutoff',
-                        children: [
-                          TextFormField(key: const Key('trip-public-slug'), controller: _slugController, decoration: const InputDecoration(labelText: 'Public URL slug', helperText: 'Lowercase words separated by hyphens; internal ID stays unchanged', border: OutlineInputBorder()), validator: (value) => RegExp(r'^[a-z0-9][a-z0-9_-]*$').hasMatch(value ?? '') && !['constructor', 'prototype', '__proto__'].contains(value) ? null : 'Enter a safe lowercase slug'),
-                          const SizedBox(height: 8),
-                          SelectableText('https://www.teamweekendtrekkers.com/trips/' + _slugController.text + '/'),
-                          const SizedBox(height: 16),
-                          TextFormField(key: const Key('trip-departure-time'), controller: _departureTimeController, decoration: const InputDecoration(labelText: 'Departure time in India (HH:mm)', helperText: 'Bookings close 24 hours after this time on the first departure day', border: OutlineInputBorder()), validator: (value) => RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch(value ?? '') ? null : 'Use 24-hour time, for example 22:00'),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      // About Trip Card
-                      _buildSectionCard(
-                        title: 'About This Trip',
-                        children: [
-                          TextFormField(
-                            key: const ValueKey('trip-about'),
-                            controller: _descriptionController,
-                            decoration: const InputDecoration(
-                              labelText: 'Trip Description / About',
-                              hintText:
-                                  'Describe the trip experience, what makes it special, scenic beauty, etc.',
-                              border: OutlineInputBorder(),
-                              alignLabelWithHint: true,
-                            ),
-                            maxLines: 8,
-                            minLines: 5,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Date & Pricing Card
-                      _buildSectionCard(
-                        title: 'Date & Pricing',
-                        children: [
-                          _responsivePair(
-                            TextFormField(
-                              key:const Key('trip-price'),
-                              controller: _priceController,
-                              decoration: const InputDecoration(
-                                labelText: 'Price (₹) *',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.currency_rupee),
-                              ),
-                              keyboardType: TextInputType.number,
-                              validator: (v) =>
-                                  v?.isEmpty == true ? 'Required' : null,
-                            ),
-                            TextFormField(
-                              controller: _discountedPriceController,
-                              decoration: const InputDecoration(
-                                labelText: 'Discounted Price (₹)',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.local_offer),
-                              ),
-                              keyboardType: TextInputType.number,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Trip Details Card
-                      _buildSectionCard(
-                        title: 'Trip Details',
-                        children: [
-                          _responsivePair(
-                            DropdownButtonFormField<String>(
-                              isExpanded: true,
-                              initialValue:
-                                  (_tripData['difficulty'] ?? 'Moderate')
-                                      .toString(),
-                              decoration: const InputDecoration(
-                                labelText: 'Difficulty',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.trending_up),
-                              ),
-                              items:
-                                  <String>{
-                                        'Easy',
-                                        'Easy-Moderate',
-                                        'Moderate',
-                                        'Moderate-Hard',
-                                        'Challenging',
-                                        'Difficult',
-                                        'Extreme',
-                                        // Retain a valid value introduced by the website
-                                        // even before this app has learned its label.
-                                        if ((_tripData['difficulty'] ?? '')
-                                            .toString()
-                                            .isNotEmpty)
-                                          _tripData['difficulty'].toString(),
-                                      }
-                                      .map(
-                                        (d) => DropdownMenuItem(
-                                          value: d,
-                                          child: Text(d),
-                                        ),
-                                      )
-                                      .toList(),
-                              onChanged: (v) {
-                                setState(() {
-                                  _tripData['difficulty'] = v;
-                                });
-                              },
-                            ),
-                            TextFormField(
-                              controller: _groupSizeController,
-                              decoration: const InputDecoration(
-                                labelText: 'Group Size',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.group),
-                              ),
-                              keyboardType: TextInputType.number,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: _pickupPointController,
-                            decoration: const InputDecoration(
-                              labelText: 'Pickup Point',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.directions_bus),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Website Fields Card (badge, distance, elevation, etc.)
-                      _buildSectionCard(
-                        title: 'Website Display Fields',
-                        children: [
-                          _responsivePair(
-                            TextFormField(
-                              controller: _badgeController,
-                              decoration: const InputDecoration(
-                                labelText: 'Badge/Type',
-                                hintText: 'e.g., Weekend Trek, Road Trip',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.label),
-                              ),
-                            ),
-                            TextFormField(
-                              controller: _durationController,
-                              decoration: const InputDecoration(
-                                labelText: 'Duration',
-                                hintText: 'e.g., 2D/1N',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.schedule),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          _responsivePair(
-                            TextFormField(
-                              controller: _distanceController,
-                              decoration: const InputDecoration(
-                                labelText: 'Distance',
-                                hintText: 'e.g., 15-20 km',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.straighten),
-                              ),
-                            ),
-                            TextFormField(
-                              controller: _elevationController,
-                              decoration: const InputDecoration(
-                                labelText: 'Elevation',
-                                hintText: 'e.g., 1,420 m',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.terrain),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: _bestTimeController,
-                            decoration: const InputDecoration(
-                              labelText: 'Best Time to Visit',
-                              hintText: 'e.g., Oct - Feb',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.wb_sunny),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      _buildSectionCard(title:'Departure Dates',children:[_buildAvailableDatesEditor()]),
-                      const SizedBox(height:16),
-                      // Image Card
-                      _buildSectionCard(
-                        title: 'Display Image — card 16:9 (1200×675 px)',
-                        children: [
-                          Text(
-                            'Recommended: 1800 × 1200 px (3:2). Keep the main subject near the centre so it also crops well on phones.',
-                            style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextFormField(
-                                  controller: _imageController,
+                            _buildSectionCard(
+                              title: 'Website URL & Booking Cutoff',
+                              children: [
+                                TextFormField(
+                                  key: const Key('trip-public-slug'),
+                                  controller: _slugController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Public URL slug',
+                                    helperText:
+                                        'Lowercase words separated by hyphens; internal ID stays unchanged',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  validator: (value) =>
+                                      RegExp(
+                                            r'^[a-z0-9][a-z0-9_-]*$',
+                                          ).hasMatch(value ?? '') &&
+                                          ![
+                                            'constructor',
+                                            'prototype',
+                                            '__proto__',
+                                          ].contains(value)
+                                      ? null
+                                      : 'Enter a safe lowercase slug',
+                                ),
+                                const SizedBox(height: 8),
+                                SelectableText(
+                                  'https://www.teamweekendtrekkers.com/trips/' +
+                                      _slugController.text +
+                                      '/',
+                                ),
+                                const SizedBox(height: 16),
+                                TextFormField(
+                                  key: const Key('trip-departure-time'),
+                                  controller: _departureTimeController,
                                   decoration: const InputDecoration(
                                     labelText:
-                                        'Image Path (e.g., images/trips/goa.jpg)',
+                                        'Departure time in India (HH:mm)',
+                                    helperText:
+                                        'Bookings close 24 hours after this time on the first departure day',
                                     border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.image),
                                   ),
+                                  validator: (value) =>
+                                      RegExp(
+                                        r'^([01]\d|2[0-3]):[0-5]\d$',
+                                      ).hasMatch(value ?? '')
+                                      ? null
+                                      : 'Use 24-hour time, for example 22:00',
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              IconButton(
-                                icon: const Icon(Icons.add_photo_alternate),
-                                onPressed: () => _pickAndUploadMainImage(),
-                                color: Colors.green,
-                                tooltip: 'Upload from gallery',
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.camera_alt),
-                                onPressed: () =>
-                                    _pickAndUploadMainImage(fromCamera: true),
-                                color: Colors.blue,
-                                tooltip: 'Take photo',
-                              ),
-                            ],
-                          ),
-                          if (_imageController.text.isNotEmpty) ...[
+                              ],
+                            ),
                             const SizedBox(height: 16),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                _getImageUrl(_imageController.text),
-                                height: 150,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) => Container(
-                                  height: 150,
-                                  color: Colors.grey[200],
-                                  child: const Center(
-                                    child: Icon(Icons.broken_image, size: 48),
+                            // About Trip Card
+                            _buildSectionCard(
+                              title: 'About This Trip',
+                              children: [
+                                TextFormField(
+                                  key: const ValueKey('trip-about'),
+                                  controller: _descriptionController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Trip Description / About',
+                                    hintText:
+                                        'Describe the trip experience, what makes it special, scenic beauty, etc.',
+                                    border: OutlineInputBorder(),
+                                    alignLabelWithHint: true,
+                                  ),
+                                  maxLines: 8,
+                                  minLines: 5,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Date & Pricing Card
+                            _buildSectionCard(
+                              title: 'Date & Pricing',
+                              children: [
+                                _responsivePair(
+                                  TextFormField(
+                                    key: const Key('trip-price'),
+                                    controller: _priceController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Price (₹) *',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.currency_rupee),
+                                    ),
+                                    keyboardType: TextInputType.number,
+                                    validator: (v) =>
+                                        v?.isEmpty == true ? 'Required' : null,
+                                  ),
+                                  TextFormField(
+                                    controller: _discountedPriceController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Discounted Price (₹)',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.local_offer),
+                                    ),
+                                    keyboardType: TextInputType.number,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Trip Details Card
+                            _buildSectionCard(
+                              title: 'Trip Details',
+                              children: [
+                                _responsivePair(
+                                  DropdownButtonFormField<String>(
+                                    isExpanded: true,
+                                    initialValue:
+                                        (_tripData['difficulty'] ?? 'Moderate')
+                                            .toString(),
+                                    decoration: const InputDecoration(
+                                      labelText: 'Difficulty',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.trending_up),
+                                    ),
+                                    items:
+                                        <String>{
+                                              'Easy',
+                                              'Easy-Moderate',
+                                              'Moderate',
+                                              'Moderate-Hard',
+                                              'Challenging',
+                                              'Difficult',
+                                              'Extreme',
+                                              // Retain a valid value introduced by the website
+                                              // even before this app has learned its label.
+                                              if ((_tripData['difficulty'] ??
+                                                      '')
+                                                  .toString()
+                                                  .isNotEmpty)
+                                                _tripData['difficulty']
+                                                    .toString(),
+                                            }
+                                            .map(
+                                              (d) => DropdownMenuItem(
+                                                value: d,
+                                                child: Text(d),
+                                              ),
+                                            )
+                                            .toList(),
+                                    onChanged: (v) {
+                                      setState(() {
+                                        _tripData['difficulty'] = v;
+                                      });
+                                    },
+                                  ),
+                                  TextFormField(
+                                    controller: _groupSizeController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Group Size',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.group),
+                                    ),
+                                    keyboardType: TextInputType.number,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                TextFormField(
+                                  controller: _pickupPointController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Pickup Point',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.directions_bus),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Website Fields Card (badge, distance, elevation, etc.)
+                            _buildSectionCard(
+                              title: 'Website Display Fields',
+                              children: [
+                                _responsivePair(
+                                  TextFormField(
+                                    controller: _badgeController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Badge/Type',
+                                      hintText: 'e.g., Weekend Trek, Road Trip',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.label),
+                                    ),
+                                  ),
+                                  TextFormField(
+                                    controller: _durationController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Duration',
+                                      hintText: 'e.g., 2D/1N',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.schedule),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                _responsivePair(
+                                  TextFormField(
+                                    controller: _distanceController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Distance',
+                                      hintText: 'e.g., 15-20 km',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.straighten),
+                                    ),
+                                  ),
+                                  TextFormField(
+                                    controller: _elevationController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Elevation',
+                                      hintText: 'e.g., 1,420 m',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.terrain),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                TextFormField(
+                                  controller: _bestTimeController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Best Time to Visit',
+                                    hintText: 'e.g., Oct - Feb',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.wb_sunny),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            _buildSectionCard(
+                              title: 'Departure Dates',
+                              children: [_buildAvailableDatesEditor()],
+                            ),
+                            const SizedBox(height: 16),
+                            // Image Card
+                            _buildSectionCard(
+                              title: 'Display Image — card 16:9 (1200×675 px)',
+                              children: [
+                                TextButton.icon(
+                                  onPressed: () async {
+                                    final photo = await Navigator.push<String>(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const ManagerToolsScreen(
+                                              tool: ManagerDestination.library,
+                                              choosePhoto: true,
+                                            ),
+                                      ),
+                                    );
+                                    if (photo != null && mounted)
+                                      setState(
+                                        () => _imageController.text = photo,
+                                      );
+                                  },
+                                  icon: const Icon(Icons.photo_library),
+                                  label: const Text(
+                                    'Choose from photo library',
+                                  ),
+                                ),
+                                Text(
+                                  'Recommended: 1800 × 1200 px (3:2). Keep the main subject near the centre so it also crops well on phones.',
+                                  style: TextStyle(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: _imageController,
+                                        decoration: const InputDecoration(
+                                          labelText:
+                                              'Image Path (e.g., images/trips/goa.jpg)',
+                                          border: OutlineInputBorder(),
+                                          prefixIcon: Icon(Icons.image),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.add_photo_alternate,
+                                      ),
+                                      onPressed: () =>
+                                          _pickAndUploadMainImage(),
+                                      color: Colors.green,
+                                      tooltip: 'Upload from gallery',
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.camera_alt),
+                                      onPressed: () => _pickAndUploadMainImage(
+                                        fromCamera: true,
+                                      ),
+                                      color: Colors.blue,
+                                      tooltip: 'Take photo',
+                                    ),
+                                  ],
+                                ),
+                                if (_imageController.text.isNotEmpty) ...[
+                                  const SizedBox(height: 16),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      _getImageUrl(_imageController.text),
+                                      height: 150,
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, _, _) => Container(
+                                        height: 150,
+                                        color: Colors.grey[200],
+                                        child: const Center(
+                                          child: Icon(
+                                            Icons.broken_image,
+                                            size: 48,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Featured Toggle & Active Status
+                            _buildSectionCard(
+                              title: 'Visibility',
+                              children: [
+                                SwitchListTile(
+                                  title: const Text('Active Trip'),
+                                  subtitle: Text(
+                                    _tripData['isActive'] == false
+                                        ? 'Trip is greyed out and hidden from bookings'
+                                        : 'Trip is visible and available for booking',
+                                  ),
+                                  value: _tripData['isActive'] ?? true,
+                                  activeTrackColor: Colors.green[200],
+                                  onChanged: (v) {
+                                    setState(() {
+                                      _tripData['isActive'] = v;
+                                    });
+                                  },
+                                ),
+                                const Divider(),
+                                SwitchListTile(
+                                  title: const Text('Featured Trip'),
+                                  subtitle: const Text(
+                                    'Show on homepage carousel',
+                                  ),
+                                  value: _tripData['featured'] ?? false,
+                                  onChanged: (v) {
+                                    setState(() {
+                                      _tripData['featured'] = v;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Highlights Card
+                            _buildListSection(
+                              title: 'Highlights',
+                              items: List<String>.from(
+                                _tripData['highlights'] ?? [],
+                              ),
+                              onAdd: () => _addListItem('highlights'),
+                              onRemove: (index) =>
+                                  _removeListItem('highlights', index),
+                              onEdit: (index, value) =>
+                                  _editListItem('highlights', index, value),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Itinerary Card
+                            _buildItinerarySection(),
+                            const SizedBox(height: 16),
+
+                            // Inclusions Card
+                            _buildListSection(
+                              title: 'Inclusions',
+                              items: List<String>.from(
+                                _tripData['inclusions'] ?? [],
+                              ),
+                              onAdd: () => _addListItem('inclusions'),
+                              onRemove: (index) =>
+                                  _removeListItem('inclusions', index),
+                              onEdit: (index, value) =>
+                                  _editListItem('inclusions', index, value),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Exclusions Card
+                            _buildListSection(
+                              title: 'Exclusions',
+                              items: List<String>.from(
+                                _tripData['exclusions'] ?? [],
+                              ),
+                              onAdd: () => _addListItem('exclusions'),
+                              onRemove: (index) =>
+                                  _removeListItem('exclusions', index),
+                              onEdit: (index, value) =>
+                                  _editListItem('exclusions', index, value),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Things to Carry Card
+                            _buildTripDetailListSection(
+                              field: 'thingsToCarry',
+                              title: 'Things to Carry',
+                              defaults: TripDetailDefaults.thingsToCarry,
+                            ),
+                            const SizedBox(height: 16),
+
+                            _buildTripDetailListSection(
+                              field: 'perfectFor',
+                              title: 'Perfect For',
+                              defaults: TripDetailDefaults.perfectFor,
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Website display preferences do not alter trip or PDF content.
+                            TripEditorPanel(
+                              section: TripEditorSection.website,
+                              child: TripSectionSettingsEditor(
+                                key: const ValueKey('website-section-display'),
+                                expandedSections:
+                                    TripSectionSettings.expandedFor(_tripData),
+                                onChanged: (sections) => setState(() {
+                                  _tripData['expandedSections'] = sections;
+                                }),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Boarding Locations Card
+                            _buildBoardingLocationsSection(),
+                            const SizedBox(height: 16),
+
+                            // Gallery Images Card
+                            _buildGallerySection(),
+                            const SizedBox(height: 16),
+
+                            // Optional card controls follow every existing editor section.
+                            _buildWebsiteCardEditor(),
+                            const SizedBox(height: 32),
+
+                            if (_sharedContent != null)
+                              TripEditorPanel(
+                                section: TripEditorSection.website,
+                                child: TripContentEditor(
+                                  value: Map<String, dynamic>.from(
+                                    _tripData['contentSections'] as Map? ?? {},
+                                  ),
+                                  defaults: _sharedContent!,
+                                  trip: {
+                                    ..._tripData,
+                                    'duration': _durationController.text,
+                                    'location': _destinationController.text,
+                                    'distance': _distanceController.text,
+                                    'groupSize': _groupSizeController.text,
+                                    'elevation': _elevationController.text,
+                                    'bestTime': _bestTimeController.text,
+                                  },
+                                  onChanged: (v) => setState(
+                                    () => _tripData['contentSections'] = v,
                                   ),
                                 ),
                               ),
+                            if (_sharedContent == null)
+                              TripEditorPanel(
+                                section: TripEditorSection.website,
+                                child: ListTile(
+                                  title: const Text(
+                                    'Customisable trip sections',
+                                  ),
+                                  subtitle: Text(
+                                    _contentError ??
+                                        'Load shared content to customise this trip’s sections.',
+                                  ),
+                                  trailing: FilledButton(
+                                    onPressed: _contentLoading
+                                        ? null
+                                        : _loadSharedContent,
+                                    child: Text(
+                                      _contentLoading
+                                          ? 'Loading…'
+                                          : 'Open editor',
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            const SizedBox(height: 16),
+                            // Save Button
+                            FilledButton.icon(
+                              onPressed: _saveTrip,
+                              icon: const Icon(Icons.save),
+                              label: Text(
+                                isEditing ? 'Update Trip' : 'Create Trip',
+                              ),
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.all(16),
+                              ),
                             ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Featured Toggle & Active Status
-                      _buildSectionCard(
-                        title: 'Visibility',
-                        children: [
-                          SwitchListTile(
-                            title: const Text('Active Trip'),
-                            subtitle: Text(
-                              _tripData['isActive'] == false
-                                  ? 'Trip is greyed out and hidden from bookings'
-                                  : 'Trip is visible and available for booking',
-                            ),
-                            value: _tripData['isActive'] ?? true,
-                            activeTrackColor: Colors.green[200],
-                            onChanged: (v) {
-                              setState(() {
-                                _tripData['isActive'] = v;
-                              });
-                            },
-                          ),
-                          const Divider(),
-                          SwitchListTile(
-                            title: const Text('Featured Trip'),
-                            subtitle: const Text('Show on homepage carousel'),
-                            value: _tripData['featured'] ?? false,
-                            onChanged: (v) {
-                              setState(() {
-                                _tripData['featured'] = v;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Highlights Card
-                      _buildListSection(
-                        title: 'Highlights',
-                        items: List<String>.from(_tripData['highlights'] ?? []),
-                        onAdd: () => _addListItem('highlights'),
-                        onRemove: (index) =>
-                            _removeListItem('highlights', index),
-                        onEdit: (index, value) =>
-                            _editListItem('highlights', index, value),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Itinerary Card
-                      _buildItinerarySection(),
-                      const SizedBox(height: 16),
-
-                      // Inclusions Card
-                      _buildListSection(
-                        title: 'Inclusions',
-                        items: List<String>.from(_tripData['inclusions'] ?? []),
-                        onAdd: () => _addListItem('inclusions'),
-                        onRemove: (index) =>
-                            _removeListItem('inclusions', index),
-                        onEdit: (index, value) =>
-                            _editListItem('inclusions', index, value),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Exclusions Card
-                      _buildListSection(
-                        title: 'Exclusions',
-                        items: List<String>.from(_tripData['exclusions'] ?? []),
-                        onAdd: () => _addListItem('exclusions'),
-                        onRemove: (index) =>
-                            _removeListItem('exclusions', index),
-                        onEdit: (index, value) =>
-                            _editListItem('exclusions', index, value),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Things to Carry Card
-                      _buildTripDetailListSection(
-                        field: 'thingsToCarry',
-                        title: 'Things to Carry',
-                        defaults: TripDetailDefaults.thingsToCarry,
-                      ),
-                      const SizedBox(height: 16),
-
-                      _buildTripDetailListSection(
-                        field: 'perfectFor',
-                        title: 'Perfect For',
-                        defaults: TripDetailDefaults.perfectFor,
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Website display preferences do not alter trip or PDF content.
-                      TripEditorPanel(section:TripEditorSection.website,child:TripSectionSettingsEditor(
-                        key: const ValueKey('website-section-display'),
-                        expandedSections: TripSectionSettings.expandedFor(
-                          _tripData,
-                        ),
-                        onChanged: (sections) => setState(() {
-                          _tripData['expandedSections'] = sections;
-                        }),
-                      )),
-                      const SizedBox(height: 16),
-
-                      // Boarding Locations Card
-                      _buildBoardingLocationsSection(),
-                      const SizedBox(height: 16),
-
-                      // Gallery Images Card
-                      _buildGallerySection(),
-                      const SizedBox(height: 16),
-
-                      // Optional card controls follow every existing editor section.
-                      _buildWebsiteCardEditor(),
-                      const SizedBox(height: 32),
-
-                      if (_sharedContent != null) TripEditorPanel(section:TripEditorSection.website,child:TripContentEditor(value: Map<String,dynamic>.from(_tripData['contentSections'] as Map? ?? {}), defaults:_sharedContent!, trip:{..._tripData,'duration':_durationController.text,'location':_destinationController.text,'distance':_distanceController.text,'groupSize':_groupSizeController.text,'elevation':_elevationController.text,'bestTime':_bestTimeController.text}, onChanged:(v)=>setState(()=>_tripData['contentSections']=v))),
-                      if (_sharedContent == null) TripEditorPanel(section:TripEditorSection.website,child:ListTile(title:const Text('Customisable trip sections'),subtitle:Text(_contentError ?? 'Load shared content to customise this trip’s sections.'),trailing:FilledButton(onPressed:_contentLoading?null:_loadSharedContent,child:Text(_contentLoading?'Loading…':'Open editor')))),
-                      const SizedBox(height:16),
-                      // Save Button
-                      FilledButton.icon(
-                        onPressed: _saveTrip,
-                        icon: const Icon(Icons.save),
-                        label: Text(isEditing ? 'Update Trip' : 'Create Trip'),
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.all(16),
+                            const SizedBox(height: 16),
+                          ]),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                    ]),
+                    ),
                   ),
                 ),
               ),
+            );
+            return constraints.maxWidth >= 1100
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(flex: 3, child: editor),
+                      SizedBox(
+                        width: 420,
+                        child: DraftPreview(
+                          settings: context.read<SettingsProvider>().settings,
+                          trip: currentDocument,
+                          sharedContent: _sharedContent,
+                        ),
+                      ),
+                    ],
+                  )
+                : editor;
+          },
+        ),
+        bottomNavigationBar: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _previewDraft,
+                    icon: const Icon(Icons.preview_outlined),
+                    label: const Text('Preview draft'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    key: const Key('editor-save-draft'),
+                    onPressed: _saveTrip,
+                    icon: const Icon(Icons.save_outlined),
+                    label: const Text('Save draft'),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
       ),
-      bottomNavigationBar: SafeArea(child: Padding(padding:const EdgeInsets.fromLTRB(16,8,16,12),child:Row(children:[Expanded(child:OutlinedButton.icon(onPressed:_previewDraft,icon:const Icon(Icons.preview_outlined),label:const Text('Preview draft'))),const SizedBox(width:12),Expanded(child:FilledButton.icon(key:const Key('editor-save-draft'),onPressed:_saveTrip,icon:const Icon(Icons.save_outlined),label:const Text('Save draft')))]))),
     );
   }
 
-  Widget _buildWebsiteCardEditor() => TripEditorPanel(section:TripEditorSection.website,child:TripCardSettingsEditor(
-    key: const Key('website-trip-card'),
-    trip: {
-      ..._tripData,
-      'title': _nameController.text,
-      'location': _destinationController.text,
-      'image': _imageController.text,
-      'price': _priceController.text,
-      'duration': _durationController.text,
-      'availableDates': _availableDates,
-    },
-    referenceDate: widget.referenceDate,
-    onChanged: (field, value) => setState(() {
-      if (value == null) {
-        _tripData.remove(field);
-      } else {
-        _tripData[field] = value;
-      }
-    }),
-    onUploadCover: widget.cardCoverUploader ?? _uploadCardCover,
-    imagePreviewBuilder:
-        widget.cardImagePreviewBuilder ??
-        (path) => Image.network(
-          _getImageUrl(path),
-          width: double.infinity,
-          height: 200,
-          fit: BoxFit.cover,
-          alignment: switch (_tripData['cardFocalPoint']) {
-            'top' => Alignment.topCenter,
-            'bottom' => Alignment.bottomCenter,
-            'left' => Alignment.centerLeft,
-            'right' => Alignment.centerRight,
-            _ => Alignment.center,
-          },
-          errorBuilder: (_, _, _) => const SizedBox(
-            height: 150,
-            child: Center(child: Icon(Icons.broken_image, size: 48)),
+  Widget _buildWebsiteCardEditor() => TripEditorPanel(
+    section: TripEditorSection.website,
+    child: TripCardSettingsEditor(
+      key: const Key('website-trip-card'),
+      trip: {
+        ..._tripData,
+        'title': _nameController.text,
+        'location': _destinationController.text,
+        'image': _imageController.text,
+        'price': _priceController.text,
+        'duration': _durationController.text,
+        'availableDates': _availableDates,
+      },
+      referenceDate: widget.referenceDate,
+      onChanged: (field, value) => setState(() {
+        if (value == null) {
+          _tripData.remove(field);
+        } else {
+          _tripData[field] = value;
+        }
+      }),
+      onChooseCover: () async {
+        final photo = await Navigator.push<String>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const ManagerToolsScreen(
+              tool: ManagerDestination.library,
+              choosePhoto: true,
+            ),
           ),
-        ),
-  ));
+        );
+        if (photo != null && mounted)
+          setState(() => _tripData['cardImage'] = photo);
+      },
+      onUploadCover: widget.cardCoverUploader ?? _uploadCardCover,
+      imagePreviewBuilder:
+          widget.cardImagePreviewBuilder ??
+          (path) => Image.network(
+            _getImageUrl(path),
+            width: double.infinity,
+            height: 200,
+            fit: BoxFit.cover,
+            alignment: switch (_tripData['cardFocalPoint']) {
+              'top' => Alignment.topCenter,
+              'bottom' => Alignment.bottomCenter,
+              'left' => Alignment.centerLeft,
+              'right' => Alignment.centerRight,
+              _ => Alignment.center,
+            },
+            errorBuilder: (_, _, _) => const SizedBox(
+              height: 150,
+              child: Center(child: Icon(Icons.broken_image, size: 48)),
+            ),
+          ),
+    ),
+  );
 
   void _previewDraft() {
-    final next={..._tripData,'title':_nameController.text,'location':_destinationController.text,'price':_priceController.text,'duration':_durationController.text,'availableDates':_availableDates,'departureTime':_departureTimeController.text};
-    final ranges=TripDateUtils.getUpcomingDateRanges(next,referenceDate:widget.referenceDate);
-    showDialog<void>(context:context,builder:(ctx)=>AlertDialog(title:const Text('Draft preview'),content:SizedBox(width:640,child:SingleChildScrollView(child:Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisSize:MainAxisSize.min,children:[
-      Text(_nameController.text,style:Theme.of(ctx).textTheme.titleLarge),const SizedBox(height:8),Text(_destinationController.text),const SizedBox(height:8),Text('Price per person: '+_priceController.text),Text('Duration: '+_durationController.text),Text('Difficulty: '+(_tripData['difficulty']?.toString()??'')),const Divider(),const Text('Eligible departures'),for(final date in ranges)Padding(padding:const EdgeInsets.symmetric(vertical:4),child:Text(date.fullLabel)),if(ranges.isEmpty)const Text('New dates coming soon'),const Divider(),Text(_descriptionController.text),const SizedBox(height:16),const Text('Content preview only. Saving and publishing are separate actions.'),
-    ]))),actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Close'))]));
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Draft website preview')),
+          body: DraftPreview(
+            settings: context.read<SettingsProvider>().settings,
+            trip: currentDocument,
+            sharedContent: _sharedContent,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _findEditorField() async {
+    final fields = {
+      'Name, destination, description, difficulty': 'Basic Information',
+      'Dates': 'Departure Dates',
+      'Price and discount': 'Date & Pricing',
+      'Pickup locations': 'Boarding Locations',
+      'Photos': 'Display Image — card 16:9 (1200×675 px)',
+      'Visibility': 'Visibility',
+      'URL and booking cutoff': 'Website URL & Booking Cutoff',
+      'Duration, distance, elevation': 'Website Display Fields',
+      'Itinerary, packing, inclusions': 'Itinerary & guidance',
+      'FAQs, cancellation, highlights': 'Website sections',
+    };
+    String search = '';
+    final field = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, set) => AlertDialog(
+          title: const Text('Find an editor field'),
+          content: SizedBox(
+            width: 540,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  autofocus: true,
+                  decoration: const InputDecoration(labelText: 'Search fields'),
+                  onChanged: (v) => set(() => search = v),
+                ),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final entry in fields.entries.where(
+                        (e) =>
+                            e.key.toLowerCase().contains(search.toLowerCase()),
+                      ))
+                        ListTile(
+                          title: Text(entry.key),
+                          onTap: () => Navigator.pop(ctx, entry.value),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (field == null || !mounted) return;
+    setState(
+      () => _editingSection = field == 'Website sections'
+          ? TripEditorSection.website
+          : field == 'Itinerary & guidance'
+          ? TripEditorSection.itinerary
+          : editorSectionFor(field),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _sectionKeys[field]?.currentContext;
+      if (ctx != null)
+        Scrollable.ensureVisible(ctx);
+      else if (_editorScroll.hasClients)
+        _editorScroll.jumpTo(0);
+    });
   }
 
   Widget _buildSectionCard({
     required String title,
     required List<Widget> children,
   }) {
-    return TripEditorPanel(section:editorSectionFor(title),child:Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            ...children,
-          ],
+    return TripEditorPanel(
+      section: editorSectionFor(title),
+      child: Card(
+        key: _sectionKeys.putIfAbsent(title, () => GlobalKey()),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ...children,
+            ],
+          ),
         ),
       ),
-    ));
+    );
   }
 
   Widget _responsivePair(Widget first, Widget second) {
@@ -763,40 +1152,43 @@ class _TripEditScreenState extends State<TripEditScreen> {
     required String title,
     required List<String> defaults,
   }) {
-    return TripEditorPanel(section:TripEditorSection.itinerary,child:Column(
-      key: ValueKey('trip-detail-list-$field'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildListSection(
-          title: title,
-          items: List<String>.from(_tripData[field] ?? []),
-          onAdd: () => _addListItem(field),
-          onRemove: (index) => _removeListItem(field, index),
-          onEdit: (index, value) => _editListItem(field, index, value),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Shown on this trip’s website page. An empty list stays hidden. Use defaults to insert: '
-                '${defaults.join(', ')}.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              TextButton.icon(
-                key: ValueKey('use-defaults-$field'),
-                onPressed: () => setState(() {
-                  _tripData[field] = List<String>.from(defaults);
-                }),
-                icon: const Icon(Icons.restore),
-                label: const Text('Use defaults'),
-              ),
-            ],
+    return TripEditorPanel(
+      section: TripEditorSection.itinerary,
+      child: Column(
+        key: ValueKey('trip-detail-list-$field'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildListSection(
+            title: title,
+            items: List<String>.from(_tripData[field] ?? []),
+            onAdd: () => _addListItem(field),
+            onRemove: (index) => _removeListItem(field, index),
+            onEdit: (index, value) => _editListItem(field, index, value),
           ),
-        ),
-      ],
-    ));
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Shown on this trip’s website page. An empty list stays hidden. Use defaults to insert: '
+                  '${defaults.join(', ')}.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                TextButton.icon(
+                  key: ValueKey('use-defaults-$field'),
+                  onPressed: () => setState(() {
+                    _tripData[field] = List<String>.from(defaults);
+                  }),
+                  icon: const Icon(Icons.restore),
+                  label: const Text('Use defaults'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildListSection({
@@ -806,142 +1198,63 @@ class _TripEditScreenState extends State<TripEditScreen> {
     required Function(int) onRemove,
     required Function(int, String) onEdit,
   }) {
-    return TripEditorPanel(section:TripEditorSection.itinerary,child:Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
+    return TripEditorPanel(
+      section: TripEditorSection.itinerary,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle),
+                    onPressed: onAdd,
+                    color: Colors.green,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (items.isEmpty)
                 Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.add_circle),
-                  onPressed: onAdd,
-                  color: Colors.green,
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (items.isEmpty)
-              Text(
-                'No items yet. Tap + to add.',
-                style: TextStyle(color: Colors.grey[500]),
-              )
-            else
-              ...items.asMap().entries.map((entry) {
-                final index = entry.key;
-                final item = entry.value;
-                return ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    radius: 12,
-                    child: Text(
-                      '${index + 1}',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ),
-                  title: Text(item),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit, size: 20),
-                        onPressed: () async {
-                          final newValue = await _showEditDialog(item);
-                          if (newValue != null) {
-                            onEdit(index, newValue);
-                          }
-                        },
+                  'No items yet. Tap + to add.',
+                  style: TextStyle(color: Colors.grey[500]),
+                )
+              else
+                ...items.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final item = entry.value;
+                  return ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      radius: 12,
+                      child: Text(
+                        '${index + 1}',
+                        style: const TextStyle(fontSize: 12),
                       ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.delete,
-                          size: 20,
-                          color: Colors.red,
-                        ),
-                        onPressed: () => onRemove(index),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-          ],
-        ),
-      ),
-    ));
-  }
-
-  Widget _buildItinerarySection() {
-    final itinerary = List<Map<String, dynamic>>.from(
-      _tripData['itinerary'] ?? [],
-    );
-
-    return TripEditorPanel(section:TripEditorSection.itinerary,child:Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                const Text(
-                  'Itinerary',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.add_circle),
-                  onPressed: _addItineraryDay,
-                  color: Colors.green,
-                ),
-                OutlinedButton.icon(
-                  key: const Key('trip-brochure'),
-                  onPressed: _openBrochure,
-                  icon: const Icon(Icons.picture_as_pdf),
-                  label: const Text('Brochure (PDF)'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (itinerary.isEmpty)
-              Text(
-                'No itinerary yet. Tap + to add days.',
-                style: TextStyle(color: Colors.grey[500]),
-              )
-            else
-              ...itinerary.asMap().entries.map((entry) {
-                final index = entry.key;
-                final day = entry.value;
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  color: Colors.grey[50],
-                  child: ListTile(
-                    title: Text(
-                      'Day ${day['day'] ?? index + 1}: ${day['title'] ?? ''}',
                     ),
-                    subtitle: Text(
-                      day['description'] ?? '',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    title: Text(item),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
                           icon: const Icon(Icons.edit, size: 20),
-                          onPressed: () => _editItineraryDay(index),
+                          onPressed: () async {
+                            final newValue = await _showEditDialog(item);
+                            if (newValue != null) {
+                              onEdit(index, newValue);
+                            }
+                          },
                         ),
                         IconButton(
                           icon: const Icon(
@@ -949,22 +1262,107 @@ class _TripEditScreenState extends State<TripEditScreen> {
                             size: 20,
                             color: Colors.red,
                           ),
-                          onPressed: () {
-                            setState(() {
-                              itinerary.removeAt(index);
-                              _tripData['itinerary'] = itinerary;
-                            });
-                          },
+                          onPressed: () => onRemove(index),
                         ),
                       ],
                     ),
-                  ),
-                );
-              }),
-          ],
+                  );
+                }),
+            ],
+          ),
         ),
       ),
-    ));
+    );
+  }
+
+  Widget _buildItinerarySection() {
+    final itinerary = List<Map<String, dynamic>>.from(
+      _tripData['itinerary'] ?? [],
+    );
+
+    return TripEditorPanel(
+      section: TripEditorSection.itinerary,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  const Text(
+                    'Itinerary',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle),
+                    onPressed: _addItineraryDay,
+                    color: Colors.green,
+                  ),
+                  OutlinedButton.icon(
+                    key: const Key('trip-brochure'),
+                    onPressed: _openBrochure,
+                    icon: const Icon(Icons.picture_as_pdf),
+                    label: const Text('Brochure (PDF)'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (itinerary.isEmpty)
+                Text(
+                  'No itinerary yet. Tap + to add days.',
+                  style: TextStyle(color: Colors.grey[500]),
+                )
+              else
+                ...itinerary.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final day = entry.value;
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    color: Colors.grey[50],
+                    child: ListTile(
+                      title: Text(
+                        'Day ${day['day'] ?? index + 1}: ${day['title'] ?? ''}',
+                      ),
+                      subtitle: Text(
+                        day['description'] ?? '',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit, size: 20),
+                            onPressed: () => _editItineraryDay(index),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.delete,
+                              size: 20,
+                              color: Colors.red,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                itinerary.removeAt(index);
+                                _tripData['itinerary'] = itinerary;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _openBrochure() {
@@ -1001,122 +1399,128 @@ class _TripEditScreenState extends State<TripEditScreen> {
   Widget _buildGallerySection() {
     final galleryImages = List<String>.from(_tripData['galleryImages'] ?? []);
 
-    return TripEditorPanel(section:TripEditorSection.photos,child:Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Gallery Photos — 4:3 (1200×900 px)',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.add_photo_alternate),
-                      onPressed: () => _pickAndUploadImage(),
-                      color: Colors.green,
-                      tooltip: 'Upload from gallery',
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.camera_alt),
-                      onPressed: () => _pickAndUploadImage(fromCamera: true),
-                      color: Colors.blue,
-                      tooltip: 'Take photo',
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (galleryImages.isEmpty)
-              Text(
-                'No gallery images yet. Tap icons to add photos.',
-                style: TextStyle(color: Colors.grey[500]),
-              )
-            else
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                ),
-                itemCount: galleryImages.length,
-                itemBuilder: (context, index) {
-                  final imagePath = galleryImages[index];
-                  return Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          _getImageUrl(imagePath),
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Container(
-                            color: Colors.grey[200],
-                            child: const Icon(Icons.broken_image),
-                          ),
-                        ),
+    return TripEditorPanel(
+      section: TripEditorSection.photos,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Gallery Photos — 4:3 (1200×900 px)',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: GestureDetector(
-                          onTap: () => _removeGalleryImage(index),
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.close,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
-                        ),
+                    ),
+                  ),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.add_photo_alternate),
+                        onPressed: () => _pickAndUploadImage(),
+                        color: Colors.green,
+                        tooltip: 'Upload from gallery',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.camera_alt),
+                        onPressed: () => _pickAndUploadImage(fromCamera: true),
+                        color: Colors.blue,
+                        tooltip: 'Take photo',
                       ),
                     ],
-                  );
-                },
-              ),
-            const SizedBox(height: 8),
-            // Manual path input
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    decoration: const InputDecoration(
-                      hintText: 'Or enter image path manually',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    onSubmitted: (value) {
-                      if (value.isNotEmpty) {
-                        setState(() {
-                          galleryImages.add(value);
-                          _tripData['galleryImages'] = galleryImages;
-                        });
-                      }
-                    },
                   ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (galleryImages.isEmpty)
+                Text(
+                  'No gallery images yet. Tap icons to add photos.',
+                  style: TextStyle(color: Colors.grey[500]),
+                )
+              else
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: galleryImages.length,
+                  itemBuilder: (context, index) {
+                    final imagePath = galleryImages[index];
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            _getImageUrl(imagePath),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => Container(
+                              color: Colors.grey[200],
+                              child: const Icon(Icons.broken_image),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: GestureDetector(
+                            onTap: () => _removeGalleryImage(index),
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
-              ],
-            ),
-          ],
+              const SizedBox(height: 8),
+              // Manual path input
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      decoration: const InputDecoration(
+                        hintText: 'Or enter image path manually',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      onSubmitted: (value) {
+                        if (value.isNotEmpty) {
+                          setState(() {
+                            galleryImages.add(value);
+                            _tripData['galleryImages'] = galleryImages;
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
-    ));
+    );
   }
 
   Future<void> _pickAndUploadImage({bool fromCamera = false}) async {
@@ -1266,9 +1670,7 @@ class _TripEditScreenState extends State<TripEditScreen> {
           current.tripsDataPath == target.tripsDataPath;
     }
 
-    final file = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-    );
+    final file = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (file == null) return null;
     if (!mounted || !targetMatches()) {
       throw StateError(
@@ -1298,7 +1700,9 @@ class _TripEditScreenState extends State<TripEditScreen> {
     }
     final advice = await photoResolutionAdvice(File(file.path), minWidth: 960);
     if (advice != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(advice)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(advice)));
     }
     return result.imagePath;
   }
@@ -1318,246 +1722,259 @@ class _TripEditScreenState extends State<TripEditScreen> {
     final defaultPickupPoints = TripsParser.getDefaultPickupPoints();
     final hasCustomLocations = boardingLocations.isNotEmpty;
 
-    return TripEditorPanel(section:TripEditorSection.dates,child:Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                const Text(
-                  'Boarding Locations',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    if (!hasCustomLocations)
-                      TextButton.icon(
-                        icon: const Icon(Icons.copy, size: 18),
-                        label: const Text('Use Defaults'),
-                        onPressed: () {
-                          setState(() {
-                            _tripData['boardingLocations'] =
-                                List<Map<String, dynamic>>.from(
-                                  defaultPickupPoints.map(
-                                    (p) => Map<String, dynamic>.from(p),
-                                  ),
-                                );
-                          });
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Default pickup points copied. You can now edit them.',
+    return TripEditorPanel(
+      section: TripEditorSection.dates,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  const Text(
+                    'Boarding Locations',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      if (!hasCustomLocations)
+                        TextButton.icon(
+                          icon: const Icon(Icons.copy, size: 18),
+                          label: const Text('Use Defaults'),
+                          onPressed: () {
+                            setState(() {
+                              _tripData['boardingLocations'] =
+                                  List<Map<String, dynamic>>.from(
+                                    defaultPickupPoints.map(
+                                      (p) => Map<String, dynamic>.from(p),
+                                    ),
+                                  );
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Default pickup points copied. You can now edit them.',
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.add_circle),
+                        onPressed: _addBoardingLocation,
+                        color: Colors.green,
                       ),
-                    IconButton(
-                      icon: const Icon(Icons.add_circle),
-                      onPressed: _addBoardingLocation,
-                      color: Colors.green,
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Show info about what's displayed on website
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: hasCustomLocations
+                      ? Colors.green[50]
+                      : Colors.blue[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: hasCustomLocations
+                        ? Colors.green[200]!
+                        : Colors.blue[200]!,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      hasCustomLocations ? Icons.check_circle : Icons.info,
+                      color: hasCustomLocations
+                          ? Colors.green[700]
+                          : Colors.blue[700],
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        hasCustomLocations
+                            ? 'Website shows custom pickup points below'
+                            : 'Website shows default Bangalore pickup points (Majestic, Koramangala, Silk Board, Electronic City)',
+                        style: TextStyle(
+                          color: hasCustomLocations
+                              ? Colors.green[700]
+                              : Colors.blue[700],
+                          fontSize: 13,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Show info about what's displayed on website
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: hasCustomLocations ? Colors.green[50] : Colors.blue[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: hasCustomLocations
-                      ? Colors.green[200]!
-                      : Colors.blue[200]!,
-                ),
               ),
-              child: Row(
-                children: [
-                  Icon(
-                    hasCustomLocations ? Icons.check_circle : Icons.info,
-                    color: hasCustomLocations
-                        ? Colors.green[700]
-                        : Colors.blue[700],
-                    size: 20,
+              const SizedBox(height: 12),
+
+              // Show default points if no custom locations
+              if (!hasCustomLocations) ...[
+                const Text(
+                  'Default Pickup Points (shown on website):',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey,
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      hasCustomLocations
-                          ? 'Website shows custom pickup points below'
-                          : 'Website shows default Bangalore pickup points (Majestic, Koramangala, Silk Board, Electronic City)',
-                      style: TextStyle(
-                        color: hasCustomLocations
-                            ? Colors.green[700]
-                            : Colors.blue[700],
-                        fontSize: 13,
+                ),
+                const SizedBox(height: 8),
+                ...defaultPickupPoints.map(
+                  (loc) => Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    color: Colors.grey[100],
+                    child: ListTile(
+                      leading: const Icon(
+                        Icons.location_on,
+                        color: Colors.blue,
+                      ),
+                      title: Text(loc['name']?.toString() ?? ''),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Landmark: ${loc['landmark']}'),
+                          Text('Time: ${loc['time']}'),
+                        ],
+                      ),
+                      trailing: const Icon(
+                        Icons.lock,
+                        color: Colors.grey,
+                        size: 18,
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Show default points if no custom locations
-            if (!hasCustomLocations) ...[
-              const Text(
-                'Default Pickup Points (shown on website):',
-                style: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey,
                 ),
-              ),
-              const SizedBox(height: 8),
-              ...defaultPickupPoints.map(
-                (loc) => Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  color: Colors.grey[100],
-                  child: ListTile(
-                    leading: const Icon(Icons.location_on, color: Colors.blue),
-                    title: Text(loc['name']?.toString() ?? ''),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Landmark: ${loc['landmark']}'),
-                        Text('Time: ${loc['time']}'),
-                      ],
-                    ),
-                    trailing: const Icon(
-                      Icons.lock,
-                      color: Colors.grey,
-                      size: 18,
-                    ),
+                const SizedBox(height: 8),
+                Text(
+                  'Tap "Use Defaults" to copy and customize these points',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Tap "Use Defaults" to copy and customize these points',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ],
+              ],
 
-            // Show custom locations if any
-            if (hasCustomLocations) ...[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Custom Pickup Points:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: Colors.green,
+              // Show custom locations if any
+              if (hasCustomLocations) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Custom Pickup Points:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: Colors.green,
+                      ),
                     ),
-                  ),
-                  TextButton.icon(
-                    icon: const Icon(
-                      Icons.clear_all,
-                      size: 18,
-                      color: Colors.red,
-                    ),
-                    label: const Text(
-                      'Clear All',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Clear Custom Points?'),
-                          content: const Text(
-                            'This will remove all custom pickup points. The website will show default Bangalore pickup points instead.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: const Text('Cancel'),
+                    TextButton.icon(
+                      icon: const Icon(
+                        Icons.clear_all,
+                        size: 18,
+                        color: Colors.red,
+                      ),
+                      label: const Text(
+                        'Clear All',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Clear Custom Points?'),
+                            content: const Text(
+                              'This will remove all custom pickup points. The website will show default Bangalore pickup points instead.',
                             ),
-                            TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  _tripData['boardingLocations'] =
-                                      <Map<String, dynamic>>[];
-                                });
-                                Navigator.pop(ctx);
-                              },
-                              child: const Text(
-                                'Clear',
-                                style: TextStyle(color: Colors.red),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: const Text('Cancel'),
                               ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ...boardingLocations.asMap().entries.map((entry) {
-                final index = entry.key;
-                final loc = entry.value;
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  color: Colors.green[50],
-                  child: ListTile(
-                    leading: const Icon(Icons.location_on, color: Colors.green),
-                    title: Text(loc['name']?.toString() ?? 'Unnamed Location'),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (loc['landmark']?.toString().isNotEmpty == true)
-                          Text('Landmark: ${loc['landmark']}'),
-                        if (loc['time']?.toString().isNotEmpty == true)
-                          Text('Time: ${loc['time']}'),
-                      ],
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit, size: 20),
-                          onPressed: () => _editBoardingLocation(index),
-                        ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.delete,
-                            size: 20,
-                            color: Colors.red,
+                              TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _tripData['boardingLocations'] =
+                                        <Map<String, dynamic>>[];
+                                  });
+                                  Navigator.pop(ctx);
+                                },
+                                child: const Text(
+                                  'Clear',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                              ),
+                            ],
                           ),
-                          onPressed: () {
-                            setState(() {
-                              boardingLocations.removeAt(index);
-                              _tripData['boardingLocations'] =
-                                  boardingLocations;
-                            });
-                          },
-                        ),
-                      ],
+                        );
+                      },
                     ),
-                  ),
-                );
-              }),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ...boardingLocations.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final loc = entry.value;
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    color: Colors.green[50],
+                    child: ListTile(
+                      leading: const Icon(
+                        Icons.location_on,
+                        color: Colors.green,
+                      ),
+                      title: Text(
+                        loc['name']?.toString() ?? 'Unnamed Location',
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (loc['landmark']?.toString().isNotEmpty == true)
+                            Text('Landmark: ${loc['landmark']}'),
+                          if (loc['time']?.toString().isNotEmpty == true)
+                            Text('Time: ${loc['time']}'),
+                        ],
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit, size: 20),
+                            onPressed: () => _editBoardingLocation(index),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.delete,
+                              size: 20,
+                              color: Colors.red,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                boardingLocations.removeAt(index);
+                                _tripData['boardingLocations'] =
+                                    boardingLocations;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
             ],
-          ],
+          ),
         ),
       ),
-    ));
+    );
   }
 
   void _addBoardingLocation() async {
@@ -1910,7 +2327,12 @@ class _TripEditScreenState extends State<TripEditScreen> {
             final range = TripDateUtils.parse(label);
             final invalid = range == null;
             final duplicate = range != null && rangeKeyCounts[range.key]! > 1;
-            final expired = range != null && !TripDateUtils.bookingCutoff(range, {..._tripData, 'departureTime': _departureTimeController.text}).isAfter((widget.referenceDate ?? DateTime.now()).toUtc());
+            final expired =
+                range != null &&
+                !TripDateUtils.bookingCutoff(range, {
+                  ..._tripData,
+                  'departureTime': _departureTimeController.text,
+                }).isAfter((widget.referenceDate ?? DateTime.now()).toUtc());
             final status = invalid
                 ? 'Invalid — edit or remove before saving'
                 : duplicate
@@ -2022,10 +2444,49 @@ class _TripEditScreenState extends State<TripEditScreen> {
     return 'https://raw.githubusercontent.com/${settings.repositoryOwner}/${settings.repositoryName}/${settings.branch}/$image';
   }
 
-  void _saveTrip() {
-    if(_editingSection!=TripEditorSection.all){setState(()=>_editingSection=TripEditorSection.all);WidgetsBinding.instance.addPostFrameCallback((_){if(mounted){if(_editorScroll.hasClients)_editorScroll.jumpTo(0);_saveTrip();}});return;}
+  Future<void> _saveTrip() async {
+    if (_saving) return;
+    if (_editingSection != TripEditorSection.all) {
+      setState(() => _editingSection = TripEditorSection.all);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          if (_editorScroll.hasClients) _editorScroll.jumpTo(0);
+          _saveTrip();
+        }
+      });
+      return;
+    }
 
+    if (DraftStore.scope(context.read<SettingsProvider>().settings) !=
+        localScope) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Repository changed. Reopen the trip before saving. Your local draft is retained.',
+          ),
+        ),
+      );
+      return;
+    }
     if (!_formKey.currentState!.validate()) {
+      Element? firstError;
+      void find(Element element) {
+        if (firstError != null) return;
+        if (element is StatefulElement &&
+            element.state is FormFieldState &&
+            (element.state as FormFieldState).hasError) {
+          firstError = element;
+          return;
+        }
+        element.visitChildren(find);
+      }
+
+      (_formKey.currentContext as Element).visitChildren(find);
+      if (firstError != null)
+        Scrollable.ensureVisible(
+          firstError!,
+          duration: const Duration(milliseconds: 200),
+        );
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all required fields')),
       );
@@ -2071,7 +2532,14 @@ class _TripEditScreenState extends State<TripEditScreen> {
         .toList();
 
     // Update trip data from controllers - use both field name variations for compatibility
-    try { TripContentSettings.validate(_tripData['contentSections'] as Map? ?? {}); } catch(e) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString()))); return; }
+    try {
+      TripContentSettings.validate(_tripData['contentSections'] as Map? ?? {});
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      return;
+    }
     _tripData['title'] = _nameController.text;
     _tripData['name'] = _nameController.text;
     _tripData['location'] = _destinationController.text;
@@ -2106,7 +2574,9 @@ class _TripEditScreenState extends State<TripEditScreen> {
       }
     }
 
-    final originalSlug = widget.trip?['publicSlug']?.toString() ?? widget.trip?['id']?.toString();
+    final originalSlug =
+        widget.trip?['publicSlug']?.toString() ??
+        widget.trip?['id']?.toString();
     final currentSlug = _slugController.text.trim();
     _tripData['publicSlug'] = currentSlug;
     _tripData['departureTime'] = _departureTimeController.text.trim();
@@ -2162,14 +2632,37 @@ class _TripEditScreenState extends State<TripEditScreen> {
       }
     }
 
+    setState(() => _saving = true);
+    try {
+      await context.read<TripsProvider>().flushDraft();
+      await acceptLocalDraft();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Draft is still in the workspace, but local saving failed: $e',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _allowLeave = true;
+      _saving = false;
+    });
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(isEditing ? 'Draft saved to workspace. Publish when ready.' : 'New trip saved to workspace. Publish when ready.'),
-        action: SnackBarAction(
-          label: 'OK',
-          onPressed: () {},
+        content: Text(
+          isEditing
+              ? 'Draft saved to workspace. Publish when ready.'
+              : 'New trip saved to workspace. Publish when ready.',
         ),
+        action: SnackBarAction(label: 'OK', onPressed: () {}),
       ),
     );
   }
