@@ -1,3 +1,5 @@
+import 'trip_edit_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -112,6 +114,60 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
             )
             .toList();
     return [
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          FilledButton.icon(
+            onPressed: p.isLoading
+                ? null
+                : () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => const TripEditScreen(),
+                    ),
+                  ),
+            icon: const Icon(Icons.add),
+            label: const Text('Add trip'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => go(ManagerDestination.trips),
+            icon: const Icon(Icons.edit_outlined),
+            label: const Text('Edit trips'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => go(ManagerDestination.batches),
+            icon: const Icon(Icons.calendar_month),
+            label: const Text('Departures'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => go(ManagerDestination.deployment),
+            icon: const Icon(Icons.cloud_sync),
+            label: const Text('Publishing status'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () async {
+              try {
+                final opened = await launchUrl(
+                  Uri.parse('https://www.teamweekendtrekkers.com'),
+                  mode: LaunchMode.externalApplication,
+                );
+                if (!opened) throw StateError('Unavailable');
+              } catch (_) {
+                if (mounted)
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Could not open website. Try again.'),
+                    ),
+                  );
+              }
+            },
+            icon: const Icon(Icons.open_in_new),
+            label: const Text('Open live website'),
+          ),
+        ],
+      ),
+      const SizedBox(height: 16),
       Text(
         'Your daily workspace',
         style: Theme.of(context).textTheme.headlineSmall,

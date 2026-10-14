@@ -1,3 +1,4 @@
+import 'app_version_card.dart';
 import 'package:flutter/material.dart';
 
 const double managerDesktopBreakpoint = 1100;
@@ -144,38 +145,7 @@ class ManagerSideNavigation extends StatelessWidget {
                   ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(18),
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: scheme.primaryContainer.withValues(alpha: 0.55),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.cloud_done_outlined, color: scheme.primary),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'GitHub connected workspace',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'Review changes before publishing.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              const AppVersionCard(compact: true),
             ],
           ),
         ),
@@ -236,6 +206,7 @@ class ManagerNavigationDrawer extends StatelessWidget {
             ],
           ),
         ),
+        const AppVersionCard(compact: true),
         const Divider(indent: 20, endIndent: 20),
         for (final destination in ManagerDestination.values)
           NavigationDrawerDestination(

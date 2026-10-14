@@ -1,3 +1,4 @@
+import '../widgets/app_version_card.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -99,6 +100,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
+                    const AppVersionCard(),
                     // GitHub Configuration Card
                     _buildCard(
                       title: 'GitHub Configuration',
@@ -203,7 +205,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    ListTile(leading: const Icon(Icons.payments_outlined), title: const Text('Payment Settings & Coupons'), subtitle: const Text('UPI receiver, checkout visibility and coupon codes'), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CommerceSettingsScreen()))),
+                    ListTile(
+                      leading: const Icon(Icons.payments_outlined),
+                      title: const Text('Payment Settings & Coupons'),
+                      subtitle: const Text(
+                        'UPI receiver, checkout visibility and coupon codes',
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const CommerceSettingsScreen(),
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     // Contact Info Card with Sync Button
                     _buildCard(
@@ -457,7 +472,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    ListTile(leading: const Icon(Icons.article_outlined), title: const Text('Shared Trip Content'), subtitle: const Text('Defaults for trip facts, cancellation, guidelines and FAQs'), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TripContentSettingsScreen()))),
+                    ListTile(
+                      leading: const Icon(Icons.article_outlined),
+                      title: const Text('Shared Trip Content'),
+                      subtitle: const Text(
+                        'Defaults for trip facts, cancellation, guidelines and FAQs',
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const TripContentSettingsScreen(),
+                        ),
+                      ),
+                    ),
 
                     // Save Button
                     ElevatedButton.icon(

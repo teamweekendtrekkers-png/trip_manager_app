@@ -2,7 +2,7 @@ name: trip_manager_app
 description: "Trip Manager App for Team Weekend Trekkers - Manage trips from mobile"
 publish_to: 'none'
 
-version: 1.6.0+7
+version: 1.7.0+8
 
 environment:
   sdk: ^3.10.4
@@ -11,6 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
+  package_info_plus: ^8.3.1
   
   # State management
   provider: ^6.1.2

@@ -1,3 +1,4 @@
+import 'package:url_launcher/url_launcher.dart';
 import '../widgets/local_draft.dart';
 import '../services/draft_store.dart';
 import '../widgets/draft_preview.dart';
@@ -61,6 +62,62 @@ class _TripEditScreenState extends State<TripEditScreen>
   String get localScope => _scope;
   @override
   String get localSlot => 'trip:${widget.trip?['id'] ?? 'new'}';
+  Map<String, dynamic>? get _publishedTrip => context
+      .read<TripsProvider>()
+      .baseTrips
+      .where((t) => t['id'] == widget.trip?['id'])
+      .firstOrNull;
+  @override
+  Map<String, dynamic>? get discardDraftBase =>
+      _publishedTrip ?? super.discardDraftBase;
+  @override
+  String get discardDraftExplanation => _publishedTrip == null
+      ? super.discardDraftExplanation
+      : 'Delete saved edits for this trip and return to its last loaded published version. Other trips and the live website will not change.';
+  @override
+  Future<void> afterDraftDeleted() async {
+    if (widget.trip == null) return;
+    final provider = context.read<TripsProvider>();
+    if (provider.draftScope != localScope ||
+        provider.isLoading ||
+        !provider.hasCompleteRemoteSnapshot) {
+      throw StateError('Reload this trip before deleting its draft.');
+    }
+    final published = _publishedTrip;
+    if (published == null) return;
+    final p = context.read<TripsProvider>();
+    final index = p.trips.indexWhere((t) => t['id'] == published['id']);
+    if (index >= 0) {
+      p.updateTrip(index, published);
+      await p.flushDraft();
+      if (p.draftError != null)
+        throw StateError('Could not save the restored workspace.');
+    }
+  }
+
+  Future<void> _openLiveTrip() async {
+    final published = _publishedTrip;
+    if (published == null) return;
+    final slug = (published['publicSlug'] ?? published['id']).toString();
+    try {
+      final opened = await launchUrl(
+        Uri.https(
+          'www.teamweekendtrekkers.com',
+          '/trips/${Uri.encodeComponent(slug)}/',
+        ),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened) throw StateError('Could not open website');
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open the live trip. Try again.'),
+          ),
+        );
+    }
+  }
+
   Map<String, TextEditingController> get _textFields => {
     'publicSlug': _slugController,
     'departureTime': _departureTimeController,
@@ -306,6 +363,12 @@ class _TripEditScreenState extends State<TripEditScreen>
             ),
           ),
           actions: [
+            if (_publishedTrip != null)
+              IconButton(
+                onPressed: _openLiveTrip,
+                tooltip: 'Open published trip',
+                icon: const Icon(Icons.open_in_new),
+              ),
             IconButton(
               onPressed: _findEditorField,
               tooltip: 'Find an editor field',
@@ -330,6 +393,7 @@ class _TripEditScreenState extends State<TripEditScreen>
                 skipTraversal: true,
                 child: Form(
                   key: _formKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
                   child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 1080),

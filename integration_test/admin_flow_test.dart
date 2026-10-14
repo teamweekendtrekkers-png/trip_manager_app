@@ -181,6 +181,11 @@ void registerAdminFlowTests() {
       await tester.pumpAndSettle();
       expect(find.text('Alpha Trek'), findsOneWidget);
       expect(find.text('Beta Trek'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('INACTIVE'),
+        100,
+        scrollable: find.byType(Scrollable).last,
+      );
       expect(find.text('INACTIVE'), findsOneWidget);
 
       // Search selects Beta from a filtered sublist, then opens the real editor.
@@ -190,7 +195,10 @@ void registerAdminFlowTests() {
       await tester.tap(find.text('Beta Trek'));
       await tester.pumpAndSettle();
       expect(find.text('Edit Trip'), findsOneWidget);
-      await tester.tap(find.byKey(const Key('editor-section-picker')));await tester.pumpAndSettle();await tester.tap(find.text('All sections').last);await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('editor-section-picker')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('All sections').last);
+      await tester.pumpAndSettle();
 
       // Exercise the production calendar editor: replace the legacy value
       // with a newly selected range before saving the trip.

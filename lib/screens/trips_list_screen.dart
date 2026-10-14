@@ -37,6 +37,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
   bool _showFeaturedOnly = false;
+  String _tripFilter = 'All';
   bool _publishing = false;
   String? _publishedCommitSha;
   String? _publishFailure;
@@ -790,6 +791,32 @@ class _TripsListScreenState extends State<TripsListScreen> {
                             },
                           ),
                         ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                for (final filter in [
+                                  'All',
+                                  'Active',
+                                  'Draft',
+                                  'Upcoming',
+                                  'Inactive',
+                                ])
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 6),
+                                    child: ChoiceChip(
+                                      label: Text(filter),
+                                      selected: _tripFilter == filter,
+                                      onSelected: (_) =>
+                                          setState(() => _tripFilter = filter),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
                         // Trips list
                         Expanded(
                           child: Consumer<TripsProvider>(
@@ -853,6 +880,23 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                   ? provider.orderedTrips
                                   : provider.searchTrips(_searchQuery);
 
+                              trips = trips
+                                  .where(
+                                    (t) => switch (_tripFilter) {
+                                      'Active' => t['isActive'] != false,
+                                      'Inactive' => t['isActive'] == false,
+                                      'Draft' => provider.changes.containsKey(
+                                        t['id'],
+                                      ),
+                                      'Upcoming' =>
+                                        t['isActive'] != false &&
+                                            TripDateUtils.getUpcomingDateRanges(
+                                              t,
+                                            ).isNotEmpty,
+                                      _ => true,
+                                    },
+                                  )
+                                  .toList();
                               if (_showFeaturedOnly) {
                                 trips = trips
                                     .where((t) => t['featured'] == true)
@@ -902,7 +946,9 @@ class _TripsListScreenState extends State<TripsListScreen> {
                               // the trip's ID so that edit/delete/toggleFeatured operate on the
                               // correct trip in the full list instead of trashing trip #0.
                               final isFiltered =
-                                  _searchQuery.isNotEmpty || _showFeaturedOnly;
+                                  _searchQuery.isNotEmpty ||
+                                  _showFeaturedOnly ||
+                                  _tripFilter != 'All';
 
                               return RefreshIndicator(
                                 onRefresh: _confirmAndRefresh,

@@ -43,7 +43,14 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
   Map<String, dynamic>? get currentDocument;
   void applyDocument(Map<String, dynamic> value);
   bool get draftBusy => false;
-  Map<String, dynamic>? _localBase, _lastDocument, _blockedDraft;
+  Map<String, dynamic>? get discardDraftBase => _localBase;
+  String get discardDraftExplanation =>
+      'Remove this editor draft and return to the version loaded when you opened this editor. The live website will not change.';
+  Future<void> afterDraftDeleted() async {}
+  Map<String, dynamic>? _localBase,
+      _lastDocument,
+      _blockedDraft,
+      _savedDocument;
   Timer? _saveTimer;
   AppLifecycleListener? _lifecycle;
   @override
@@ -51,7 +58,7 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
     super.initState();
     _lifecycle = AppLifecycleListener(
       onInactive: () {
-        if (mounted) unawaited(saveLocalDraft());
+        if (mounted) unawaited(saveLocalDraft(checkpoint: false));
       },
     );
   }
@@ -73,6 +80,7 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
       _localBase != null && !WorkspaceChanges.same(_localBase, currentDocument);
   void startLocalDraft(Map<String, dynamic> remote) {
     _localBase = copyDocument(remote);
+    _savedDocument = null;
     final record = DraftStore.read(localScope, localSlot);
     if (record != null) {
       try {
@@ -80,6 +88,13 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
         _apply(
           recoverDocument(data['base'] as Map, data['draft'] as Map, remote),
         );
+        if (data['saved'] is Map) {
+          _savedDocument = recoverDocument(
+            data['base'] as Map,
+            data['saved'] as Map,
+            remote,
+          );
+        }
         localSavedAt = DateTime.tryParse(record['savedAt'].toString());
       } catch (e) {
         localDraftError = e.toString();
@@ -88,6 +103,9 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
         );
       }
     }
+    _savedDocument ??= currentDocument == null
+        ? null
+        : copyDocument(currentDocument!);
     _lastDocument = currentDocument == null
         ? null
         : copyDocument(currentDocument!);
@@ -106,11 +124,14 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
     }
     if (_blockedDraft == null) {
       _saveTimer?.cancel();
-      _saveTimer = Timer(const Duration(milliseconds: 500), saveLocalDraft);
+      _saveTimer = Timer(
+        const Duration(milliseconds: 500),
+        () => saveLocalDraft(checkpoint: false),
+      );
     }
   }
 
-  Future<void> saveLocalDraft() async {
+  Future<void> saveLocalDraft({bool checkpoint = true}) async {
     _saveTimer?.cancel();
     if (currentDocument == null ||
         _localBase == null ||
@@ -123,10 +144,12 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
         await DraftStore.write(localScope, localSlot, {
           'base': _localBase,
           'draft': document,
+          'saved': checkpoint ? document : _savedDocument,
         });
       } else {
         await DraftStore.remove(localScope, localSlot);
       }
+      if (checkpoint) _savedDocument = document;
       if (mounted)
         super.setState(() {
           localSavedAt = DateTime.now();
@@ -147,6 +170,7 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
     _saveTimer?.cancel();
     _localBase = copyDocument(after);
     _lastDocument = copyDocument(after);
+    _savedDocument = copyDocument(after);
     _undoDocuments.clear();
     _blockedDraft = null;
     if (!DraftStore.available) return;
@@ -176,8 +200,87 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
         ? null
         : copyDocument(currentDocument!);
     _lastDocument = _localBase == null ? null : copyDocument(_localBase!);
+    _savedDocument = _lastDocument == null
+        ? null
+        : copyDocument(_lastDocument!);
     _blockedDraft = null;
     await DraftStore.remove(localScope, localSlot);
+  }
+
+  Future<void> discardEditorChanges({
+    bool deleteDraft = false,
+    bool confirm = true,
+  }) async {
+    final target = deleteDraft ? discardDraftBase : _savedDocument;
+    if (target == null || draftBusy) return;
+    final confirmed =
+        !confirm ||
+        await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: Text(
+                  deleteDraft
+                      ? 'Delete saved local draft?'
+                      : 'Discard changes?',
+                ),
+                content: Text(
+                  deleteDraft
+                      ? discardDraftExplanation
+                      : 'Undo edits since you last tapped Save local draft or opened this editor. Automatic recovery saves do not reset this point. The live website will not change.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Keep editing'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: Text(
+                      deleteDraft ? 'Delete saved draft' : 'Discard changes',
+                    ),
+                  ),
+                ],
+              ),
+            ) ==
+            true;
+    if (confirmed != true || !mounted) return;
+    _saveTimer?.cancel();
+    try {
+      if (deleteDraft) {
+        if (!WorkspaceChanges.same(target, discardDraftBase)) {
+          throw StateError(
+            'The loaded version changed. Review it before deleting this draft.',
+          );
+        }
+        await afterDraftDeleted();
+        await DraftStore.remove(localScope, localSlot);
+      } else if (_localBase != null && DraftStore.available) {
+        await DraftStore.write(localScope, localSlot, {
+          'base': _localBase,
+          'draft': target,
+          'saved': target,
+        });
+      }
+      if (!mounted) return;
+      super.setState(() {
+        _apply(copyDocument(target));
+        _lastDocument = copyDocument(currentDocument!);
+        _savedDocument = copyDocument(currentDocument!);
+        _undoDocuments.clear();
+        _blockedDraft = null;
+        localDraftError = null;
+        if (deleteDraft) {
+          localSavedAt = null;
+          _localBase = copyDocument(currentDocument!);
+        }
+      });
+    } catch (_) {
+      if (mounted)
+        super.setState(
+          () => localDraftError =
+              'Could not discard the draft. Your edits are retained; try again.',
+        );
+    }
   }
 
   Future<bool> leaveLocalDraft() async {
@@ -206,12 +309,8 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
       ),
     );
     if (choice == 'discard') {
-      _saveTimer?.cancel();
-      await DraftStore.remove(localScope, localSlot);
-      _localBase = currentDocument == null
-          ? null
-          : copyDocument(currentDocument!);
-      return true;
+      await discardEditorChanges(confirm: false);
+      return localDraftError == null && _blockedDraft == null;
     }
     if (choice == 'save') {
       await saveLocalDraft();
@@ -246,6 +345,26 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
                 icon: const Icon(Icons.save_outlined),
                 label: const Text('Save local draft'),
               ),
+              if (hasLocalEdits)
+                TextButton.icon(
+                  onPressed:
+                      draftBusy ||
+                          _savedDocument == null ||
+                          WorkspaceChanges.same(_savedDocument, currentDocument)
+                      ? null
+                      : () => discardEditorChanges(),
+                  icon: const Icon(Icons.undo_outlined),
+                  label: const Text('Discard changes'),
+                ),
+              if (hasLocalEdits || _blockedDraft != null)
+                TextButton.icon(
+                  onPressed:
+                      draftBusy || (!hasLocalEdits && _blockedDraft == null)
+                      ? null
+                      : () => discardEditorChanges(deleteDraft: true),
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Delete saved draft'),
+                ),
               TextButton.icon(
                 onPressed: _undoDocuments.isEmpty || draftBusy
                     ? null
@@ -253,7 +372,7 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
                         final previous = _undoDocuments.removeLast();
                         super.setState(() => _apply(previous));
                         _lastDocument = copyDocument(previous);
-                        saveLocalDraft();
+                        saveLocalDraft(checkpoint: false);
                       },
                 icon: const Icon(Icons.undo),
                 label: const Text('Undo'),
@@ -344,7 +463,7 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
     );
     if (value != null && mounted) {
       setState(() => _apply(value));
-      await saveLocalDraft();
+      await saveLocalDraft(checkpoint: false);
     }
   }
 
@@ -360,6 +479,7 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
         DraftStore.write(localScope, localSlot, {
           'base': _localBase,
           'draft': copyDocument(currentDocument!),
+          'saved': _savedDocument,
         }).catchError((Object _) {}),
       );
     }
