@@ -1,3 +1,7 @@
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import '../services/image_upload_service.dart';
+import '../widgets/payment_options_editor.dart';
 import '../widgets/local_draft.dart';
 import '../widgets/change_review.dart';
 import '../services/workspace_changes.dart';
@@ -12,7 +16,8 @@ import '../services/github_service.dart';
 import '../services/commerce_settings_service.dart';
 
 class CommerceSettingsScreen extends StatefulWidget {
-  const CommerceSettingsScreen({super.key, this.service});
+  const CommerceSettingsScreen({super.key, this.service, this.qrUploader});
+  final Future<String?> Function()? qrUploader;
   final CommerceSettingsService? service;
   @override
   State<CommerceSettingsScreen> createState() => _CommerceSettingsScreenState();
@@ -39,13 +44,17 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
             ...(config!['payment'] as Map),
             'upiId': upi.text,
             'receiverName': receiver.text,
+            'qrImage': qrImage.text,
+            'instructions': instructions.text,
           },
         };
   @override
   void applyDocument(Map<String, dynamic> value) {
-    config = copyDocument(value);
+    config = CommerceSettingsService.normalize(copyDocument(value));
     upi.text = config!['payment']['upiId'];
     receiver.text = config!['payment']['receiverName'];
+    qrImage.text = config!['payment']['qrImage'];
+    instructions.text = config!['payment']['instructions'];
     dirty = true;
   }
 
@@ -53,6 +62,8 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
   Map<String, dynamic>? config;
   final upi = TextEditingController();
   final receiver = TextEditingController();
+  final qrImage = TextEditingController();
+  final instructions = TextEditingController();
   String? error;
   bool busy = false;
   bool dirty = false;
@@ -72,6 +83,8 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
   void dispose() {
     upi.dispose();
     receiver.dispose();
+    qrImage.dispose();
+    instructions.dispose();
     super.dispose();
   }
 
@@ -87,6 +100,8 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
         config = value;
         upi.text = value['payment']['upiId'];
         receiver.text = value['payment']['receiverName'];
+        qrImage.text = value['payment']['qrImage'];
+        instructions.text = value['payment']['instructions'];
         dirty = false;
         _baseline = copyDocument(value);
         startLocalDraft(value);
@@ -113,6 +128,8 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
     );
     draft['payment']['upiId'] = upi.text.trim();
     draft['payment']['receiverName'] = receiver.text.trim();
+    draft['payment']['qrImage'] = qrImage.text.trim();
+    draft['payment']['instructions'] = instructions.text.trim();
     try {
       CommerceSettingsService.validate(draft);
     } catch (e) {
@@ -146,7 +163,10 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
         ],
       ),
     );
-    if (approved != true || !mounted) return;
+    if (approved != true ||
+        !mounted ||
+        DraftStore.scope(context.read<SettingsProvider>().settings) != _scope)
+      return;
     setState(() {
       busy = true;
       error = null;
@@ -188,10 +208,28 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
       mainAxisSize: MainAxisSize.min,
       children: [
         const Text(
-          'Pay only after our team confirms availability',
+          'Payment options and customer messages',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
+        Text(
+          'Mode: ${{'confirmation': 'Pay after confirmation', 'direct': 'Pay directly', 'both': 'Offer both options'}[payment['mode'] ?? 'confirmation']}',
+        ),
+        Text(
+          '${(payment['directDepartures'] as List? ?? []).length} direct-payment departure approvals',
+        ),
+        Text('QR section: ${payment['showQr'] == true ? 'Visible' : 'Hidden'}'),
+        if (payment['showQr'] == true &&
+            payment['qrImage']?.toString().isNotEmpty == true)
+          _qrPreview(payment['qrImage']),
+        Text(payment['instructions']?.toString() ?? ''),
+        const Text(
+          'Request first → Booking request received; availability confirmation pending.',
+        ),
+        if (payment['mode'] != 'confirmation')
+          const Text(
+            'Direct payment → Payment details submitted; verification pending. No seat is confirmed automatically.',
+          ),
         if (payment['showReceiverName'] == true &&
             payment['receiverName'].toString().isNotEmpty)
           Text('Receiver: ${payment['receiverName']}'),
@@ -213,6 +251,73 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
         ),
       ],
     );
+  }
+
+  Widget _qrPreview(String path) {
+    final settings = service.github.settings;
+    return SizedBox(
+      height: 220,
+      child: Image.network(
+        'https://raw.githubusercontent.com/${settings.repositoryOwner}/${settings.repositoryName}/${settings.branch}/$path',
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => const Center(
+          child: Text('QR preview unavailable. Check the image path.'),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _uploadQr() async {
+    if (busy ||
+        DraftStore.scope(context.read<SettingsProvider>().settings) != _scope)
+      return;
+    setState(() => busy = true);
+    try {
+      String? path;
+      if (widget.qrUploader != null) {
+        path = await widget.qrUploader!();
+      } else {
+        final image = await ImagePicker().pickImage(
+          source: ImageSource.gallery,
+        );
+        if (image != null) {
+          if (!mounted ||
+              DraftStore.scope(context.read<SettingsProvider>().settings) !=
+                  _scope)
+            return;
+          if (![
+            'png',
+            'jpg',
+            'jpeg',
+            'webp',
+          ].contains(image.path.split('.').last.toLowerCase()))
+            throw const FormatException(
+              'Choose an original PNG, JPG or WebP QR image.',
+            );
+          final result =
+              await ImageUploadService(
+                settings: service.github.settings,
+              ).uploadImage(
+                imageFile: File(image.path),
+                tripId: 'payment_qr',
+                isMainImage: true,
+              );
+          if (!result.success)
+            throw StateError(result.error ?? 'QR upload failed.');
+          path = result.imagePath;
+        }
+      }
+      if (path != null && mounted) {
+        _changed(() {
+          qrImage.text = path!;
+          config!['payment']['qrImage'] = path;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
 
   Future<void> _coupon([int? index]) async {
@@ -297,6 +402,16 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
                         ),
                       ),
                       const SizedBox(height: 16),
+                      PaymentOptionsEditor(
+                        payment: config!['payment'] as Map<String, dynamic>,
+                        key: ValueKey(
+                          'payment-options-${config!['payment']['mode']}',
+                        ),
+                        trips: context.watch<TripsProvider>().trips,
+                        busy: busy,
+                        onChanged: () => _changed(() {}),
+                      ),
+                      const SizedBox(height: 16),
                       TextField(
                         enabled: !busy,
                         controller: upi,
@@ -330,6 +445,75 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
                                     value,
                               ),
                       ),
+                      const Divider(),
+                      const Text(
+                        'UPI QR code',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Text(
+                        'Upload the original QR image without cropping. Check that it pays the same UPI account. Uploading stores the original in GitHub; publish settings to display it.',
+                      ),
+                      SwitchListTile(
+                        key: const Key('payment-show-qr'),
+                        title: const Text('Show UPI QR section'),
+                        value: config!['payment']['showQr'] == true,
+                        onChanged: busy
+                            ? null
+                            : (value) => _changed(
+                                () => config!['payment']['showQr'] = value,
+                              ),
+                      ),
+                      TextField(
+                        key: const Key('payment-qr-image'),
+                        controller: qrImage,
+                        enabled: !busy,
+                        decoration: const InputDecoration(
+                          labelText: 'QR image path',
+                          hintText: 'images/trips/payment_qr.png',
+                        ),
+                        onChanged: (value) => _changed(
+                          () => config!['payment']['qrImage'] = value,
+                        ),
+                      ),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          OutlinedButton.icon(
+                            key: const Key('payment-upload-qr'),
+                            onPressed: busy ? null : _uploadQr,
+                            icon: const Icon(Icons.qr_code),
+                            label: const Text('Upload / replace QR'),
+                          ),
+                          TextButton(
+                            onPressed: busy
+                                ? null
+                                : () => _changed(() {
+                                    qrImage.clear();
+                                    config!['payment']['qrImage'] = '';
+                                    config!['payment']['showQr'] = false;
+                                  }),
+                            child: const Text('Remove QR image'),
+                          ),
+                        ],
+                      ),
+                      if (qrImage.text.isNotEmpty) _qrPreview(qrImage.text),
+                      TextField(
+                        key: const Key('payment-instructions'),
+                        controller: instructions,
+                        enabled: !busy,
+                        maxLines: 3,
+                        maxLength: 500,
+                        decoration: const InputDecoration(
+                          labelText: 'Payment instructions',
+                        ),
+                        onChanged: (value) => _changed(
+                          () => config!['payment']['instructions'] = value,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       SwitchListTile(
                         title: const Text('Show Razorpay'),
                         subtitle: const Text(
@@ -401,12 +585,15 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
                               ...(config!['payment'] as Map),
                               'upiId': upi.text.trim(),
                               'receiverName': receiver.text.trim(),
+                              'qrImage': qrImage.text.trim(),
+                              'instructions': instructions.text.trim(),
                             },
                           }),
                         ),
                       ),
                       const SizedBox(height: 16),
                       FilledButton.icon(
+                        key: const Key('payment-publish'),
                         onPressed: busy ? null : _save,
                         icon: const Icon(Icons.publish),
                         label: Text(busy ? 'Publishing…' : 'Preview & Publish'),
