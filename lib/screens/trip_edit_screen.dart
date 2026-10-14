@@ -16,6 +16,7 @@ import '../services/image_upload_service.dart';
 import '../services/photo_advice.dart';
 import '../services/trips_parser.dart';
 import '../services/trip_date_utils.dart';
+import '../services/trip_editor_document.dart';
 import '../services/trip_detail_defaults.dart';
 import '../services/trip_brochure_service.dart';
 import '../models/trip_section_settings.dart';
@@ -68,8 +69,13 @@ class _TripEditScreenState extends State<TripEditScreen>
       .where((t) => t['id'] == widget.trip?['id'])
       .firstOrNull;
   @override
-  Map<String, dynamic>? get discardDraftBase =>
-      _publishedTrip ?? super.discardDraftBase;
+  Map<String, dynamic>? get discardDraftBase {
+    final published = _publishedTrip;
+    return published == null
+        ? super.discardDraftBase
+        : publishedTripEditorDocument(published);
+  }
+
   @override
   String get discardDraftExplanation => _publishedTrip == null
       ? super.discardDraftExplanation

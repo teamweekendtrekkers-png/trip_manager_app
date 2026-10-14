@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:trip_manager_app/services/draft_store.dart';
+import 'package:trip_manager_app/services/trip_editor_document.dart';
 import 'package:trip_manager_app/widgets/local_draft.dart';
 import 'package:trip_manager_app/widgets/app_version_card.dart';
 
@@ -46,6 +47,38 @@ void main() {
   tearDown(() async {
     await DraftStore.close();
   });
+
+  test(
+    'restoring older trips keeps editor defaults and unknown published fields',
+    () {
+      final original = <String, dynamic>{
+        'id': 'older-trip',
+        'name': 'Original title',
+        'destination': 'Coorg',
+        'description': 'Original description',
+        'custom': {'keep': true},
+      };
+      final restored = publishedTripEditorDocument(original);
+      expect(restored['publicSlug'], 'older-trip');
+      expect(
+        restored['departureTime'],
+        matches(RegExp(r'^([01]\d|2[0-3]):[0-5]\d$')),
+      );
+      expect(restored['title'], 'Original title');
+      expect(restored['location'], 'Coorg');
+      expect(restored['about'], 'Original description');
+      expect(restored['custom'], {'keep': true});
+      expect(original.containsKey('departureTime'), false);
+      expect(
+        publishedTripEditorDocument({
+          ...original,
+          'publicSlug': 'custom-route',
+          'departureTime': '22:30',
+        })['departureTime'],
+        '22:30',
+      );
+    },
+  );
 
   for (final scenario in ['newer', 'current', 'expired', 'offline']) {
     testWidgets('update check reports $scenario build honestly', (
