@@ -42,6 +42,12 @@ void main() {
     expect(find.byKey(const Key('desktop-workspace-summary')), findsOneWidget);
     expect(find.text('Website content'), findsOneWidget);
     expect(find.text('Payments & coupons'), findsOneWidget);
+    final navigationScroll = find.descendant(of: find.byKey(const Key('manager-desktop-navigation')), matching: find.byType(Scrollable)).first;
+    await tester.scrollUntilVisible(find.text('Booking review'), 100, scrollable: navigationScroll);
+    expect(find.text('Booking review'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Manage departures'), 100, scrollable: navigationScroll);
+    expect(find.text('Manage departures'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Shared trip content'), 100, scrollable: navigationScroll);
     expect(find.text('Shared trip content'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Data health'),120,scrollable:find.descendant(of:find.byKey(const Key('manager-desktop-navigation')),matching:find.byType(Scrollable)).first);
     expect(find.text('Data health'), findsOneWidget);
@@ -175,3 +181,4 @@ Map<String, dynamic> _trip(String id, String title, {bool featured = false}) =>
       'inclusions': <String>[],
       'exclusions': <String>[],
     };
+
