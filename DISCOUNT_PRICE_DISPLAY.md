@@ -1,6 +1,6 @@
 # Manager 1.7.1 (build 9): original and discounted prices
 
-In Edit trip → Basics:
+In Edit trip → Dates & price:
 
 - Price (₹): original amount, for example ₹6,599.
 - Discounted Price (₹): reduced amount, for example ₹5,999.
