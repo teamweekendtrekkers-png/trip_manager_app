@@ -7,6 +7,7 @@ void main() {
   test('legacy account is retained while the backup starts empty', () {
     final config=CommerceSettingsService.normalize({'version':1,'payment':{'upiId':'original@upi','qrImage':'images/original.png','receiverName':'Original'},'showCoupons':true,'coupons':[]});
     final p=config['payment'];
+    expect(config['version'],2);
     expect(p['checkoutVersion'],2);expect(p['mode'],'direct');
     expect(p['profiles'][0]['upiId'],'original@upi');expect(p['profiles'][0]['qrImage'],'images/original.png');
     expect(p['profiles'][1]['upiId'],'');expect(p['requestTripIds'],isEmpty);

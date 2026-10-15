@@ -5,6 +5,9 @@ enter its matching UPI ID, receiver name and original QR image, then choose Use
 this account. Review the active-account preview and publish. Editing the backup
 does not activate it. Existing settings migrate into Primary; Backup starts empty.
 There is no payment-account-history tracking.
+The published commerce document uses version 2. Older manager releases reject
+that version, preventing their single-account editor from changing only part of
+the new payment profile.
 
 UPI payment is the default for every bookable trip. Under Allow booking requests
 for selected trips, check only the trips that may also accept an availability

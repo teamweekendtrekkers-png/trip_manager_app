@@ -10,7 +10,7 @@ class CommerceSettingsService {
   String? _sha;
   bool _loaded = false;
   static Map<String, dynamic> defaults() => {
-    'version': 1,
+    'version': 2,
     'payment': <String, dynamic>{
       'upiId': '',
       'receiverName': '',
@@ -47,7 +47,7 @@ class CommerceSettingsService {
     p['requestTripIds']=List<String>.from(p['requestTripIds'] as List? ?? []);
     final active=(p['profiles'] as List).cast<Map>().firstWhere((a)=>a['id']==p['activeProfileId']);
     for(final key in ['upiId','receiverName','qrImage'])p[key]=active[key]??'';
-    return {...value,'payment':p};
+    return {...value,'version':2,'payment':p};
   }
 
   static bool validQrPath(String value) =>
@@ -71,7 +71,7 @@ class CommerceSettingsService {
   }
 
   static void validate(Map<String, dynamic> config) {
-    if (config['version'] != 1 ||
+    if (![1,2].contains(config['version']) ||
         config['payment'] is! Map ||
         config['coupons'] is! List ||
         config['showCoupons'] is! bool) {
