@@ -1,3 +1,4 @@
+import '../widgets/departure_tools.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/local_draft.dart';
 import '../services/draft_store.dart';
@@ -2450,11 +2451,6 @@ class _TripEditScreenState extends State<TripEditScreen>
                 trailing: Wrap(
                   spacing: 0,
                   children: [
-                    if(!invalid&&!duplicate)IconButton(
-                      key:ValueKey('close-date-$index'),tooltip:closed?'Reopen bookings':'Close bookings',
-                      onPressed:()=>setState((){final values=List<String>.from(_tripData['closedDepartures'] as List? ?? []);if(closed){values.remove(range.key);}else{values.add(range.key);}_tripData['closedDepartures']=values;}),
-                      icon:Icon(closed?Icons.lock_open:Icons.lock_outline)),
-                    if(!invalid&&!duplicate)IconButton(key:ValueKey('duplicate-date-$index'),tooltip:'Duplicate departure',onPressed:()=>_pickDateRange(index:index,duplicate:true),icon:const Icon(Icons.copy)),
                     IconButton(
                       key: ValueKey('edit-date-$index'),
                       tooltip: 'Edit date range',
@@ -2474,6 +2470,11 @@ class _TripEditScreenState extends State<TripEditScreen>
               ),
             );
           }),
+        if(_availableDates.any((date)=>TripDateUtils.parse(date)!=null))DepartureTools(
+          dates:_availableDates,closedKeys:List<String>.from(_tripData['closedDepartures'] as List? ?? []),
+          onToggle:(key)=>setState((){final keys=List<String>.from(_tripData['closedDepartures'] as List? ?? []);if(!keys.remove(key))keys.add(key);_tripData['closedDepartures']=keys;}),
+          onDuplicate:(index)=>_pickDateRange(index:index,duplicate:true),
+        ),
       ],
     );
   }
@@ -2527,6 +2528,9 @@ class _TripEditScreenState extends State<TripEditScreen>
       if (index == null || duplicate) {
         _availableDates.add(canonical);
       } else {
+        final oldKey=TripDateUtils.parse(_availableDates[index])?.key;
+        final closed=List<String>.from(_tripData['closedDepartures'] as List? ?? []);
+        if(closed.remove(oldKey)){closed.add(range.key);_tripData['closedDepartures']=closed;}
         _availableDates[index] = canonical;
       }
     });

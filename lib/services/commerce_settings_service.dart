@@ -43,6 +43,7 @@ class CommerceSettingsService {
       p['activeProfileId']='primary';
     }
     p['checkoutVersion']=2;p['mode']='direct';p['directDepartures']=<Map<String,dynamic>>[];
+    p['showRazorpay']=false;p['showReceiverName']=true;
     p['requestTripIds']=List<String>.from(p['requestTripIds'] as List? ?? []);
     final active=(p['profiles'] as List).cast<Map>().firstWhere((a)=>a['id']==p['activeProfileId']);
     for(final key in ['upiId','receiverName','qrImage'])p[key]=active[key]??'';

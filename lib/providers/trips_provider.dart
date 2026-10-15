@@ -923,6 +923,7 @@ class TripsProvider extends ChangeNotifier {
       ..['availableDates'] = <String>[];
     copy.remove('previousSlugs');
     copy.remove('date');
+    copy.remove('closedDepartures');
     return addTrip(copy) == null ? newId : null;
   }
 

@@ -258,9 +258,6 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
         Text(
           'Coupon entry: ${value['showCoupons'] == true ? 'Visible' : 'Hidden'}',
         ),
-        Text(
-          'Razorpay: ${payment['showRazorpay'] == true ? 'Visible; online payment link must be confirmed by the team' : 'Hidden'}',
-        ),
         const SizedBox(height: 8),
         const Text(
           'Send your payment screenshot on WhatsApp after paying. Your place is confirmed after availability and payment are verified.',
@@ -456,16 +453,7 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
                           border: OutlineInputBorder(),
                         ),
                       ),
-                      SwitchListTile(
-                        title: const Text('Show receiver name'),
-                        value: config!['payment']['showReceiverName'] == true,
-                        onChanged: busy
-                            ? null
-                            : (value) => _changed(
-                                () => config!['payment']['showReceiverName'] =
-                                    value,
-                              ),
-                      ),
+                      const Text('The receiver name is shown with the active payment account.'),
                       const Divider(),
                       const Text(
                         'UPI QR code',
@@ -535,19 +523,6 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
                         ),
                       ),
                       const SizedBox(height: 16),
-                      SwitchListTile(
-                        title: const Text('Show Razorpay'),
-                        subtitle: const Text(
-                          'Off by default. The existing gateway is a placeholder; customers are directed to ask for a payment link.',
-                        ),
-                        value: config!['payment']['showRazorpay'] == true,
-                        onChanged: busy
-                            ? null
-                            : (value) => _changed(
-                                () =>
-                                    config!['payment']['showRazorpay'] = value,
-                              ),
-                      ),
                       const Divider(),
                       SwitchListTile(
                         title: const Text('Show coupon entry at checkout'),

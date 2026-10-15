@@ -284,7 +284,7 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
     ),
   );
   String _visibility(Map<String, dynamic> trip) {
-    if (trip['isActive'] == false) return 'Inactive: hidden from the website';
+    if (trip['isActive'] == false) return 'Inactive: shown only with Show coming soon';
     if (homepage == null)
       return 'Upcoming Batches selection could not be loaded';
     final options = homepage!['upcomingBatches'] as Map;
