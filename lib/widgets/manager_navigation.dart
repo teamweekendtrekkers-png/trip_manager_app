@@ -12,6 +12,7 @@ enum ManagerDestination {
   batches,
   payments,
   bookingReview,
+  departureManagement,
   sharedContent,
   health,
   deployment,
@@ -28,6 +29,7 @@ extension ManagerDestinationDetails on ManagerDestination {
     ManagerDestination.batches => 'Departures',
     ManagerDestination.payments => 'Payments & coupons',
     ManagerDestination.bookingReview => 'Booking review',
+    ManagerDestination.departureManagement => 'Manage departures',
     ManagerDestination.sharedContent => 'Shared trip content',
     ManagerDestination.health => 'Data health',
     ManagerDestination.deployment => 'Publishing status',
@@ -43,6 +45,7 @@ extension ManagerDestinationDetails on ManagerDestination {
     ManagerDestination.batches => 'Preview departures',
     ManagerDestination.payments => 'UPI and discount codes',
     ManagerDestination.bookingReview => 'Review customer payment submissions',
+    ManagerDestination.departureManagement => 'Close, reopen and duplicate dates',
     ManagerDestination.sharedContent => 'FAQs, policies and trip highlights',
     ManagerDestination.health => 'Check website data',
     ManagerDestination.deployment => 'Monitor publishing',
@@ -58,6 +61,7 @@ extension ManagerDestinationDetails on ManagerDestination {
     ManagerDestination.batches => Icons.calendar_month_outlined,
     ManagerDestination.payments => Icons.payments_outlined,
     ManagerDestination.bookingReview => Icons.fact_check_outlined,
+    ManagerDestination.departureManagement => Icons.event_available_outlined,
     ManagerDestination.sharedContent => Icons.article_outlined,
     ManagerDestination.health => Icons.health_and_safety_outlined,
     ManagerDestination.deployment => Icons.rocket_launch_outlined,
@@ -73,6 +77,7 @@ extension ManagerDestinationDetails on ManagerDestination {
     ManagerDestination.batches => Icons.calendar_month,
     ManagerDestination.payments => Icons.payments,
     ManagerDestination.bookingReview => Icons.fact_check,
+    ManagerDestination.departureManagement => Icons.event_available,
     ManagerDestination.sharedContent => Icons.article,
     ManagerDestination.health => Icons.health_and_safety,
     ManagerDestination.deployment => Icons.rocket_launch,
@@ -265,3 +270,4 @@ class _SideDestination extends StatelessWidget {
     );
   }
 }
+

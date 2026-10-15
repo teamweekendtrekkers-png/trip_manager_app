@@ -1,4 +1,3 @@
-import '../widgets/departure_tools.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/local_draft.dart';
 import '../services/draft_store.dart';
@@ -2470,11 +2469,6 @@ class _TripEditScreenState extends State<TripEditScreen>
               ),
             );
           }),
-        if(_availableDates.any((date)=>TripDateUtils.parse(date)!=null))DepartureTools(
-          dates:_availableDates,closedKeys:List<String>.from(_tripData['closedDepartures'] as List? ?? []),
-          onToggle:(key)=>setState((){final keys=List<String>.from(_tripData['closedDepartures'] as List? ?? []);if(!keys.remove(key))keys.add(key);_tripData['closedDepartures']=keys;}),
-          onDuplicate:(index)=>_pickDateRange(index:index,duplicate:true),
-        ),
       ],
     );
   }
@@ -2769,3 +2763,4 @@ class _TripEditScreenState extends State<TripEditScreen>
     );
   }
 }
+

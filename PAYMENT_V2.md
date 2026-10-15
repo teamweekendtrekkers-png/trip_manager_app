@@ -14,8 +14,8 @@ for selected trips, check only the trips that may also accept an availability
 request. Customers still see payment selected first. The customer page offers
 scan/download QR and Copy UPI ID; app-launch buttons are removed.
 
-Trip date rows offer Duplicate departure (choose a new range) and Close/Reopen
-bookings. Closing preserves the date in the editor while excluding it from the
+The Manage departures screen offers Duplicate departure (choose a new range)
+and Close/Reopen bookings. Closing preserves the date in the editor while excluding it from the
 website's bookable dates. The dashboard now counts inactive and bookable trips
 alongside missing dates and unpublished changes. Existing bulk dates, source
 preservation, previews, draft recovery, version recovery and publishing status
