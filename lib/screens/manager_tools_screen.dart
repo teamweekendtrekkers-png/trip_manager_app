@@ -198,6 +198,8 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
             upcoming.fold<int>(0, (n, b) => n + b.trips.length),
           ),
           _metric('Trips without bookable dates', missing.length),
+          _metric('Inactive trips', p.trips.where((t)=>t['isActive']==false).length),
+          _metric('Bookable trips', p.trips.where((t)=>TripDateUtils.getUpcomingDateRanges(t).isNotEmpty).length),
           _metric('Unpublished trip changes', p.changes.length),
         ],
       ),

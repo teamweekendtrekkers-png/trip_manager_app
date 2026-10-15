@@ -2423,7 +2423,8 @@ class _TripEditScreenState extends State<TripEditScreen>
                   ..._tripData,
                   'departureTime': _departureTimeController.text,
                 }).isAfter((widget.referenceDate ?? DateTime.now()).toUtc());
-            final status = invalid
+            final closed=range!=null&&(_tripData['closedDepartures'] as List? ?? []).contains(range.key);
+            final status = closed ? 'Bookings closed' : invalid
                 ? 'Invalid — edit or remove before saving'
                 : duplicate
                 ? 'Duplicate — edit or remove before saving'
@@ -2449,6 +2450,11 @@ class _TripEditScreenState extends State<TripEditScreen>
                 trailing: Wrap(
                   spacing: 0,
                   children: [
+                    if(!invalid&&!duplicate)IconButton(
+                      key:ValueKey('close-date-$index'),tooltip:closed?'Reopen bookings':'Close bookings',
+                      onPressed:()=>setState((){final values=List<String>.from(_tripData['closedDepartures'] as List? ?? []);if(closed){values.remove(range.key);}else{values.add(range.key);}_tripData['closedDepartures']=values;}),
+                      icon:Icon(closed?Icons.lock_open:Icons.lock_outline)),
+                    if(!invalid&&!duplicate)IconButton(key:ValueKey('duplicate-date-$index'),tooltip:'Duplicate departure',onPressed:()=>_pickDateRange(index:index,duplicate:true),icon:const Icon(Icons.copy)),
                     IconButton(
                       key: ValueKey('edit-date-$index'),
                       tooltip: 'Edit date range',
@@ -2472,7 +2478,7 @@ class _TripEditScreenState extends State<TripEditScreen>
     );
   }
 
-  Future<void> _pickDateRange({int? index}) async {
+  Future<void> _pickDateRange({int? index, bool duplicate=false}) async {
     final now = DateTime.now();
     final existing = index == null
         ? null
@@ -2500,7 +2506,7 @@ class _TripEditScreenState extends State<TripEditScreen>
       firstDate: firstDate,
       lastDate: lastDate,
       initialDateRange: DateTimeRange(start: initialStart, end: initialEnd),
-      helpText: index == null ? 'Add trip dates' : 'Edit trip dates',
+      helpText: duplicate ? 'Choose dates for the new departure' : index == null ? 'Add trip dates' : 'Edit trip dates',
     );
     if (picked == null || !mounted) return;
 
@@ -2509,7 +2515,7 @@ class _TripEditScreenState extends State<TripEditScreen>
       final candidate = TripDateUtils.parse(label);
       return candidate?.key == range.key;
     });
-    if (duplicateIndex >= 0 && duplicateIndex != index) {
+    if (duplicateIndex >= 0 && (duplicate || duplicateIndex != index)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('That date range already exists.')),
       );
@@ -2518,7 +2524,7 @@ class _TripEditScreenState extends State<TripEditScreen>
 
     setState(() {
       final canonical = TripDateUtils.formatCanonical(range);
-      if (index == null) {
+      if (index == null || duplicate) {
         _availableDates.add(canonical);
       } else {
         _availableDates[index] = canonical;

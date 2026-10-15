@@ -8,6 +8,7 @@ import '../widgets/change_review.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'commerce_settings_screen.dart';
+import 'booking_review_screen.dart';
 import 'trip_content_settings_screen.dart';
 import '../widgets/quick_trip_editor.dart';
 import '../widgets/trip_editor_sections.dart';
@@ -250,6 +251,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
       ManagerDestination.payments => MaterialPageRoute<void>(
         builder: (_) => const CommerceSettingsScreen(),
       ),
+      ManagerDestination.bookingReview => MaterialPageRoute<void>(builder: (_) => const BookingReviewScreen()),
       ManagerDestination.sharedContent => MaterialPageRoute<void>(
         builder: (_) => const TripContentSettingsScreen(),
       ),
@@ -372,6 +374,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
                 ManagerDestination.library,
                 ManagerDestination.history,
                 ManagerDestination.payments,
+                ManagerDestination.bookingReview,
                 ManagerDestination.sharedContent,
                 ManagerDestination.deployment,
                 ManagerDestination.health,

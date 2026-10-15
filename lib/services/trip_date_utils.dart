@@ -324,7 +324,7 @@ abstract final class TripDateUtils {
       final value = availableDates[index];
       if (value is! String) continue;
       final range = parse(value);
-      if (range == null || !bookingCutoff(range, trip).isAfter(instant) || !seen.add(range.key)) {
+      if (range == null || (trip['closedDepartures'] as List? ?? []).contains(range.key) || !bookingCutoff(range, trip).isAfter(instant) || !seen.add(range.key)) {
         continue;
       }
       indexedRanges.add((index: index, range: range));

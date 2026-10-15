@@ -33,7 +33,7 @@ void main() {
   }
 
   testWidgets(
-    'manager controls both paths, approved dates, QR upload, hide and publish',
+    'manager saves two accounts, switches the active pair and chooses optional request trips',
     (tester) async {
       tester.view.physicalSize = const Size(390, 900);
       tester.view.devicePixelRatio = 1;
@@ -72,70 +72,58 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await show(tester, 'payment-mode');
-      await tester.tap(find.byKey(const Key('payment-mode')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Offer both options').last);
-      await tester.pumpAndSettle();
       await show(tester, 'payment-eligibility');
       await tester.tap(find.byKey(const Key('payment-eligibility')));
       await tester.pumpAndSettle();
       await show(tester, 'payment-trip-demo');
       await tester.tap(find.byKey(const Key('payment-trip-demo')));
       await tester.pumpAndSettle();
-      await show(tester, 'payment-departure-demo|2099-12-20/2099-12-22');
-      await tester.tap(
-        find.byKey(const Key('payment-departure-demo|2099-12-20/2099-12-22')),
-      );
-      await tester.pumpAndSettle();
+      await show(tester, 'payment-upi-id');
+      await tester.enterText(find.byKey(const Key('payment-upi-id')), 'primary@upi');
+      await show(tester, 'payment-receiver-name');
+      await tester.enterText(find.byKey(const Key('payment-receiver-name')), 'Primary receiver');
       await show(tester, 'payment-upload-qr');
       await tester.tap(find.byKey(const Key('payment-upload-qr')));
       await tester.pumpAndSettle();
       await show(tester, 'payment-show-qr');
       await tester.tap(find.byKey(const Key('payment-show-qr')));
       await tester.pumpAndSettle();
-      await show(tester, 'payment-instructions');
-      await tester.enterText(
-        find.byKey(const Key('payment-instructions')),
-        'Verify the receiver name before paying.',
-      );
+      await show(tester, 'payment-profile-0');
+      await tester.tap(find.byKey(const Key('payment-profile-0')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Backup account').last);
+      await tester.pumpAndSettle();
+      await show(tester, 'payment-upi-id');
+      expect(tester.widget<TextField>(find.byKey(const Key('payment-upi-id'))).controller!.text, '');
+      await tester.enterText(find.byKey(const Key('payment-upi-id')), 'backup@upi');
+      await show(tester, 'payment-receiver-name');
+      await tester.enterText(find.byKey(const Key('payment-receiver-name')), 'Backup receiver');
+      await show(tester, 'payment-upload-qr');
+      await tester.tap(find.byKey(const Key('payment-upload-qr')));
+      await tester.pumpAndSettle();
+      await show(tester, 'payment-use-account');
+      await tester.tap(find.byKey(const Key('payment-use-account')));
       await tester.pumpAndSettle();
       expect(github.commits, 0);
-      FocusManager.instance.primaryFocus?.unfocus();
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('payment-publish')),
-        300,
-        scrollable: find.byType(Scrollable).first,
-        maxScrolls: 50,
-      );
+      await show(tester, 'payment-publish');
       await tester.tap(find.byKey(const Key('payment-publish')));
       await tester.pumpAndSettle();
-      expect(
-        find.textContaining('Direct payment → Payment details submitted'),
-        findsWidgets,
-      );
+      expect(find.text('Active account: Backup account'), findsWidgets);
       await tester.tap(find.widgetWithText(FilledButton, 'Publish'));
       await tester.pumpAndSettle();
       expect(github.commits, 1);
       final payment = jsonDecode(github.content)['payment'];
-      expect(payment['mode'], 'both');
+      expect(payment['checkoutVersion'], 2);
+      expect(payment['mode'], 'direct');
       expect(payment['showQr'], true);
+      expect(payment['activeProfileId'], 'backup');
+      expect(payment['upiId'], 'backup@upi');
+      expect(payment['receiverName'], 'Backup receiver');
+      expect(payment['profiles'][0]['upiId'], 'primary@upi');
+      expect(payment['profiles'][1]['upiId'], 'backup@upi');
       expect(payment['qrImage'], 'images/trips/demo-qr.png');
-      expect(payment['directDepartures'], [
-        {'tripId': 'demo', 'dateKey': '2099-12-20/2099-12-22'},
-      ]);
+      expect(payment['requestTripIds'], ['demo']);
       expect(tripService.atomicCalls, isEmpty);
-      await show(tester, 'payment-show-qr');
-      await tester.tap(find.byKey(const Key('payment-show-qr')));
-      await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<TextField>(find.byKey(const Key('payment-qr-image')))
-            .controller!
-            .text,
-        'images/trips/demo-qr.png',
-      );
       expect(tester.takeException(), isNull);
     },
   );
