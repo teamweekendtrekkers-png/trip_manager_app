@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'trip_price.dart';
 import '../models/app_settings.dart';
 import '../models/homepage_config.dart';
 import '../services/trip_date_utils.dart';
@@ -65,9 +66,13 @@ class _DraftPreviewState extends State<DraftPreview> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         text(trip['title']?.toString() ?? '', heading: true),
-        text(
-          '${trip['duration'] ?? ''} · ${trip['difficulty'] ?? ''} · ${trip['price'] ?? ''} / person',
-        ),
+        if (TripPrice.hasDiscount(trip)) ...[
+          text('${trip['duration'] ?? ''} · ${trip['difficulty'] ?? ''}'),
+          TripPrice(trip: trip),
+        ] else
+          text(
+            '${trip['duration'] ?? ''} · ${trip['difficulty'] ?? ''} · ${trip['price'] ?? ''} / person',
+          ),
         text(
           dates.isEmpty
               ? 'New dates coming soon'
@@ -236,9 +241,15 @@ class _DraftPreviewState extends State<DraftPreview> {
                     (trip['cardTitle'] ?? trip['title']).toString(),
                     heading: true,
                   ),
-                  text(
-                    '${trip['duration'] ?? ''} · ${trip['difficulty'] ?? ''} · ${trip['price'] ?? ''} / person',
-                  ),
+                  if (TripPrice.hasDiscount(trip)) ...[
+                    text(
+                      '${trip['duration'] ?? ''} · ${trip['difficulty'] ?? ''}',
+                    ),
+                    TripPrice(trip: trip),
+                  ] else
+                    text(
+                      '${trip['duration'] ?? ''} · ${trip['difficulty'] ?? ''} · ${trip['price'] ?? ''} / person',
+                    ),
                 ],
               ),
             ),

@@ -48,16 +48,76 @@ void main() {
     matching: find.byIcon(Icons.save),
   );
 
-  testWidgets('switching sections retains draft fields and saving validates the complete trip',(tester) async {
-    final source=tripWithDates(['Jan 1-2, 2099']);final provider=TripsProvider(AppSettings())..addTrip(source);provider.markChangesSaved();
-    await tester.pumpWidget(buildSubject(provider,source));
-    await tester.enterText(find.byKey(const ValueKey('trip-name')),'Updated weekend');
-    await tester.tap(find.byKey(const Key('editor-section-picker')));await tester.pumpAndSettle();await tester.tap(find.text('Dates & price').last);await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('trip-name')),findsNothing);expect(find.byKey(const Key('trip-price')),findsOneWidget);
-    await tester.enterText(find.byKey(const Key('trip-price')),'4999');
-    await tester.tap(find.byKey(const Key('editor-save-draft')));await tester.pumpAndSettle();
-    expect(provider.trips.single['title'],'Updated weekend');expect(provider.trips.single['price'],'₹4999');expect(provider.trips.single['highlights'],source['highlights']);expect(provider.hasUnsavedChanges,true);
-  });
+  testWidgets(
+    'discount saves the selling fare and reopens both editor amounts',
+    (tester) async {
+      final trip = tripWithDates(['Jan 1-2, 2099']);
+      final provider = TripsProvider(AppSettings())..addTrip(trip);
+      await tester.pumpWidget(buildSubject(provider, trip));
+      await tester.tap(find.byKey(const Key('editor-section-picker')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dates & price').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('trip-price')), '6599');
+      await tester.enterText(
+        find.byKey(const Key('trip-discount-price')),
+        '5999',
+      );
+      await tester.tap(find.byKey(const Key('editor-save-draft')));
+      await tester.pumpAndSettle();
+      expect(provider.trips.single['price'], '₹5,999');
+      expect(provider.trips.single['originalPrice'], 6599);
+      expect(provider.trips.single['priceNumeric'], 5999);
+      final saved = Map<String, dynamic>.from(provider.trips.single);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(buildSubject(provider, saved));
+      await tester.tap(find.byKey(const Key('editor-section-picker')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dates & price').last);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const Key('trip-price')))
+            .controller!
+            .text,
+        '₹6,599',
+      );
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const Key('trip-discount-price')))
+            .controller!
+            .text,
+        '5999',
+      );
+    },
+  );
+
+  testWidgets(
+    'switching sections retains draft fields and saving validates the complete trip',
+    (tester) async {
+      final source = tripWithDates(['Jan 1-2, 2099']);
+      final provider = TripsProvider(AppSettings())..addTrip(source);
+      provider.markChangesSaved();
+      await tester.pumpWidget(buildSubject(provider, source));
+      await tester.enterText(
+        find.byKey(const ValueKey('trip-name')),
+        'Updated weekend',
+      );
+      await tester.tap(find.byKey(const Key('editor-section-picker')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dates & price').last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('trip-name')), findsNothing);
+      expect(find.byKey(const Key('trip-price')), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('trip-price')), '4999');
+      await tester.tap(find.byKey(const Key('editor-save-draft')));
+      await tester.pumpAndSettle();
+      expect(provider.trips.single['title'], 'Updated weekend');
+      expect(provider.trips.single['price'], '₹4999');
+      expect(provider.trips.single['highlights'], source['highlights']);
+      expect(provider.hasUnsavedChanges, true);
+    },
+  );
 
   testWidgets('keeps an invalid legacy date visible and blocks saving', (
     tester,

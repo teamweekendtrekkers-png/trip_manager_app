@@ -17,6 +17,7 @@ import '../services/photo_advice.dart';
 import '../services/trips_parser.dart';
 import '../services/trip_date_utils.dart';
 import '../services/trip_editor_document.dart';
+import '../services/trip_pricing.dart';
 import '../services/trip_detail_defaults.dart';
 import '../services/trip_brochure_service.dart';
 import '../models/trip_section_settings.dart';
@@ -208,7 +209,9 @@ class _TripEditScreenState extends State<TripEditScreen>
     super.initState();
     _scope = DraftStore.scope(context.read<SettingsProvider>().settings);
     _editingSection = widget.initialSection;
-    _tripData = TripContentSettings.copy(widget.trip ?? _getDefaultTrip());
+    _tripData = TripContentSettings.copy(
+      TripPricing.forEditor(widget.trip ?? _getDefaultTrip()),
+    );
 
     _slugController = TextEditingController(
       text:
@@ -548,13 +551,26 @@ class _TripEditScreenState extends State<TripEditScreen>
                                         v?.isEmpty == true ? 'Required' : null,
                                   ),
                                   TextFormField(
+                                    key: const Key('trip-discount-price'),
                                     controller: _discountedPriceController,
                                     decoration: const InputDecoration(
                                       labelText: 'Discounted Price (₹)',
+                                      helperText:
+                                          'Optional. Enter a lower amount than Price to show a discount.',
                                       border: OutlineInputBorder(),
                                       prefixIcon: Icon(Icons.local_offer),
                                     ),
                                     keyboardType: TextInputType.number,
+                                    validator: (value) =>
+                                        (value ?? '').trim().isEmpty ||
+                                            TripPricing.lower(
+                                              TripPricing.amount(
+                                                _priceController.text,
+                                              ),
+                                              TripPricing.amount(value),
+                                            )
+                                        ? null
+                                        : 'Enter a positive discount price below the original price.',
                                   ),
                                 ),
                               ],
@@ -1449,8 +1465,12 @@ class _TripEditScreenState extends State<TripEditScreen>
         'groupSize': _groupSizeController.text,
         'availableDates': List<String>.from(_availableDates),
       };
+      draft.remove('originalPrice');
+      draft['discountedPrice'] = TripPricing.amount(
+        _discountedPriceController.text,
+      );
       final brochure = TripBrochure.fromTrip(
-        draft,
+        TripPricing.forPublication(draft),
         whatsapp: context.read<SettingsProvider>().settings.whatsappNumber,
       );
       Navigator.push(
@@ -2661,13 +2681,15 @@ class _TripEditScreenState extends State<TripEditScreen>
     _tripData['boardingLocations'] =
         _tripData['boardingLocations'] ?? <Map<String, dynamic>>[];
 
-    if (_discountedPriceController.text.isNotEmpty) {
-      _tripData['discountedPrice'] = double.tryParse(
+    if (_discountedPriceController.text.trim().isNotEmpty) {
+      _tripData['discountedPrice'] = TripPricing.amount(
         _discountedPriceController.text,
       );
     } else {
       _tripData.remove('discountedPrice');
+      _tripData.remove('originalPrice');
     }
+    _tripData = TripPricing.forPublication(_tripData);
 
     final provider = context.read<TripsProvider>();
 

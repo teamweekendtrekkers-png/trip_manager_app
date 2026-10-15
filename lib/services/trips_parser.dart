@@ -2,17 +2,22 @@ import '../models/trip_section_settings.dart';
 import '../models/trip_card_settings.dart';
 import '../models/trip_content_settings.dart';
 import 'dart:convert';
+import 'trip_pricing.dart';
 
 /// Parser for the trips-data.js JavaScript file
 /// Handles object format: const tripsData = { tripId: {...}, tripId2: {...} }
 class TripsParser {
   static const Set<String> _supportedSourceTripFields = {
-    'contentSections', 'publicSlug', 'previousSlugs', 'departureTime',
+    'contentSections',
+    'publicSlug',
+    'previousSlugs',
+    'departureTime',
     'title',
     'location',
     'badge',
     'featured',
     'price',
+    'originalPrice',
     'image',
     ...TripCardSettings.optionalFields,
     'distance',
@@ -220,7 +225,8 @@ class TripsParser {
       ).map((error) => 'Trip "$tripId": $error'),
     );
     const stringFields = {
-      'publicSlug', 'departureTime',
+      'publicSlug',
+      'departureTime',
       'title',
       'location',
       'badge',
@@ -257,6 +263,14 @@ class TripsParser {
         errors.add('Trip "$tripId" field "$field" must be true or false.');
       }
     }
+    if (source.containsKey('originalPrice') &&
+        (source['originalPrice'] is! num ||
+            !(source['originalPrice'] as num).isFinite ||
+            source['originalPrice'] <= 0)) {
+      errors.add(
+        'Trip "$tripId" field "originalPrice" must be a positive finite number.',
+      );
+    }
     for (final field in stringListFields) {
       final value = source[field];
       if (value == null && !source.containsKey(field)) continue;
@@ -265,7 +279,13 @@ class TripsParser {
       }
     }
 
-    if (source.containsKey('contentSections')) { try { TripContentSettings.validate(source['contentSections'] as Map); } catch(e) {errors.add('Trip content: '+e.toString());} }
+    if (source.containsKey('contentSections')) {
+      try {
+        TripContentSettings.validate(source['contentSections'] as Map);
+      } catch (e) {
+        errors.add('Trip content: ' + e.toString());
+      }
+    }
     final itinerary = source['itinerary'];
     if (source.containsKey('expandedSections')) {
       final error = TripSectionSettings.validationError(
@@ -356,11 +376,15 @@ class TripsParser {
   ) {
     final result = <String, dynamic>{'id': tripId};
     const directlyRepresentedFields = {
-      'contentSections', 'publicSlug', 'previousSlugs', 'departureTime',
+      'contentSections',
+      'publicSlug',
+      'previousSlugs',
+      'departureTime',
       'title',
       'location',
       'badge',
       'price',
+      'originalPrice',
       'image',
       ...TripCardSettings.optionalFields,
       'distance',
@@ -445,7 +469,10 @@ class TripsParser {
       return SourcePreservingWriteResult.failure(parsed.errors);
     }
 
-    final inputErrors = [..._validateAppTrips(trips), ..._validateRoutes(trips)];
+    final inputErrors = [
+      ..._validateAppTrips(trips),
+      ..._validateRoutes(trips),
+    ];
     if (inputErrors.isNotEmpty) {
       return SourcePreservingWriteResult.failure(inputErrors);
     }
@@ -514,7 +541,10 @@ class TripsParser {
 
   /// Generate trips-data.js content from trip maps (maintains object format)
   static String generateTripsDataJs(List<Map<String, dynamic>> trips) {
-    final validationErrors = [..._validateAppTrips(trips), ..._validateRoutes(trips)];
+    final validationErrors = [
+      ..._validateAppTrips(trips),
+      ..._validateRoutes(trips),
+    ];
     if (validationErrors.isNotEmpty) {
       throw FormatException(validationErrors.join('\n'));
     }
@@ -533,7 +563,7 @@ class TripsParser {
     buffer.writeln('const tripsData = {');
 
     for (int i = 0; i < trips.length; i++) {
-      final trip = trips[i];
+      final trip = TripPricing.forPublication(trips[i]);
       final tripId = trip['id'].toString();
 
       final quotedId = RegExp(r'^[A-Za-z_$][A-Za-z0-9_$]*$').hasMatch(tripId)
@@ -568,6 +598,8 @@ class TripsParser {
         buffer.writeln('        featured: ${trip['featured']},');
       }
       writeStringField('price', const ['price']);
+      if (trip.containsKey('originalPrice'))
+        buffer.writeln('        originalPrice: ${trip['originalPrice']},');
       writeStringField('image', const ['image']);
       for (final field in TripCardSettings.optionalFields) {
         writeStringField(field, [field]);
@@ -601,7 +633,10 @@ class TripsParser {
       writeStringListField('thingsToCarry', const ['thingsToCarry']);
       writeStringListField('perfectFor', const ['perfectFor']);
       writeStringListField('expandedSections', const ['expandedSections']);
-      if (trip.containsKey('contentSections')) buffer.writeln('        contentSections: ${jsonEncode(trip['contentSections'])},');
+      if (trip.containsKey('contentSections'))
+        buffer.writeln(
+          '        contentSections: ${jsonEncode(trip['contentSections'])},',
+        );
 
       if (trip.containsKey('boardingLocations')) {
         final boardingLocations = trip['boardingLocations'] as List<dynamic>;
@@ -666,18 +701,33 @@ class TripsParser {
       description.isEmpty ? <dynamic>[] : description.split('\n');
 
   static List<String> _validateRoutes(List<Map<String, dynamic>> trips) {
-    final errors = <String>[]; final owners = <String, String>{};
+    final errors = <String>[];
+    final owners = <String, String>{};
     for (final trip in trips) {
       final id = trip['id']?.toString() ?? '';
       final aliases = trip['previousSlugs'];
-      final paths = <Object?>[id, trip['publicSlug'] ?? id, if (aliases is List) ...aliases];
+      final paths = <Object?>[
+        id,
+        trip['publicSlug'] ?? id,
+        if (aliases is List) ...aliases,
+      ];
       for (final raw in paths) {
-        if (raw is! String || (raw != id && (!RegExp(r'^[a-z0-9][a-z0-9_-]*$').hasMatch(raw) || ['constructor', 'prototype', '__proto__'].contains(raw)))) { errors.add('Trip ' + id + ' has an invalid URL slug.'); continue; }
-        if (owners.containsKey(raw) && owners[raw] != id) errors.add('URL slug collision: ' + raw);
+        if (raw is! String ||
+            (raw != id &&
+                (!RegExp(r'^[a-z0-9][a-z0-9_-]*$').hasMatch(raw) ||
+                    ['constructor', 'prototype', '__proto__'].contains(raw)))) {
+          errors.add('Trip ' + id + ' has an invalid URL slug.');
+          continue;
+        }
+        if (owners.containsKey(raw) && owners[raw] != id)
+          errors.add('URL slug collision: ' + raw);
         owners[raw] = id;
       }
       final clock = trip['departureTime'];
-      if (clock != null && (clock is! String || !RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch(clock))) errors.add('Trip ' + id + ' has an invalid departure time.');
+      if (clock != null &&
+          (clock is! String ||
+              !RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch(clock)))
+        errors.add('Trip ' + id + ' has an invalid departure time.');
     }
     return errors;
   }
@@ -688,7 +738,8 @@ class TripsParser {
     final duplicateIds = <String>{};
 
     const stringFields = {
-      'publicSlug', 'departureTime',
+      'publicSlug',
+      'departureTime',
       'title',
       'name',
       'location',
@@ -706,7 +757,7 @@ class TripsParser {
       'pickupPoint',
     };
     const stringOrNumberFields = {'price', 'groupSize'};
-    const numberFields = {'priceNumeric', 'discountedPrice'};
+    const numberFields = {'priceNumeric', 'discountedPrice', 'originalPrice'};
     const booleanFields = {'featured', 'isActive'};
     const stringListFields = {
       'previousSlugs',
@@ -781,7 +832,13 @@ class TripsParser {
         }
       }
 
-      if (trip.containsKey('contentSections')) {try {TripContentSettings.validate(trip['contentSections'] as Map);} catch(e) {errors.add('Trip content: '+e.toString());}}
+      if (trip.containsKey('contentSections')) {
+        try {
+          TripContentSettings.validate(trip['contentSections'] as Map);
+        } catch (e) {
+          errors.add('Trip content: ' + e.toString());
+        }
+      }
       if (trip.containsKey('expandedSections')) {
         final error = TripSectionSettings.validationError(
           trip['expandedSections'],

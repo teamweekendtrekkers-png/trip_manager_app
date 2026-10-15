@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'trip_price.dart';
 import '../models/trip_card_settings.dart';
 import '../services/trip_date_utils.dart';
 
@@ -342,7 +343,10 @@ class TripCardPreview extends StatelessWidget {
                           : dates.first.fullLabel,
                     ),
                     if ('${trip['price'] ?? ''}'.isNotEmpty)
-                      Text('${trip['price']} per person'),
+                      if (TripPrice.hasDiscount(trip))
+                        TripPrice(trip: trip)
+                      else
+                        Text('${trip['price']} per person'),
                     const SizedBox(height: 8),
                     const Text('View Dates & Details →'),
                   ],

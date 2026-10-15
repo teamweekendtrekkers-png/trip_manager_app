@@ -24,6 +24,7 @@ import 'deployment_status_screen.dart';
 import 'upcoming_batches_screen.dart';
 import 'homepage_settings_screen.dart';
 import '../widgets/manager_navigation.dart';
+import '../widgets/trip_price.dart';
 
 class TripsListScreen extends StatefulWidget {
   const TripsListScreen({super.key});
@@ -1726,7 +1727,6 @@ class _TripCard extends StatelessWidget {
     final isActive = trip['isActive'] != false; // Default to true if not set
     final name = trip['title'] ?? trip['name'] ?? 'Untitled Trip';
     final location = trip['location'] ?? trip['destination'] ?? '';
-    final price = trip['price']?.toString() ?? '₹0';
     final upcomingDates = TripDateUtils.getUpcomingDateRanges(trip);
     final date = upcomingDates.isEmpty
         ? 'New dates coming soon'
@@ -1850,24 +1850,31 @@ class _TripCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Text(
-                            price,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: isActive ? Colors.green : Colors.grey,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final price = TripPrice(trip: trip, active: isActive);
+                          final dateLabel = Text(
                             date,
                             style: TextStyle(
                               color: Colors.grey[500],
                               fontSize: 12,
                             ),
-                          ),
-                        ],
+                          );
+                          if (TripPrice.hasDiscount(trip) &&
+                              constraints.maxWidth < 210) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                price,
+                                const SizedBox(height: 2),
+                                dateLabel,
+                              ],
+                            );
+                          }
+                          return Row(
+                            children: [price, const Spacer(), dateLabel],
+                          );
+                        },
                       ),
                       if (trip['badge'] != null &&
                           trip['badge'].toString().isNotEmpty)

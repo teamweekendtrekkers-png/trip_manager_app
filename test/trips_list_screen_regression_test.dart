@@ -57,6 +57,41 @@ void main() {
     );
   }
 
+  testWidgets(
+    'discount card shows original and offer prices without changing trip data',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final original = {
+        ...trip(id: 'offer', title: 'Discount trip'),
+        'price': '₹6599',
+        'discountedPrice': 5999,
+      };
+      final service = _FakeGitHubService(
+        tripsFuture: Future.value(_tripsResult([original])),
+      );
+      final providers = await providersFor(service);
+      await tester.pumpWidget(
+        buildSubject(trips: providers.trips, settings: providers.settings),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Text>(find.text('₹6,599')).style!.decoration,
+        TextDecoration.lineThrough,
+      );
+      expect(
+        tester.widget<Text>(find.text('₹5,999')).style!.fontWeight,
+        FontWeight.bold,
+      );
+      expect(providers.trips.trips.single['price'], '₹5,999');
+      expect(providers.trips.trips.single['originalPrice'], 6599);
+      expect(providers.trips.hasUnsavedChanges, false);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('shows loading, populated, and inactive semantic states', (
     tester,
   ) async {

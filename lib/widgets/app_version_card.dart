@@ -157,7 +157,7 @@ class _AppVersionCardState extends State<AppVersionCard> {
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const Text(
-              '• Visible version and update checks\n• Clearer trip filters and quick actions\n• Discard and delete local drafts\n• Easier website access and publishing status',
+              '• Original prices crossed out beside discounted prices\n• Visible version and update checks\n• Clearer trip filters and quick actions\n• Discard and delete local drafts\n• Easier website access and publishing status',
             ),
             const SizedBox(height: 12),
             const Text(
