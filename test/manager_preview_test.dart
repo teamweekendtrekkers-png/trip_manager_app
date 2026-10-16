@@ -12,6 +12,8 @@ import 'package:trip_manager_app/providers/trips_provider.dart';
 import 'package:trip_manager_app/screens/trip_edit_screen.dart';
 import 'package:trip_manager_app/widgets/trip_editor_sections.dart';
 import 'package:trip_manager_app/widgets/departure_selection_editor.dart';
+import 'package:trip_manager_app/widgets/trip_content_editor.dart';
+import 'package:trip_manager_app/models/trip_content_settings.dart';
 import 'package:trip_manager_app/theme/app_theme.dart';
 import 'trips_provider_publication_test.dart' as fixtures;
 
@@ -45,6 +47,20 @@ Future<void> capture(
 }
 
 void main() {
+  testWidgets('extra-section controls fit a phone screen', (tester) async {
+    await tester.runAsync(() async {final font=File(Platform.isWindows?'C:/Windows/Fonts/arial.ttf':'/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf');if(await font.exists()) await (FontLoader('SectionPreview')..addFont(font.readAsBytes().then((bytes)=>ByteData.sublistView(bytes)))).load();});
+    tester.view.physicalSize = const Size(390,900); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    final key=GlobalKey();
+    var value=<String,dynamic>{'custom_why_choose_us':TripContentSettings.customSection('Why choose us')..['items']=[{'title':'Local hosts','description':'Support throughout your journey.','icon':'group'}]};
+    final defaults={for(final key in TripContentSettings.titles.keys) key:key=='cancellation'?{'mode':'default','heading':'Cancellation policy','expanded':false,'items':[{'minDays':0,'maxDays':null,'percent':100}]}:{'mode':'default','heading':TripContentSettings.titles[key],'expanded':false,'items':[]}};
+    await tester.pumpWidget(MaterialApp(theme:ThemeData(fontFamily:'SectionPreview'),home:RepaintBoundary(key:key,child:Scaffold(appBar:AppBar(title:const Text('Edit website sections')),body:SingleChildScrollView(child:StatefulBuilder(builder:(context,set)=>TripContentEditor(value:value,defaults:defaults,onChanged:(next)=>set(()=>value=next))))))));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Why choose us'));await tester.tap(find.text('Why choose us'));await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Add item').last);await tester.pumpAndSettle();
+    expect(tester.takeException(),isNull);
+    await capture(tester,key,'custom-trip-sections-phone.png');
+  });
   ThemeData previewTheme() {
     final base = AppTheme.light();
     const style = WidgetStatePropertyAll(
@@ -210,3 +226,4 @@ void main() {
     },
   );
 }
+

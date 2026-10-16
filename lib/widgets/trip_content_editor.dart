@@ -18,6 +18,31 @@ class TripContentEditor extends StatefulWidget {
 }
 
 class _TripContentEditorState extends State<TripContentEditor> {
+  String? newlyAddedSection;
+  Future<void> addSection() async {
+    final controller = TextEditingController(text: 'Why choose us');
+    String? error;
+    final route = DialogRoute<String>(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, set) => AlertDialog(
+      title: const Text('Add website section'),
+      content: SizedBox(width: 420, child: TextField(key: const ValueKey('new-section-heading'), controller: controller, autofocus: true, maxLength: 120, decoration: InputDecoration(labelText: 'Section name', hintText: 'For example: Why choose us', helperText: 'Add your text and items after creating the section.', errorText: error))),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')), FilledButton(onPressed: () { final value = controller.text.trim(); if(value.isEmpty) {set(() => error = 'Enter a section name.'); return;} Navigator.pop(ctx,value); }, child: const Text('Create section'))],
+    )));
+    final heading = await Navigator.of(context,rootNavigator:true).push<String>(route);
+    await route.completed;
+    controller.dispose();
+    if (heading == null || !mounted) return;
+    final next = draft(), key = TripContentSettings.newKey(widget.value, heading);
+    newlyAddedSection = key;
+    next[key] = TripContentSettings.customSection(heading);
+    widget.onChanged(next);
+  }
+
+  Future<void> removeSection(String key) async {
+    final yes = await showDialog<bool>(context: context,builder: (ctx) => AlertDialog(title: const Text('Remove this section?'),content: Text('Remove "${effective(key)['heading']}" and its items from this trip? The website changes when you publish.'),actions: [TextButton(onPressed: () => Navigator.pop(ctx,false),child: const Text('Keep section')),FilledButton(onPressed: () => Navigator.pop(ctx,true),child: const Text('Remove section'))]));
+    if (yes != true || !mounted) return;
+    final next = draft()..remove(key);
+    widget.onChanged(next);
+  }
   Map<String, dynamic> draft() => TripContentSettings.copy(widget.value);
   Map<String, dynamic> effective(String key) {
     final section = TripContentSettings.copy(
@@ -26,7 +51,7 @@ class _TripContentEditorState extends State<TripContentEditor> {
                   (['custom', 'hidden'].contains(widget.value[key]['mode']) &&
                       widget.value[key]['items'] is List))
           ? widget.value[key] as Map
-          : (widget.defaults[key] ?? TripContentSettings.highlightsDefault())
+          : (widget.defaults[key] ?? (TripContentSettings.isCustomKey(key) ? TripContentSettings.customSection('New section') : TripContentSettings.highlightsDefault()))
                 as Map,
     );
     if (key == 'highlights' &&
@@ -59,7 +84,7 @@ class _TripContentEditorState extends State<TripContentEditor> {
         ? ['label', 'value']
         : key == 'faqs'
         ? ['question', 'answer']
-        : (key == 'guidelines' || key == 'highlights')
+        : (key == 'guidelines' || key == 'highlights' || TripContentSettings.isCustomKey(key))
         ? ['title', 'description']
         : ['minDays', 'maxDays', 'percent'];
     final controllers = {
@@ -68,7 +93,8 @@ class _TripContentEditorState extends State<TripContentEditor> {
     };
     var icon = item['icon']?.toString() ?? 'info',
         binding = item['field']?.toString() ?? '';
-    final result = await showDialog<Map<String, dynamic>>(
+    String? itemError;
+    final route = DialogRoute<Map<String, dynamic>>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, set) => AlertDialog(
@@ -96,12 +122,19 @@ class _TripContentEditorState extends State<TripContentEditor> {
                                 'maxDays':
                                     'Through days (blank = no upper limit)',
                                 'percent': 'Cancellation fee (%)',
+                                'title': key == 'highlights' || TripContentSettings.isCustomKey(key) ? 'Item title (optional)' : 'Item title',
+                                'description': 'Description',
+                                'question': 'Question',
+                                'answer': 'Answer',
+                                'label': 'Label',
+                                'value': 'Custom value',
                               }[f] ??
                               f,
                           border: const OutlineInputBorder(),
                         ),
                       ),
                     ),
+                  if (itemError != null) Text(itemError!, style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
                   if (key == 'glance')
                     DropdownButtonFormField<String>(
                       value: binding,
@@ -145,6 +178,10 @@ class _TripContentEditorState extends State<TripContentEditor> {
                 final value = <String, dynamic>{
                   for (final f in fields) f: controllers[f]!.text.trim(),
                 };
+                if (key != 'cancellation') {
+                  final required = key == 'glance' ? ['label', if(binding.isEmpty) 'value'] : key == 'faqs' ? ['question','answer'] : key == 'highlights' || TripContentSettings.isCustomKey(key) ? ['description'] : ['title','description'];
+                  if(required.any((f) => (value[f] as String).isEmpty)) {set(() => itemError = 'Complete the required text before saving.'); return;}
+                }
                 if (key == 'cancellation') {
                   value['minDays'] =
                       int.tryParse(value['minDays'] as String) ?? -1;
@@ -165,6 +202,8 @@ class _TripContentEditorState extends State<TripContentEditor> {
         ),
       ),
     );
+    final result = await Navigator.of(context,rootNavigator:true).push<Map<String,dynamic>>(route);
+    await route.completed;
     for (final c in controllers.values) c.dispose();
     if (result == null || !mounted) return;
     update(key, (s) {
@@ -209,7 +248,7 @@ class _TripContentEditorState extends State<TripContentEditor> {
         label = '${item['label']}: $value';
       } else if (key == 'faqs') {
         label = '${item['question']}\n${item['answer']}';
-      } else if (key == 'guidelines' || key == 'highlights') {
+      } else if (key == 'guidelines' || key == 'highlights' || TripContentSettings.isCustomKey(key)) {
         label = '${item['title']}\n${item['description']}';
       } else {
         label =
@@ -251,7 +290,7 @@ class _TripContentEditorState extends State<TripContentEditor> {
                               width == 360 ? 'Mobile' : 'Desktop',
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
-                            for (final key in TripContentSettings.titles.keys)
+                            for (final key in TripContentSettings.editorKeys(widget.value))
                               if (widget.value[key]?['mode'] != 'hidden' &&
                                   effective(key)['mode'] != 'hidden')
                                 previewSection(key),
@@ -287,20 +326,28 @@ class _TripContentEditorState extends State<TripContentEditor> {
                 : 'Customisable website sections',
             style: Theme.of(context).textTheme.titleLarge,
           ),
-          const Text(
-            'Linked fields follow trip edits. Empty custom lists stay empty. Shared settings apply only to trips using defaults.',
-          ),
+          Text(widget.shared ? 'Changes apply to trips using shared defaults.' : 'Edit the sections below, or add your own section such as Why choose us. Preview your changes before publishing.'),
+          Wrap(spacing: 8, runSpacing: 8, children: [
           OutlinedButton.icon(
             onPressed: preview,
             icon: const Icon(Icons.preview),
             label: const Text('Mobile & desktop preview'),
           ),
-          for (final key in TripContentSettings.titles.keys)
+          if (!widget.shared) FilledButton.icon(onPressed: TripContentSettings.customKeys(widget.value).length >= 20 ? null : addSection, icon: const Icon(Icons.add), label: const Text('Add section')),
+          ]),
+          for (final key in TripContentSettings.editorKeys(widget.value))
             ExpansionTile(
-              title: Text(TripContentSettings.titles[key]!),
+              key: ValueKey('trip-content-$key'),
+              initiallyExpanded: newlyAddedSection == key,
+              title: Text(TripContentSettings.isCustomKey(key) ? (effective(key)['heading'] as String).isEmpty ? 'New section' : effective(key)['heading'] as String : TripContentSettings.titles[key]!),
               subtitle: Text({'default':'Shared defaults','custom':'Custom for this trip','hidden':'Hidden'}[widget.value[key]?['mode']??'default']!),
               children: [
-                if(!widget.shared)TextButton.icon(onPressed:(){final next=draft();next[key]=effective(key)..['mode']='default';widget.onChanged(next);},icon:const Icon(Icons.restore),label:const Text('Reset to shared defaults')),
+                if(!widget.shared && !TripContentSettings.isCustomKey(key))TextButton.icon(onPressed:(){final next=draft();next[key]=effective(key)..['mode']='default';widget.onChanged(next);},icon:const Icon(Icons.restore),label:const Text('Reset to shared defaults')),
+                if (TripContentSettings.isCustomKey(key)) Wrap(spacing: 8, children: [
+                  TextButton.icon(onPressed: TripContentSettings.customKeys(widget.value).first == key ? null : () => widget.onChanged(TripContentSettings.moveSection(widget.value,key,-1)), icon: const Icon(Icons.arrow_upward), label: const Text('Move section up')),
+                  TextButton.icon(onPressed: TripContentSettings.customKeys(widget.value).last == key ? null : () => widget.onChanged(TripContentSettings.moveSection(widget.value,key,1)), icon: const Icon(Icons.arrow_downward), label: const Text('Move section down')),
+                  TextButton.icon(onPressed: () => removeSection(key), icon: const Icon(Icons.delete_outline), label: const Text('Remove section')),
+                ]),
                 DropdownButtonFormField<String>(
                   key: ValueKey('content-mode-$key'),
                   value: widget.value[key]?['mode'] ?? 'default',
@@ -308,7 +355,7 @@ class _TripContentEditorState extends State<TripContentEditor> {
                     labelText: 'Content source',
                   ),
                   items:
-                      (widget.shared
+                      (TripContentSettings.isCustomKey(key) ? ['custom','hidden'] : widget.shared
                               ? ['default', 'hidden']
                               : ['default', 'custom', 'hidden'])
                           .map(
@@ -317,7 +364,7 @@ class _TripContentEditorState extends State<TripContentEditor> {
                               child: Text(
                                 {
                                   'default': 'Use shared defaults',
-                                  'custom': 'Customise this trip',
+                                  'custom': TripContentSettings.isCustomKey(key) ? 'Show section' : 'Customise this trip',
                                   'hidden': 'Hide section',
                                 }[mode]!,
                               ),
@@ -421,37 +468,21 @@ class _TripContentEditorState extends State<TripContentEditor> {
                                     : Icons.visibility,
                               ),
                             ),
-                          IconButton(
-                            tooltip: 'Move up',
-                            onPressed: i == 0
-                                ? null
-                                : () => update(key, (s) {
-                                    final list = s['items'] as List;
-                                    final item = list.removeAt(i);
-                                    list.insert(i - 1, item);
-                                  }),
-                            icon: const Icon(Icons.arrow_upward),
-                          ),
-                          IconButton(
-                            tooltip: 'Move down',
-                            onPressed:
-                                i ==
-                                    (effective(key)['items'] as List).length - 1
-                                ? null
-                                : () => update(key, (s) {
-                                    final list = s['items'] as List;
-                                    final item = list.removeAt(i);
-                                    list.insert(i + 1, item);
-                                  }),
-                            icon: const Icon(Icons.arrow_downward),
-                          ),
-                          IconButton(
-                            tooltip: 'Remove item',
-                            onPressed: () => update(
-                              key,
-                              (s) => (s['items'] as List).removeAt(i),
-                            ),
-                            icon: const Icon(Icons.delete_outline),
+                          PopupMenuButton<String>(
+                            tooltip: 'More item actions',
+                            itemBuilder: (_) => [
+                              const PopupMenuItem(value: 'edit', child: Text('Edit item')),
+                              PopupMenuItem(value: 'up', enabled: i > 0, child: const Text('Move item up')),
+                              PopupMenuItem(value: 'down', enabled: i < (effective(key)['items'] as List).length - 1, child: const Text('Move item down')),
+                              const PopupMenuItem(value: 'remove', child: Text('Remove item')),
+                            ],
+                            onSelected: (action) {
+                              if(action == 'edit') {editItem(key,index:i); return;}
+                              update(key,(s) {
+                                final list = s['items'] as List, item = list.removeAt(i);
+                                if(action != 'remove') list.insert(i + (action == 'up' ? -1 : 1), item);
+                              });
+                            },
                           ),
                         ],
                       ),
@@ -482,3 +513,4 @@ class _TripContentEditorState extends State<TripContentEditor> {
     ),
   );
 }
+

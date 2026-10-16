@@ -10,6 +10,23 @@ import 'package:trip_manager_app/widgets/trip_content_editor.dart';
   };
 
 void main(){
+  testWidgets('create an independent Why choose us section and preview it',(tester) async {
+    var value=<String,dynamic>{};
+    await tester.pumpWidget(MaterialApp(home:Scaffold(body:SingleChildScrollView(child:StatefulBuilder(builder:(context,set)=>TripContentEditor(value:value,defaults:defaults(),trip:const {'highlights':['Existing experience']},onChanged:(next)=>set(()=>value=next)))))));
+    await tester.tap(find.text('Add section'));await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('new-section-heading')),'Why choose us');
+    await tester.tap(find.text('Create section'));await tester.pumpAndSettle();
+    expect(value['custom_why_choose_us']['heading'],'Why choose us');expect(value.containsKey('highlights'),false);
+    final addItem=find.descendant(of:find.byKey(const ValueKey('trip-content-custom_why_choose_us')),matching:find.text('Add item'));
+    await tester.ensureVisible(addItem);await tester.tap(addItem);await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField,'Description'),'Local hosts and personal support.');
+    await tester.tap(find.text('Save item'));await tester.pumpAndSettle();
+    expect(value['custom_why_choose_us']['items'][0]['description'],'Local hosts and personal support.');
+    await tester.ensureVisible(find.text('Mobile & desktop preview'));await tester.tap(find.text('Mobile & desktop preview'));await tester.pumpAndSettle();
+    expect(find.descendant(of:find.byType(AlertDialog),matching:find.textContaining('Local hosts and personal support.')),findsNWidgets(2));
+    expect(find.descendant(of:find.byType(AlertDialog),matching:find.text('Why choose us')),findsNWidgets(2));
+    expect(tester.takeException(),isNull);
+  });
   testWidgets('renaming highlights preserves trip text and visibility through hide/restore',(tester) async {
     var value=<String,dynamic>{};
     await tester.pumpWidget(MaterialApp(home:Scaffold(body:SingleChildScrollView(child:StatefulBuilder(builder:(context,set)=>TripContentEditor(value:value,defaults:defaults(),trip:const {'highlights':['Theyyam night','Coastal sunsets']},onChanged:(next)=>set(()=>value=next)))))));
@@ -41,3 +58,4 @@ void main(){
     await tester.tap(find.text('Mobile & desktop preview'));await tester.pumpAndSettle();expect(find.text('Mobile'),findsOneWidget);expect(find.text('Desktop'),findsOneWidget);expect(find.text('Location: Kannur'),findsNWidgets(2));
   });
 }
+
