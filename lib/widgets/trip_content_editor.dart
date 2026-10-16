@@ -22,11 +22,13 @@ class _TripContentEditorState extends State<TripContentEditor> {
   Future<void> addSection() async {
     final controller = TextEditingController(text: 'Why choose us');
     String? error;
-    final heading = await showDialog<String>(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, set) => AlertDialog(
+    final route = DialogRoute<String>(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, set) => AlertDialog(
       title: const Text('Add website section'),
       content: SizedBox(width: 420, child: TextField(key: const ValueKey('new-section-heading'), controller: controller, autofocus: true, maxLength: 120, decoration: InputDecoration(labelText: 'Section name', hintText: 'For example: Why choose us', helperText: 'Add your text and items after creating the section.', errorText: error))),
       actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')), FilledButton(onPressed: () { final value = controller.text.trim(); if(value.isEmpty) {set(() => error = 'Enter a section name.'); return;} Navigator.pop(ctx,value); }, child: const Text('Create section'))],
     )));
+    final heading = await Navigator.of(context,rootNavigator:true).push<String>(route);
+    await route.completed;
     controller.dispose();
     if (heading == null || !mounted) return;
     final next = draft(), key = TripContentSettings.newKey(widget.value, heading);
@@ -92,7 +94,7 @@ class _TripContentEditorState extends State<TripContentEditor> {
     var icon = item['icon']?.toString() ?? 'info',
         binding = item['field']?.toString() ?? '';
     String? itemError;
-    final result = await showDialog<Map<String, dynamic>>(
+    final route = DialogRoute<Map<String, dynamic>>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, set) => AlertDialog(
@@ -200,6 +202,8 @@ class _TripContentEditorState extends State<TripContentEditor> {
         ),
       ),
     );
+    final result = await Navigator.of(context,rootNavigator:true).push<Map<String,dynamic>>(route);
+    await route.completed;
     for (final c in controllers.values) c.dispose();
     if (result == null || !mounted) return;
     update(key, (s) {
