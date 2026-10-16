@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/trip_content_settings.dart';
 import 'trip_price.dart';
 import '../models/app_settings.dart';
 import '../models/homepage_config.dart';
@@ -91,6 +92,7 @@ class _DraftPreviewState extends State<DraftPreview> {
           'cancellation',
           'guidelines',
           'faqs',
+          ...TripContentSettings.customKeys(config),
         ])
           if ((config[key] as Map?)?['mode'] != 'hidden')
             ExpansionTile(
@@ -102,7 +104,7 @@ class _DraftPreviewState extends State<DraftPreview> {
                       'cancellation': 'Cancellation policy',
                       'guidelines': 'Trip guidelines',
                       'faqs': 'FAQs',
-                    }[key]!,
+                    }[key] ?? 'Custom section',
               ),
               children: [
                 for (final item
@@ -166,7 +168,7 @@ class _DraftPreviewState extends State<DraftPreview> {
             child: image(photo.toString(), 4 / 3),
           ),
         text(
-          'Request your spot. Pay only after the team confirms availability.',
+          'Continue to checkout to pay by QR code or UPI ID. Our team verifies payment and availability.',
         ),
       ],
     );
@@ -336,3 +338,4 @@ class _DraftPreviewState extends State<DraftPreview> {
     ],
   );
 }
+
