@@ -13,7 +13,9 @@ class MemoryCommerce extends GitHubService {
   int commits = 0;
   @override
   Future<GitHubFileResult> fetchFile(String path) async =>
-      GitHubFileResult(content: content, sha: sha, success: true);
+      path == 'js/security.js'
+      ? GitHubFileResult(content: 'const config={_p1: [97], _p2: 64, _p3: [98], _checksum: 0};', sha: 'security-base', success: true)
+      : GitHubFileResult(content: content, sha: sha, success: true);
   @override
   Future<GitHubCommitResult> commitFilesAtomically({
     required Map<String, String> files,
@@ -33,7 +35,7 @@ class MemoryCommerce extends GitHubService {
 
 void main() {
   test(
-    'legacy payment settings keep confirmation-first and a hidden QR section',
+    'legacy settings migrate to two profiles and payment by default',
     () async {
       final github = MemoryCommerce();
       github.content = jsonEncode({
@@ -48,7 +50,9 @@ void main() {
         'coupons': [],
       });
       final config = await CommerceSettingsService(github).load();
-      expect(config['payment']['mode'], 'confirmation');
+      expect(config['payment']['mode'], 'direct');
+      expect(config['payment']['profiles'], hasLength(2));
+      expect(config['payment']['requestTripIds'], isEmpty);
       expect(config['payment']['showQr'], false);
       expect(config['payment']['directDepartures'], isEmpty);
     },

@@ -198,6 +198,8 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
             upcoming.fold<int>(0, (n, b) => n + b.trips.length),
           ),
           _metric('Trips without bookable dates', missing.length),
+          _metric('Inactive trips', p.trips.where((t)=>t['isActive']==false).length),
+          _metric('Bookable trips', p.trips.where((t)=>TripDateUtils.getUpcomingDateRanges(t).isNotEmpty).length),
           _metric('Unpublished trip changes', p.changes.length),
         ],
       ),
@@ -282,7 +284,7 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
     ),
   );
   String _visibility(Map<String, dynamic> trip) {
-    if (trip['isActive'] == false) return 'Inactive: hidden from the website';
+    if (trip['isActive'] == false) return 'Inactive: shown only with Show coming soon';
     if (homepage == null)
       return 'Upcoming Batches selection could not be loaded';
     final options = homepage!['upcomingBatches'] as Map;

@@ -10,13 +10,20 @@ class CommerceSettingsService {
   String? _sha;
   bool _loaded = false;
   static Map<String, dynamic> defaults() => {
-    'version': 1,
+    'version': 2,
     'payment': <String, dynamic>{
       'upiId': '',
       'receiverName': '',
       'showReceiverName': true,
       'showRazorpay': false,
-      'mode': 'confirmation',
+      'mode': 'direct',
+      'checkoutVersion': 2,
+      'requestTripIds': <String>[],
+      'activeProfileId': 'primary',
+      'profiles': <Map<String,dynamic>>[
+        {'id':'primary','label':'Primary account','upiId':'','receiverName':'','qrImage':''},
+        {'id':'backup','label':'Backup account','upiId':'','receiverName':'','qrImage':''},
+      ],
       'directDepartures': <Map<String, dynamic>>[],
       'showQr': false,
       'qrImage': '',
@@ -26,13 +33,22 @@ class CommerceSettingsService {
     'coupons': <Map<String, dynamic>>[],
   };
 
-  static Map<String, dynamic> normalize(Map<String, dynamic> value) => {
-    ...value,
-    'payment': <String, dynamic>{
-      ...(defaults()['payment'] as Map),
-      ...(value['payment'] as Map),
-    },
-  };
+  static Map<String,dynamic> normalize(Map<String,dynamic> value) {
+    final p=<String,dynamic>{...(defaults()['payment'] as Map), ...?(value['payment'] as Map?)};
+    if ((value['payment'] as Map?)?['profiles'] is! List) {
+      p['profiles']=<Map<String,dynamic>>[
+        {'id':'primary','label':'Primary account','upiId':p['upiId'],'receiverName':p['receiverName'],'qrImage':p['qrImage']},
+        {'id':'backup','label':'Backup account','upiId':'','receiverName':'','qrImage':''},
+      ];
+      p['activeProfileId']='primary';
+    }
+    p['checkoutVersion']=2;p['mode']='direct';p['directDepartures']=<Map<String,dynamic>>[];
+    p['showRazorpay']=false;p['showReceiverName']=true;
+    p['requestTripIds']=List<String>.from(p['requestTripIds'] as List? ?? []);
+    final active=(p['profiles'] as List).cast<Map>().firstWhere((a)=>a['id']==p['activeProfileId']);
+    for(final key in ['upiId','receiverName','qrImage'])p[key]=active[key]??'';
+    return {...value,'version':2,'payment':p};
+  }
 
   static bool validQrPath(String value) =>
       RegExp(
@@ -55,13 +71,27 @@ class CommerceSettingsService {
   }
 
   static void validate(Map<String, dynamic> config) {
-    if (config['version'] != 1 ||
+    if (![1,2].contains(config['version']) ||
         config['payment'] is! Map ||
         config['coupons'] is! List ||
         config['showCoupons'] is! bool) {
       throw const FormatException('Unsupported payment settings.');
     }
     final payment = config['payment'] as Map;
+    if(payment['profiles']!=null){
+      final profiles=payment['profiles'];
+      if(profiles is! List||profiles.length!=2)throw const FormatException('Keep exactly two payment profiles.');
+      final ids=<String>{};
+      for(final account in profiles){
+        if(account is! Map||account['id'] is! String||!ids.add(account['id'])||account['label'] is! String||account['label'].toString().trim().isEmpty||account['label'].toString().length>80||account['upiId'] is! String||account['receiverName'] is! String||account['qrImage'] is! String)throw const FormatException('Invalid payment profile.');
+        final id=account['upiId'] as String,qr=account['qrImage'] as String;
+        if(id.isNotEmpty&&!RegExp(r'^[\w.-]+@[\w.-]+$').hasMatch(id))throw const FormatException('Enter a valid UPI ID for each account.');
+        if(qr.isNotEmpty&&!validQrPath(qr))throw const FormatException('Choose an original PNG, JPG or WebP QR image.');
+      }
+      if(!ids.contains(payment['activeProfileId']))throw const FormatException('Choose an active payment account.');
+      final requests=payment['requestTripIds'];
+      if(requests is! List||requests.length>1000||requests.any((id)=>id is! String||!RegExp(r'^[a-z0-9][a-z0-9_-]*$').hasMatch(id))||requests.toSet().length!=requests.length)throw const FormatException('Choose unique trips for optional booking requests.');
+    }
     final upi = payment['upiId'];
     if (upi is! String ||
         (upi.isNotEmpty && !RegExp(r'^[\w.-]+@[\w.-]+$').hasMatch(upi))) {

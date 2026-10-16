@@ -36,28 +36,52 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
   @override
   bool get draftBusy => busy;
   @override
-  Map<String, dynamic>? get currentDocument => config == null
-      ? null
-      : {
-          ...copyDocument(config!),
-          'payment': {
-            ...(config!['payment'] as Map),
-            'upiId': upi.text,
-            'receiverName': receiver.text,
-            'qrImage': qrImage.text,
-            'instructions': instructions.text,
-          },
-        };
+  Map<String,dynamic>? get currentDocument {
+    if(config==null)return null;
+    final draft=copyDocument(config!);
+    final p=draft['payment'] as Map;
+    final account=(p['profiles'] as List)[editingProfile] as Map;
+    account['upiId']=upi.text.trim();account['receiverName']=receiver.text.trim();account['qrImage']=qrImage.text.trim();
+    p['instructions']=instructions.text;
+    return CommerceSettingsService.normalize(draft);
+  }
   @override
   void applyDocument(Map<String, dynamic> value) {
     config = CommerceSettingsService.normalize(copyDocument(value));
-    upi.text = config!['payment']['upiId'];
-    receiver.text = config!['payment']['receiverName'];
-    qrImage.text = config!['payment']['qrImage'];
+    _loadProfileFields();
     instructions.text = config!['payment']['instructions'];
     dirty = true;
   }
 
+  int editingProfile=0;
+  void _loadProfileFields(){
+    final account=(config!['payment']['profiles'] as List)[editingProfile] as Map;
+    upi.text=account['upiId']??'';receiver.text=account['receiverName']??'';qrImage.text=account['qrImage']??'';
+  }
+  void _selectProfile(int index){
+    _changed((){config=currentDocument;editingProfile=index;_loadProfileFields();});
+  }
+  void _activateProfile(){
+    final draft=currentDocument!,account=(draft['payment']['profiles'] as List)[editingProfile] as Map;
+    if(!RegExp(r'^[\w.-]+@[\w.-]+$').hasMatch(account['upiId'].toString())||account['receiverName'].toString().trim().isEmpty||!CommerceSettingsService.validQrPath(account['qrImage'].toString())){
+      setState(()=>error='Enter this account’s UPI ID, receiver name and QR image before activating it.');return;
+    }
+    _changed((){draft['payment']['activeProfileId']=account['id'];config=CommerceSettingsService.normalize(draft);error=null;});
+  }
+  Widget _profiles(){
+    final profiles=config!['payment']['profiles'] as List;
+    final selected=profiles[editingProfile] as Map;
+    final active=config!['payment']['activeProfileId'];
+    return Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+      const Text('Two saved payment accounts',style:TextStyle(fontSize:20,fontWeight:FontWeight.bold)),
+      const Text('One account is shown to customers. Edit either account, choose Use this account, then Preview & Publish.'),
+      const SizedBox(height:12),
+      DropdownButtonFormField<int>(key:ValueKey('payment-profile-$editingProfile'),initialValue:editingProfile,isExpanded:true,decoration:const InputDecoration(labelText:'Edit payment account'),items:[for(var i=0;i<profiles.length;i++)DropdownMenuItem(value:i,child:Text('${profiles[i]['label']}${profiles[i]['id']==active?' · Active':''}'))],onChanged:busy?null:(v){if(v!=null)_selectProfile(v);}),
+      TextFormField(key:ValueKey('payment-profile-label-$editingProfile'),initialValue:selected['label'].toString(),enabled:!busy,decoration:const InputDecoration(labelText:'Account label'),onChanged:(v)=>_changed(()=>selected['label']=v)),
+      if(selected['id']==active)const ListTile(leading:Icon(Icons.check_circle),title:Text('Active account'))
+      else OutlinedButton.icon(key:const Key('payment-use-account'),onPressed:busy?null:_activateProfile,icon:const Icon(Icons.swap_horiz),label:const Text('Use this account')),
+    ]);
+  }
   late CommerceSettingsService service;
   Map<String, dynamic>? config;
   final upi = TextEditingController();
@@ -98,9 +122,8 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
       if (!mounted) return;
       setState(() {
         config = value;
-        upi.text = value['payment']['upiId'];
-        receiver.text = value['payment']['receiverName'];
-        qrImage.text = value['payment']['qrImage'];
+        editingProfile = (value['payment']['profiles'] as List).indexWhere((p) => p['id'] == value['payment']['activeProfileId']);
+        _loadProfileFields();
         instructions.text = value['payment']['instructions'];
         dirty = false;
         _baseline = copyDocument(value);
@@ -123,13 +146,7 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
       setState(() => error = 'Repository changed. Reopen this editor.');
       return;
     }
-    final draft = Map<String, dynamic>.from(
-      jsonDecode(jsonEncode(config)) as Map,
-    );
-    draft['payment']['upiId'] = upi.text.trim();
-    draft['payment']['receiverName'] = receiver.text.trim();
-    draft['payment']['qrImage'] = qrImage.text.trim();
-    draft['payment']['instructions'] = instructions.text.trim();
+    final draft = currentDocument!;
     try {
       CommerceSettingsService.validate(draft);
     } catch (e) {
@@ -212,11 +229,10 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
+        Text('Active account: ${(payment['profiles'] as List).firstWhere((p) => p['id'] == payment['activeProfileId'])['label']}'),
+        const Text('UPI payment is the default for every bookable trip.'),
         Text(
-          'Mode: ${{'confirmation': 'Pay after confirmation', 'direct': 'Pay directly', 'both': 'Offer both options'}[payment['mode'] ?? 'confirmation']}',
-        ),
-        Text(
-          '${(payment['directDepartures'] as List? ?? []).length} direct-payment departure approvals',
+          '${(payment['requestTripIds'] as List? ?? []).length} trips also offer availability requests',
         ),
         Text('QR section: ${payment['showQr'] == true ? 'Visible' : 'Hidden'}'),
         if (payment['showQr'] == true &&
@@ -237,13 +253,10 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
           'UPI ID: ${payment['upiId'].toString().isEmpty ? 'Existing UPI account' : payment['upiId']}',
         ),
         const SizedBox(height: 8),
-        const Text('Copy UPI ID · Open UPI App · Chat on WhatsApp'),
+        const Text('Scan QR · Download QR · Copy UPI ID · Chat on WhatsApp'),
         const SizedBox(height: 12),
         Text(
           'Coupon entry: ${value['showCoupons'] == true ? 'Visible' : 'Hidden'}',
-        ),
-        Text(
-          'Razorpay: ${payment['showRazorpay'] == true ? 'Visible; online payment link must be confirmed by the team' : 'Hidden'}',
         ),
         const SizedBox(height: 8),
         const Text(
@@ -355,6 +368,7 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
     },
     child: Scaffold(
       appBar: AppBar(title: const Text('Payment Settings & Coupons')),
+      bottomNavigationBar: config==null?null:SafeArea(child:Padding(padding:const EdgeInsets.all(12),child:Text(busy?'Publishing…':hasLocalEdits?'Unpublished changes · preview and publish when ready':_commit!=null?'Published to GitHub · check Publishing status for deployment':'No unpublished changes',textAlign:TextAlign.center))),
       body: busy && config == null
           ? const Center(child: CircularProgressIndicator())
           : Align(
@@ -412,19 +426,23 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
                         onChanged: () => _changed(() {}),
                       ),
                       const SizedBox(height: 16),
+                      _profiles(),
+                      const SizedBox(height: 16),
                       TextField(
+                        key: const Key('payment-upi-id'),
                         enabled: !busy,
                         controller: upi,
                         onChanged: (_) => _changed(() {}),
                         decoration: const InputDecoration(
                           labelText: 'UPI ID',
                           helperText:
-                              'Leave blank to retain the existing UPI account',
+                              'UPI ID that matches this account’s QR image',
                           border: OutlineInputBorder(),
                         ),
                       ),
                       const SizedBox(height: 16),
                       TextField(
+                        key: const Key('payment-receiver-name'),
                         enabled: !busy,
                         controller: receiver,
                         onChanged: (_) => _changed(() {}),
@@ -435,16 +453,7 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
                           border: OutlineInputBorder(),
                         ),
                       ),
-                      SwitchListTile(
-                        title: const Text('Show receiver name'),
-                        value: config!['payment']['showReceiverName'] == true,
-                        onChanged: busy
-                            ? null
-                            : (value) => _changed(
-                                () => config!['payment']['showReceiverName'] =
-                                    value,
-                              ),
-                      ),
+                      const Text('The receiver name is shown with the active payment account.'),
                       const Divider(),
                       const Text(
                         'UPI QR code',
@@ -514,19 +523,6 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
                         ),
                       ),
                       const SizedBox(height: 16),
-                      SwitchListTile(
-                        title: const Text('Show Razorpay'),
-                        subtitle: const Text(
-                          'Off by default. The existing gateway is a placeholder; customers are directed to ask for a payment link.',
-                        ),
-                        value: config!['payment']['showRazorpay'] == true,
-                        onChanged: busy
-                            ? null
-                            : (value) => _changed(
-                                () =>
-                                    config!['payment']['showRazorpay'] = value,
-                              ),
-                      ),
                       const Divider(),
                       SwitchListTile(
                         title: const Text('Show coupon entry at checkout'),
@@ -579,16 +575,7 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
                       Card(
                         child: Padding(
                           padding: const EdgeInsets.all(16),
-                          child: _preview({
-                            ...config!,
-                            'payment': {
-                              ...(config!['payment'] as Map),
-                              'upiId': upi.text.trim(),
-                              'receiverName': receiver.text.trim(),
-                              'qrImage': qrImage.text.trim(),
-                              'instructions': instructions.text.trim(),
-                            },
-                          }),
+                          child: _preview(currentDocument!),
                         ),
                       ),
                       const SizedBox(height: 16),
