@@ -160,6 +160,22 @@ void main() {
         );
       }
       await capture(tester, key, 'productivity-editor-${width.toInt()}.png');
+      await tester.enterText(find.byType(TextFormField).first, 'My unsaved trip title');
+      await tester.tap(find.byKey(const Key('editor-next-section'))); await tester.pumpAndSettle();
+      expect(tester.widget<TripEditorSectionPicker>(find.byType(TripEditorSectionPicker)).value, TripEditorSection.dates);
+      await tester.tap(find.byKey(const Key('editor-previous-section'))); await tester.pumpAndSettle();
+      expect(tester.widget<TextFormField>(find.byType(TextFormField).first).controller!.text, 'My unsaved trip title');
+      expect(provider.trips.single['title'], 'Coorg weekend');
+      expect(find.byKey(const Key('editor-publish-help')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('editor-quick-actions'))); await tester.pumpAndSettle();
+      expect(find.text('Preview / share PDF'), findsOneWidget);
+      expect(find.text('Find an editor field'), findsOneWidget);
+      await capture(tester, key, 'trip-actions-${width.toInt()}.png');
+      await tester.tap(find.text('Preview / share PDF')); await tester.pumpAndSettle();
+      expect(find.text('Trip Brochure'), findsOneWidget);
+      expect(find.text('My unsaved trip title'), findsOneWidget);
+      expect(provider.trips.single['title'], 'Coorg weekend');
+      expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       provider.dispose();
       settings.dispose();

@@ -2,6 +2,12 @@
 
 Flutter administration app for Team Weekend Trekkers.
 
+Trip editing has labelled **Trip actions** for website preview, PDF export,
+field search and the published page. Use the arrows beside **Editing section**
+to move through the form without losing edits. **Save draft** keeps the trip
+in the workspace; return to **Trips → Review & publish** to make it live.
+The dashboard also links directly to booking review and UPI/coupon settings.
+
 ## Shareable PDF brochures
 
 Open a trip, scroll to **Itinerary → Brochure (PDF)**, review the current draft,

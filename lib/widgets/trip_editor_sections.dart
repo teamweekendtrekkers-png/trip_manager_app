@@ -50,13 +50,28 @@ class TripEditorSectionPicker extends StatelessWidget {
   final ValueChanged<TripEditorSection> onChanged;
   @override Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    child: DropdownButtonFormField<TripEditorSection>(
+    child: Row(children: [
+      IconButton(
+        key: const Key('editor-previous-section'),
+        tooltip: 'Previous section',
+        onPressed: value.index == 0 ? null : () => onChanged(TripEditorSection.values[value.index - 1]),
+        icon: const Icon(Icons.chevron_left),
+      ),
+      Expanded(child: DropdownButtonFormField<TripEditorSection>(
       key: const Key('editor-section-picker'),
       value: value,
       isExpanded: true,
       decoration: const InputDecoration(labelText: 'Editing section', border: OutlineInputBorder(), isDense: true),
       items: [for (final section in TripEditorSection.values) DropdownMenuItem(value: section, child: Text(section.label))],
       onChanged: (section) { if (section != null) onChanged(section); },
-    ),
+      )),
+      IconButton(
+        key: const Key('editor-next-section'),
+        tooltip: 'Next section',
+        onPressed: value.index == TripEditorSection.values.length - 1 ? null : () => onChanged(TripEditorSection.values[value.index + 1]),
+        icon: const Icon(Icons.chevron_right),
+      ),
+    ]),
   );
 }
+

@@ -157,7 +157,7 @@ class _AppVersionCardState extends State<AppVersionCard> {
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const Text(
-              '• Original prices crossed out beside discounted prices\n• Visible version and update checks\n• Clearer trip filters and quick actions\n• Discard and delete local drafts\n• Easier website access and publishing status',
+              '• PDF page previews with zoom and custom trip sections\n• Labelled trip actions and previous/next editor sections\n• Dashboard shortcuts for booking review, UPI and coupons\n• Clearer draft saving and publishing guidance\n• Extra website sections and coupon deletion with Undo',
             ),
             const SizedBox(height: 12),
             const Text(
@@ -259,3 +259,4 @@ class _AppVersionCardState extends State<AppVersionCard> {
     );
   }
 }
+

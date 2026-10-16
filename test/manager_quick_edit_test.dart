@@ -7,6 +7,22 @@ import 'package:trip_manager_app/services/quick_edit_safety.dart';
 Map<String,dynamic> trip() => {'id':'kannur','title':'Kannur Theyyam','price':'₹6,599','availableDates':['Oct 30-Nov 1, 2026'],'date':'Oct 30-Nov 1, 2026','highlights':['Theyyam night'],'contentSections':{'faqs':{'mode':'hidden'}},'customField':'keep'};
 
 void main(){
+  testWidgets('section arrows navigate in order and stop at the ends on a narrow phone', (tester) async {
+    tester.view.physicalSize = const Size(360, 800); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    var selected = TripEditorSection.all;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StatefulBuilder(builder: (context, update) =>
+      TripEditorSectionPicker(value: selected, onChanged: (next) => update(() => selected = next))))));
+    expect(tester.widget<IconButton>(find.byKey(const Key('editor-previous-section'))).onPressed, isNull);
+    for (final expected in TripEditorSection.values.skip(1)) {
+      await tester.tap(find.byKey(const Key('editor-next-section'))); await tester.pumpAndSettle();
+      expect(selected, expected);
+    }
+    expect(tester.widget<IconButton>(find.byKey(const Key('editor-next-section'))).onPressed, isNull);
+    await tester.tap(find.byKey(const Key('editor-previous-section'))); await tester.pumpAndSettle();
+    expect(selected, TripEditorSection.itinerary);
+    expect(tester.takeException(), isNull);
+  });
   test('quick edits retain concurrent unrelated fields and reject same-field changes',(){
     final initial=trip(),edited={...trip(),'price':'₹6999'},current={...trip(),'customField':'remote edit'};
     final merged=mergeQuickTripEdit(current,initial,edited);
@@ -33,3 +49,4 @@ void main(){
     await tester.enterText(find.byKey(const Key('quick-trip-price')),'6599');await tester.ensureVisible(find.byTooltip('Remove departure 1'));await tester.tap(find.byTooltip('Remove departure 1'));await tester.pumpAndSettle();await tester.tap(find.byKey(const Key('quick-trip-save')));await tester.pumpAndSettle();expect(saved!['availableDates'],isEmpty);expect(saved!.containsKey('date'),false);expect(original['availableDates'],isNotEmpty);
   });
 }
+
