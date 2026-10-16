@@ -353,6 +353,19 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
       });
   }
 
+  Future<void> _deleteCoupon(int index) async {
+    final coupon=Map<String,dynamic>.from((config!['coupons'] as List)[index] as Map);
+    final code=coupon['code'].toString();
+    final confirmed=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(
+      title:Text('Delete coupon $code?'),
+      content:const Text('This removes the coupon from your draft. Publish the payment settings to remove it from checkout. Existing bookings keep their recorded totals.'),
+      actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('Keep coupon')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Delete coupon'))],
+    ));
+    if(confirmed!=true||!mounted||busy)return;
+    _changed(()=>(config!['coupons'] as List).removeAt(index));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('$code removed from this draft.'),action:SnackBarAction(label:'Undo',onPressed:(){if(!mounted||busy)return;final coupons=config!['coupons'] as List;if(coupons.any((c)=>c['code'].toString().toUpperCase()==code.toUpperCase()))return;_changed(()=>coupons.insert(index.clamp(0,coupons.length),coupon));})));
+  }
+
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: _allowLeave || !hasLocalEdits && !busy,
@@ -551,14 +564,14 @@ class _CommerceSettingsScreenState extends State<CommerceSettingsScreen>
                               '${entry.value['enabled'] == true ? 'Active' : 'Disabled'} · ${entry.value['expiresAt'] ?? 'No expiry'}',
                             ),
                             onTap: busy ? null : () => _coupon(entry.key),
-                            trailing: Switch(
+                            trailing: Row(mainAxisSize:MainAxisSize.min,children:[Switch(
                               value: entry.value['enabled'] == true,
                               onChanged: busy
                                   ? null
                                   : (value) => _changed(
                                       () => entry.value['enabled'] = value,
                                     ),
-                            ),
+                            ),IconButton(key:ValueKey('delete-coupon-${entry.value['code']}'),tooltip:'Delete coupon ${entry.value['code']}',icon:const Icon(Icons.delete_outline),onPressed:busy?null:()=>_deleteCoupon(entry.key))]),
                           ),
                         ),
                       OutlinedButton.icon(
@@ -779,3 +792,4 @@ class _CouponEditorState extends State<CouponEditor> {
     ],
   );
 }
+

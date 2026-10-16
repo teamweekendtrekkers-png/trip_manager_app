@@ -11,6 +11,18 @@ import 'manager_preview_test.dart' show MemorySettings;
 import 'trips_provider_publication_test.dart' as fixtures;
 
 void main() {
+  testWidgets('coupon deletion confirms, keeps live settings unchanged and supports undo',(tester) async {
+    final settings=SettingsProvider(store:MemorySettings());await settings.init();
+    final github=MemoryCommerce();final config=CommerceSettingsService.defaults();config['coupons']=[{'code':'SAVE10','type':'percent','value':10,'maxDiscount':null,'enabled':true,'startsAt':null,'expiresAt':null,'tripIds':[]}];github.content=jsonEncode(config);
+    final tripService=fixtures.FakeGitHubService();final trips=TripsProvider(tripService.settings,serviceFactory:(_)=>tripService);addTearDown(trips.dispose);
+    await tester.pumpWidget(MultiProvider(providers:[ChangeNotifierProvider.value(value:settings),ChangeNotifierProvider.value(value:trips)],child:MaterialApp(home:CommerceSettingsScreen(service:CommerceSettingsService(github)))));await tester.pumpAndSettle();
+    final delete=find.byKey(const ValueKey('delete-coupon-SAVE10'));
+    await tester.scrollUntilVisible(delete,400,scrollable:find.byType(Scrollable).first,maxScrolls:30);await tester.tap(delete);await tester.pumpAndSettle();
+    await tester.tap(find.text('Keep coupon'));await tester.pumpAndSettle();expect(delete,findsOneWidget);
+    await tester.tap(delete);await tester.pumpAndSettle();await tester.tap(find.text('Delete coupon'));await tester.pumpAndSettle();
+    expect(delete,findsNothing);expect(github.commits,0);expect(jsonDecode(github.content)['coupons'],hasLength(1));
+    await tester.tap(find.text('Undo'));await tester.pumpAndSettle();expect(delete,findsOneWidget);expect(tester.takeException(),isNull);
+  });
   Future<void> show(WidgetTester tester, String key) async {
     FocusManager.instance.primaryFocus?.unfocus();
     await tester.pumpAndSettle();
@@ -128,3 +140,4 @@ void main() {
     },
   );
 }
+
