@@ -375,7 +375,7 @@ class _TripEditScreenState extends State<TripEditScreen>
             TextButton.icon(
               icon: const Icon(Icons.save),
               onPressed: _saving ? null : _saveTrip,
-              label: Text(_saving ? 'Saving…' : 'Save'),
+              label: Text(_saving ? 'Saving…' : 'Save draft'),
             ),
             PopupMenuButton<String>(
               key: const Key('editor-quick-actions'),
