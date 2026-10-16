@@ -1391,9 +1391,9 @@ class _TripEditScreenState extends State<TripEditScreen>
                   ),
                   OutlinedButton.icon(
                     key: const Key('trip-brochure'),
-                    onPressed: _openBrochure,
+                    onPressed: _contentLoading ? null : _openBrochure,
                     icon: const Icon(Icons.picture_as_pdf),
-                    label: const Text('Brochure (PDF)'),
+                    label: Text(_contentLoading ? 'Loading trip sections…' : 'Brochure (PDF)'),
                   ),
                 ],
               ),
@@ -1451,7 +1451,17 @@ class _TripEditScreenState extends State<TripEditScreen>
     );
   }
 
-  void _openBrochure() {
+  void _openBrochure() async {
+    if (_sharedContent == null && context.read<SettingsProvider>().settings.isConfigured) {
+      await _loadSharedContent();
+      if (!mounted) return;
+      if (_sharedContent == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not load shared website sections. Reload them in Website sections before exporting the complete brochure.'),
+        ));
+        return;
+      }
+    }
     try {
       final draft = <String, dynamic>{
         ..._tripData,
@@ -1472,6 +1482,7 @@ class _TripEditScreenState extends State<TripEditScreen>
       final brochure = TripBrochure.fromTrip(
         TripPricing.forPublication(draft),
         whatsapp: context.read<SettingsProvider>().settings.whatsappNumber,
+        sharedContent: _sharedContent,
       );
       Navigator.push(
         context,

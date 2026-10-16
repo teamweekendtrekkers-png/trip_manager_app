@@ -5,13 +5,20 @@ Flutter administration app for Team Weekend Trekkers.
 ## Shareable PDF brochures
 
 Open a trip, scroll to **Itinerary → Brochure (PDF)**, review the current draft,
-then tap **Share / save PDF**. Android's share sheet can send the PDF to another
+then tap **Preview PDF pages** for the actual A4 pages (pinch to zoom), or
+**Share / save PDF**. The page count and file size appear after generation.
+Android's share sheet can send the PDF to another
 app or save it using an installed file/cloud app. Export does not save the trip
 or write to GitHub. Publish trip edits normally to update the website brochure.
 
 The website's trip pages have **Brochure (PDF)** with preview and download;
 compatible browsers also offer native file sharing. Brochures are generated
 from the trip data, not separately uploaded files. See `BROCHURE_VERIFICATION.md`.
+The brochure follows custom headings, hidden items and extra sections such as
+**Why choose us**. Configured managers load shared website sections before export
+so guidelines, cancellation rules and FAQs match the website settings. Hidden
+sections and intentionally empty lists are omitted. Generation failures allow a
+retry without changing the trip draft.
 
 ## Homepage customization
 
@@ -87,3 +94,4 @@ For help getting started with Flutter development, view the
 samples, guidance on mobile development, and a full API reference.
 
 Supported releases: Android APK/AAB and Windows x64. iOS builds are disabled.
+

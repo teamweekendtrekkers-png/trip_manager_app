@@ -150,6 +150,38 @@ void main() {
     expect(body, contains('Draft dinner'));
     expect(body, isNot(contains('• Lunch')));
   });
+  test('PDF respects shared sections, hidden content, empty custom lists and extra section order', () {
+    final trip = {...fixture(), 'highlights': ['Old highlight'], 'contentSections': {
+      'highlights': {'mode': 'custom', 'heading': 'Our highlights', 'useTripHighlights': false, 'items': [
+        {'title': 'Local hosts', 'description': 'Walk with a local.'},
+        {'description': 'Disabled highlight', 'enabled': false},
+      ]},
+      'custom_why_us': {'mode': 'custom', 'heading': 'Why choose us', 'items': [{'title': 'Small groups', 'description': 'Time to enjoy the trail.\nNo rush.'}]},
+      'custom_extra': {'mode': 'custom', 'heading': 'Good to know', 'items': [{'description': 'Bring curiosity.'}]},
+      'custom_hidden': {'mode': 'hidden', 'heading': 'Hidden extra', 'items': [{'description': 'Private note'}]},
+      'guidelines': {'mode': 'hidden'},
+      'faqs': {'mode': 'custom', 'heading': 'Your questions', 'items': []},
+      'cancellation': {'mode': 'custom', 'heading': 'Trip refund rules', 'items': [{'minDays': 0, 'maxDays': null, 'percent': 40}], 'refundNote': 'Refund note from this trip.'},
+    }};
+    final before = jsonEncode(trip);
+    final body = content(TripBrochure.fromTrip(trip, referenceDate: reference, sharedContent: {
+      'guidelines': {'heading': 'Shared guidelines', 'items': [{'title': 'Hidden guideline', 'description': 'Do not export.'}]},
+      'faqs': {'heading': 'Shared FAQ', 'items': [{'question': 'Old question', 'answer': 'Old answer'}]},
+    }));
+    for (final expected in ['Our highlights', 'Local hosts\nWalk with a local.', 'Why choose us', 'No rush.', 'Good to know', 'Trip refund rules', '0+ days before departure: 40% cancellation fee', 'Refund note from this trip.']) {
+      expect(body, contains(expected));
+    }
+    for (final hidden in ['Old highlight', 'Disabled highlight', 'Private note', 'Hidden extra', 'Hidden guideline', 'Old question', 'Your questions']) {
+      expect(body, isNot(contains(hidden)));
+    }
+    expect(body.indexOf('Why choose us'), lessThan(body.indexOf('Good to know')));
+    expect(jsonEncode(trip), before);
+    final shared = content(TripBrochure.fromTrip(fixture(), sharedContent: {
+      'glance': {'heading': 'Quick facts', 'items': [{'label': 'Region', 'field': 'location'}, {'label': 'Stay', 'value': 'Homestay'}]},
+      'faqs': {'heading': 'Before you go', 'items': [{'question': 'Meals?', 'answer': 'See inclusions.'}]},
+    }));
+    for (final expected in ['Quick facts', 'Region: Coorg', 'Stay: Homestay', 'Before you go', 'Meals?\nSee inclusions.']) { expect(shared, contains(expected)); }
+  });
   test(
     'malformed values, unsafe paths and huge content are contained without mutating trip schema',
     () {
@@ -225,8 +257,9 @@ void main() {
           },
         ],
       };
+      final previews = <Uint8List>[];
       final bytes = await tester.runAsync(
-        () => TripBrochurePdf.generate(brochure(trip)),
+        () => TripBrochurePdf.generate(brochure(trip), onPageRendered: (image, _) => previews.add(image)),
       );
       expect(bytes, isNotNull);
       final source = latin1.decode(bytes!);
@@ -234,6 +267,8 @@ void main() {
         RegExp(r'/Type /Pages /Count (\d+)').firstMatch(source)!.group(1)!,
       );
       expect(count, greaterThan(3));
+      expect(previews.length, count);
+      for (final image in previews) { expect(image.take(8), [137, 80, 78, 71, 13, 10, 26, 10]); }
       expect(RegExp(r'/Subtype /Image').allMatches(source).length, count);
       expect(RegExp(r'/Subtype /Link').allMatches(source).length, count);
       if (const bool.fromEnvironment('BROCHURE_VERIFY') &&
@@ -417,3 +452,4 @@ class _MemoryStore implements SettingsStore {
     value = null;
   }
 }
+
