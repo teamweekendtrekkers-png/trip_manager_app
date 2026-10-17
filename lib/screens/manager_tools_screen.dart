@@ -1,3 +1,6 @@
+import '../services/trip_attention.dart';
+import '../widgets/manager_setup_checklist.dart';
+import '../widgets/trip_editor_sections.dart';
 import 'trip_edit_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
@@ -113,7 +116,17 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
                   TripDateUtils.getUpcomingDateRanges(t).isEmpty,
             )
             .toList();
+    final attention = p.trips.where((trip) => tripAttention(trip).isNotEmpty).toList();
     return [
+      ManagerSetupChecklist(
+        configured: context.read<SettingsProvider>().isConfigured,
+        hasTrips: p.hasTrips, hasPublished: p.lastPublishedCommit != null,
+        onConnection: () => go(ManagerDestination.settings),
+        onTrips: () => go(ManagerDestination.trips),
+        onPayments: () => go(ManagerDestination.payments),
+        onPublish: () => go(ManagerDestination.deployment),
+      ),
+      const SizedBox(height: 12),
       Wrap(
         spacing: 8,
         runSpacing: 8,
@@ -255,15 +268,27 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
         ],
       ),
       Text(
-        'Trips needing dates',
+        'Needs attention (${attention.length})',
         style: Theme.of(context).textTheme.titleLarge,
       ),
-      for (final t in missing)
+      if (attention.isEmpty)
+        const ListTile(leading: Icon(Icons.check_circle_outline), title: Text('Active trips have dates, prices and cover photos.')),
+      for (final t in attention)
         ListTile(
+          leading: const Icon(Icons.rule_outlined),
           title: Text(t['title']?.toString() ?? t['id'].toString()),
-          subtitle: const Text(
-            'No bookable dates: expired, missing or invalid. Edit Trips → Dates & price.',
-          ),
+          subtitle: Text(tripAttention(t).join(' · ')),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: p.isLoading ? null : () {
+            final id = t['id']?.toString() ?? '';
+            final current = p.getTripById(id), index = p.getTripIndexById(id);
+            if (current == null || index == null) return;
+            final issues = tripAttention(current);
+            Navigator.push(context, MaterialPageRoute<void>(builder: (_) => TripEditScreen(
+              trip: current, index: index, initialSection: issues.contains('Add upcoming dates') || issues.contains('Check price')
+                  ? TripEditorSection.dates : TripEditorSection.photos,
+            )));
+          },
         ),
       Text(
         'Upcoming departures',
