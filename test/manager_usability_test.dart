@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'package:flutter/services.dart';
+import 'manager_preview_test.dart' as previews;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trip_manager_app/models/app_settings.dart';
@@ -55,12 +58,18 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     var action = '';
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: ManagerSetupChecklist(
+    final previewKey = GlobalKey();
+    await tester.runAsync(() async {
+      final font = File(Platform.isWindows ? 'C:/Windows/Fonts/arial.ttf' : '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf');
+      if (await font.exists()) await (FontLoader('ManagerGuide')..addFont(font.readAsBytes().then((bytes) => ByteData.sublistView(bytes)))).load();
+    });
+    await tester.pumpWidget(MaterialApp(theme: ThemeData(colorSchemeSeed: Colors.teal, fontFamily: 'ManagerGuide'), home: RepaintBoundary(key: previewKey, child: Scaffold(appBar: AppBar(title: const Text('Manager setup')), body: SingleChildScrollView(child: ManagerSetupChecklist(
       configured: false, hasTrips: false, hasPublished: false,
       onConnection: () => action = 'connect', onTrips: () => action = 'trips',
       onPayments: () => action = 'payments', onPublish: () => action = 'publish',
-    )))));
+    ))))));
     await tester.pumpAndSettle();
+    await previews.capture(tester, previewKey, 'manager-setup-phone.png');
     for (final step in {'1. Save connection details':'connect', '2. Load and edit trips':'trips',
       '3. Check UPI and coupons':'payments', '4. Review and publish':'publish'}.entries) {
       await tester.ensureVisible(find.text(step.key));

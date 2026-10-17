@@ -108,8 +108,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const AppVersionCard(),
                     ManagerSetupChecklist(
                       configured: provider.isConfigured,
-                      hasTrips: context.watch<TripsProvider>().hasTrips,
-                      hasPublished: context.watch<TripsProvider>().lastPublishedCommit != null,
+                      hasTrips: context.watch<TripsProvider?>()?.hasTrips ?? false,
+                      hasPublished: context.watch<TripsProvider?>()?.lastPublishedCommit != null,
                       onConnection: () {
                         final field = _connectionKey.currentContext;
                         if (field != null) Scrollable.ensureVisible(field);
@@ -117,7 +117,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                       onTrips: () => Navigator.popUntil(context, (route) => route.isFirst),
                       onPayments: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const CommerceSettingsScreen())),
-                      onPublish: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => DeploymentStatusScreen(savedCommitSha: context.read<TripsProvider>().lastPublishedCommit))),
+                      onPublish: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => DeploymentStatusScreen(savedCommitSha: context.read<TripsProvider?>()?.lastPublishedCommit))),
                     ),
                     // GitHub Configuration Card
                     _buildCard(
