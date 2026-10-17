@@ -3,6 +3,15 @@ import 'package:flutter/material.dart';
 enum TripEditorSection { all, basics, dates, photos, itinerary, website }
 
 extension TripEditorSectionLabel on TripEditorSection {
+  String get hint => switch (this) {
+    TripEditorSection.all => 'Browse every field, or choose a section above.',
+    TripEditorSection.basics => 'Trip name, destination, description and key details.',
+    TripEditorSection.dates => 'Departure dates, prices and boarding locations.',
+    TripEditorSection.photos => 'Cover image and the trip photo gallery.',
+    TripEditorSection.itinerary => 'Daily plan, inclusions and traveller guidance.',
+    TripEditorSection.website => 'Custom sections, visibility and booking options.',
+  };
+
   String get label => switch (this) {
     TripEditorSection.all => 'All sections',
     TripEditorSection.basics => 'Basics',
@@ -61,7 +70,7 @@ class TripEditorSectionPicker extends StatelessWidget {
       key: const Key('editor-section-picker'),
       value: value,
       isExpanded: true,
-      decoration: const InputDecoration(labelText: 'Editing section', border: OutlineInputBorder(), isDense: true),
+      decoration: InputDecoration(labelText: 'Editing section', border: const OutlineInputBorder(), isDense: true, helperText: value.hint, helperMaxLines: 3),
       items: [for (final section in TripEditorSection.values) DropdownMenuItem(value: section, child: Text(section.label))],
       onChanged: (section) { if (section != null) onChanged(section); },
       )),

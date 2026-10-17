@@ -447,6 +447,18 @@ class _TripsListScreenState extends State<TripsListScreen> {
     }
   }
 
+  bool get _hasFilters =>
+      _searchQuery.isNotEmpty || _showFeaturedOnly || _tripFilter != 'All';
+
+  void _clearFilters() {
+    _searchController.clear();
+    setState(() {
+      _searchQuery = '';
+      _showFeaturedOnly = false;
+      _tripFilter = 'All';
+    });
+  }
+
   void _toggleFeaturedFilter() {
     setState(() => _showFeaturedOnly = !_showFeaturedOnly);
   }
@@ -776,6 +788,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
                               suffixIcon: _searchQuery.isNotEmpty
                                   ? IconButton(
                                       icon: const Icon(Icons.clear),
+                                      tooltip: 'Clear search',
                                       onPressed: () {
                                         _searchController.clear();
                                         setState(() {
@@ -804,6 +817,16 @@ class _TripsListScreenState extends State<TripsListScreen> {
                             scrollDirection: Axis.horizontal,
                             child: Row(
                               children: [
+                                if (_hasFilters)
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 6),
+                                    child: ActionChip(
+                                      key: const Key('clear-trip-filters'),
+                                      avatar: const Icon(Icons.filter_alt_off, size: 18),
+                                      label: const Text('Clear filters'),
+                                      onPressed: _clearFilters,
+                                    ),
+                                  ),
                                 for (final filter in [
                                   'All',
                                   'Active',
@@ -814,7 +837,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                   Padding(
                                     padding: const EdgeInsets.only(right: 6),
                                     child: ChoiceChip(
-                                      label: Text(filter),
+                                      label: Text(filter == 'Draft' ? 'Unpublished' : filter),
                                       selected: _tripFilter == filter,
                                       onSelected: (_) =>
                                           setState(() => _tripFilter = filter),
@@ -931,16 +954,19 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
-                                        'Tap + to add a new trip',
+                                        _hasFilters
+                                            ? 'Try another search or clear your filters.'
+                                            : 'Tap + to add a new trip',
                                         style: TextStyle(
                                           color: Colors.grey[600],
                                         ),
                                       ),
                                       const SizedBox(height: 16),
                                       ElevatedButton.icon(
-                                        onPressed: _confirmAndRefresh,
-                                        icon: const Icon(Icons.refresh),
-                                        label: const Text('Refresh'),
+                                        key: const Key('empty-trips-action'),
+                                        onPressed: _hasFilters ? _clearFilters : _confirmAndRefresh,
+                                        icon: Icon(_hasFilters ? Icons.filter_alt_off : Icons.refresh),
+                                        label: Text(_hasFilters ? 'Show all trips' : 'Refresh'),
                                       ),
                                     ],
                                   ),
@@ -957,7 +983,19 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                   _showFeaturedOnly ||
                                   _tripFilter != 'All';
 
-                              return RefreshIndicator(
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+                                    child: Text(
+                                      '${trips.length} of ${provider.tripCount} trips'
+                                      '${_showFeaturedOnly ? ' · Featured only' : ''}',
+                                      key: const Key('trip-results-count'),
+                                      style: Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                  ),
+                                  Expanded(child: RefreshIndicator(
                                 onRefresh: _confirmAndRefresh,
                                 child: ReorderableListView.builder(
                                   padding: const EdgeInsets.only(bottom: 80),
@@ -1018,6 +1056,8 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                     );
                                   },
                                 ),
+                              )),
+                                ],
                               );
                             },
                           ),

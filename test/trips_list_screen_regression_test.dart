@@ -57,6 +57,59 @@ void main() {
     );
   }
 
+  for (final width in [390.0, 1280.0]) {
+    testWidgets('search across fields and recover from combined filters at $width', (tester) async {
+      tester.view.physicalSize = Size(width, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final service = _FakeGitHubService(
+        tripsFuture: Future.value(_tripsResult([
+          {...trip(id: 'coorg-01', title: 'Coorg Trek', featured: true), 'departureCity': 'Bengaluru'},
+          trip(id: 'beach-02', title: 'Beach Escape', isActive: false),
+        ])),
+        featuredIds: const ['coorg-01'],
+      );
+      final providers = await providersFor(service);
+      await tester.pumpWidget(buildSubject(trips: providers.trips, settings: providers.settings));
+      await tester.pumpAndSettle();
+      expect(find.text('2 of 2 trips'), findsOneWidget);
+      expect(find.byKey(const Key('clear-trip-filters')), findsNothing);
+      await tester.enterText(find.byType(TextField).first, '  COORG  Bengaluru ');
+      await tester.pump();
+      expect(find.text('Coorg Trek'), findsOneWidget);
+      expect(find.text('Beach Escape'), findsNothing);
+      expect(find.text('1 of 2 trips'), findsOneWidget);
+      await tester.tap(find.byTooltip('Show featured only'));
+      await tester.pump();
+      expect(find.text('1 of 2 trips · Featured only'), findsOneWidget);
+      final inactive = find.widgetWithText(ChoiceChip, 'Inactive');
+      await tester.ensureVisible(inactive);
+      await tester.tap(inactive);
+      await tester.pump();
+      expect(find.text('Try another search or clear your filters.'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('empty-trips-action')));
+      await tester.pump();
+      expect(tester.widget<TextField>(find.byType(TextField).first).controller!.text, isEmpty);
+      expect(find.text('2 of 2 trips'), findsOneWidget);
+      expect(find.text('Beach Escape'), findsOneWidget);
+      expect(tester.widget<ReorderableListView>(find.byType(ReorderableListView)).buildDefaultDragHandles, isTrue);
+      await tester.enterText(find.byType(TextField).first, 'coorg-01');
+      await tester.pump();
+      expect(find.text('Coorg Trek'), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const Key('clear-trip-filters')));
+      await tester.tap(find.byKey(const Key('clear-trip-filters')));
+      await tester.pump();
+      expect(find.text('2 of 2 trips'), findsOneWidget);
+      await tester.enterText(find.byType(TextField).first, '   ');
+      await tester.pump();
+      expect(find.text('2 of 2 trips'), findsOneWidget);
+      expect(providers.trips.hasUnsavedChanges, isFalse);
+      expect(service.fetchTripsCalls, 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'discount card shows original and offer prices without changing trip data',
     (tester) async {
@@ -488,3 +541,4 @@ final class _MemorySettingsStore implements SettingsStore {
   @override
   Future<void> write(String key, String value) async => this.value = value;
 }
+
