@@ -1906,8 +1906,7 @@ class _TripCard extends StatelessWidget {
                               fontSize: 12,
                             ),
                           );
-                          if (TripPrice.hasDiscount(trip) &&
-                              constraints.maxWidth < 210) {
+                          if (constraints.maxWidth < 300) {
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -1918,7 +1917,7 @@ class _TripCard extends StatelessWidget {
                             );
                           }
                           return Row(
-                            children: [price, const Spacer(), dateLabel],
+                            children: [Flexible(child: price), const SizedBox(width: 12), Expanded(child: Align(alignment: Alignment.centerRight, child: dateLabel))],
                           );
                         },
                       ),

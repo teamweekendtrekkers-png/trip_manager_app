@@ -531,6 +531,7 @@ Future<void> _chooseTripMenuAction(
     of: find.byKey(ValueKey<dynamic>(id)),
     matching: find.byType(PopupMenuButton<String>),
   );
+  await tester.ensureVisible(menu);
   await tester.tap(menu);
   await tester.pumpAndSettle();
   await tester.tap(find.text(action));
@@ -685,3 +686,4 @@ final class _MemorySettingsStore implements SettingsStore {
   @override
   Future<void> write(String key, String value) async => this.value = value;
 }
+
