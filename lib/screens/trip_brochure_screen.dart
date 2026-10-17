@@ -23,6 +23,31 @@ class _TripBrochureScreenState extends State<TripBrochureScreen> {
   bool _busy = false;
   String? _error;
   Uint8List? _pdf;
+  final List<Uint8List> _pages = [];
+  bool _showPages = false;
+  Future<Uint8List> _prepare() async {
+    if (_pdf != null) return _pdf!;
+    _pages.clear();
+    final bytes = widget.generator != null
+        ? await widget.generator!(widget.brochure)
+        : await TripBrochurePdf.generate(widget.brochure, onPageRendered: (image, _) {
+            if (!mounted) throw StateError('Preview closed.');
+            _pages.add(image);
+          });
+    _pdf = bytes;
+    return bytes;
+  }
+  Future<void> _preview() async {
+    if (_busy) return;
+    if (_showPages) { setState(() => _showPages = false); return; }
+    setState(() { _busy = true; _error = null; });
+    try {
+      await _prepare();
+      if (mounted) setState(() => _showPages = _pages.isNotEmpty);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Could not prepare the PDF preview. Please try again.');
+    } finally { if (mounted) setState(() => _busy = false); }
+  }
   Future<void> _share() async {
     if (_busy) return;
     setState(() {
@@ -30,9 +55,7 @@ class _TripBrochureScreenState extends State<TripBrochureScreen> {
       _error = null;
     });
     try {
-      _pdf ??= await (widget.generator ?? TripBrochurePdf.generate)(
-        widget.brochure,
-      );
+      await _prepare();
       if (!mounted) return;
       if (widget.sharePdf != null) {
         await widget.sharePdf!(_pdf!, widget.brochure.filename);
@@ -68,11 +91,26 @@ class _TripBrochureScreenState extends State<TripBrochureScreen> {
     body: Column(
       children: [
         const Padding(
-          padding: EdgeInsets.all(16),
+          padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Text(
-            'Preview of your current trip draft. Sharing a PDF does not save or publish any trip changes. Use the Android share sheet to send or save it.',
+            'Your current trip draft, ready to keep or share. Preview the PDF pages before sending. Trip edits are published separately.',
           ),
         ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: OutlinedButton.icon(
+            key: const Key('brochure-preview-pages'),
+            onPressed: _busy ? null : _preview,
+            icon: Icon(_showPages ? Icons.subject : Icons.preview_outlined),
+            label: Text(_showPages ? 'Read trip details' : 'Preview PDF pages'),
+          ),
+        ),
+        if (_pdf != null && !_busy)
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Text('${_pages.isEmpty ? 'PDF ready' : '${_pages.length} ${_pages.length == 1 ? 'page' : 'pages'}'} · ${(_pdf!.length / 1024).ceil()} KB${_showPages ? ' · Pinch to zoom' : ''}',
+              key: const Key('brochure-ready')),
+          ),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.all(16),
@@ -84,7 +122,24 @@ class _TripBrochureScreenState extends State<TripBrochureScreen> {
           ),
         if (_busy) const LinearProgressIndicator(),
         Expanded(
-          child: ListView.builder(
+          child: _showPages ? ListView.builder(
+            key: const Key('brochure-page-list'),
+            padding: const EdgeInsets.all(16),
+            itemCount: _pages.length,
+            itemBuilder: (context, index) => Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Column(children: [
+                InteractiveViewer(
+                  minScale: 1, maxScale: 3,
+                  child: Image.memory(_pages[index],
+                    semanticLabel: '${widget.brochure.title} - PDF page ${index + 1}',
+                    gaplessPlayback: true),
+                ),
+                const SizedBox(height: 6),
+                Text('Page ${index + 1} of ${_pages.length}'),
+              ]),
+            ),
+          ) : ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: widget.brochure.blocks.length,
             itemBuilder: (context, index) {
@@ -122,3 +177,4 @@ class _TripBrochureScreenState extends State<TripBrochureScreen> {
     ),
   );
 }
+

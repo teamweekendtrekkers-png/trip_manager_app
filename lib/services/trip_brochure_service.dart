@@ -6,6 +6,7 @@ import 'package:flutter/painting.dart';
 import 'trip_date_utils.dart';
 import 'trip_detail_defaults.dart';
 import 'trips_parser.dart';
+import '../models/trip_content_settings.dart';
 
 class BrochureBlock {
   const BrochureBlock(this.kind, this.text);
@@ -26,6 +27,7 @@ class TripBrochure {
     DateTime? referenceDate,
     String? selectedDate,
     String? whatsapp,
+    Map<String, dynamic>? sharedContent,
   }) {
     final title = _text(trip['title'] ?? trip['name']);
     final blocks = <BrochureBlock>[
@@ -36,8 +38,29 @@ class TripBrochure {
       blocks.add(BrochureBlock('heading', heading));
       blocks.addAll(lines.map((line) => BrochureBlock('body', line)));
     }
+    final sections = trip['contentSections'] is Map
+        ? trip['contentSections'] as Map : <String, dynamic>{};
+    Map? resolve(String key) {
+      final own = sections[key];
+      if (own is Map && own['mode'] == 'hidden') return null;
+      final result = own is Map && own['mode'] == 'custom'
+          ? own : sharedContent?[key];
+      return result is Map && result['mode'] != 'hidden' ? result : null;
+    }
+    List<Map> visibleItems(Map? value) => value?['items'] is List
+        ? (value!['items'] as List).whereType<Map>()
+            .where((item) => item['enabled'] != false).toList() : [];
+    String heading(Map? value, String fallback) =>
+        _text(value?['heading']).isEmpty ? fallback : _text(value?['heading']);
+    List<String> descriptions(Map? value, {bool faq = false}) =>
+        visibleItems(value).map((item) => [
+          _text(item[faq ? 'question' : 'title']),
+          _text(item[faq ? 'answer' : 'description']),
+        ].where((part) => part.isNotEmpty).join('\n'))
+        .where((line) => line.isNotEmpty).toList();
 
-    section('Trip at a glance', [
+    final glance = resolve('glance');
+    final glanceLines = [
       'Location: ${_text(trip['location'] ?? trip['destination'])}',
       for (final key in [
         'duration',
@@ -50,7 +73,19 @@ class TripBrochure {
           '${key == 'groupSize' ? 'Group size' : key[0].toUpperCase() + key.substring(1)}: ${_text(trip[key])}',
       if (_text(trip['price']).isNotEmpty) 'Price: ${_text(trip['price'])}',
       if (trip['isActive'] == false) 'Currently unavailable for booking.',
-    ]);
+    ];
+    final ownGlance = sections['glance'];
+    final sharedGlance = sharedContent?['glance'];
+    if (!(ownGlance is Map && ownGlance['mode'] == 'hidden') &&
+        (glance != null || !(sharedGlance is Map && sharedGlance['mode'] == 'hidden'))) {
+      section(heading(glance, 'Trip at a glance'), glance == null ? glanceLines : [
+        for (final item in visibleItems(glance))
+          if (_text(_text(item['field']).isNotEmpty ? trip[item['field']] : item['value']).isNotEmpty)
+            '${_text(item['label'])}: ${_text(_text(item['field']).isNotEmpty ? trip[item['field']] : item['value'])}',
+        if (_text(trip['price']).isNotEmpty) 'Price: ${_text(trip['price'])}',
+        if (trip['isActive'] == false) 'Currently unavailable for booking.',
+      ]);
+    }
     final upcoming = TripDateUtils.getUpcomingDateRanges(
       trip,
       referenceDate: referenceDate,
@@ -70,10 +105,22 @@ class TripBrochure {
           : ['New dates coming soon. Contact us to confirm.'],
     );
     section('About this trip', _items([trip['about'] ?? trip['description']]));
-    section(
-      'Highlights',
-      _items(trip['highlights']).map((line) => '• $line').toList(),
-    );
+    final highlights = resolve('highlights');
+    final ownHighlights = sections['highlights'];
+    final sharedHighlights = sharedContent?['highlights'];
+    if (!(ownHighlights is Map && ownHighlights['mode'] == 'hidden') &&
+        (highlights != null || !(sharedHighlights is Map && sharedHighlights['mode'] == 'hidden'))) {
+      section(heading(highlights, 'Highlights'),
+        highlights == null || highlights['useTripHighlights'] == true
+            ? _items(trip['highlights']).map((line) => '• $line').toList()
+            : descriptions(highlights));
+    }
+    for (final key in TripContentSettings.customKeys(sections).take(20)) {
+      final extra = sections[key];
+      if (extra is Map && extra['mode'] == 'custom' && _text(extra['heading']).isNotEmpty) {
+        section(_text(extra['heading']), descriptions(extra));
+      }
+    }
     final itinerary = trip['itinerary'] is List
         ? (trip['itinerary'] as List).whereType<Map>().toList()
         : <Map>[];
@@ -142,6 +189,19 @@ class TripBrochure {
       );
     }
     final id = _text(trip['publicSlug'] ?? trip['id']);
+    final guidelines = resolve('guidelines');
+    section(heading(guidelines, 'Trip guidelines'), descriptions(guidelines));
+    final cancellation = resolve('cancellation');
+    final rules = visibleItems(cancellation).where((rule) =>
+        rule['minDays'] is num && rule['percent'] is num).toList()
+      ..sort((a, b) => (b['minDays'] as num).compareTo(a['minDays'] as num));
+    section(heading(cancellation, 'Cancellation policy'), [
+      for (final rule in rules)
+        '${rule['maxDays'] == null ? '${rule['minDays']}+ days' : '${rule['minDays']}–${rule['maxDays']} days'} before departure: ${rule['percent']}% cancellation fee',
+      ..._items([cancellation?['refundNote'], cancellation?['changeNote']]),
+    ]);
+    final faqs = resolve('faqs');
+    section(heading(faqs, 'Frequently asked questions'), descriptions(faqs, faq: true));
     final bookingUrl = RegExp(r'^[a-z0-9][a-z0-9_-]*$').hasMatch(id)
         ? 'https://www.teamweekendtrekkers.com/trips/$id/'
         : 'https://www.teamweekendtrekkers.com/trips.html';
@@ -182,11 +242,13 @@ class TripBrochurePdf {
   static const margin = 80.0, bottom = 1600.0;
 
   /// Rasterized A4 pages preserve platform Unicode/emoji without new font/network dependencies.
-  static Future<Uint8List> generate(TripBrochure brochure) async {
+  static Future<Uint8List> generate(TripBrochure brochure, {
+    void Function(Uint8List image, int page)? onPageRendered,
+  }) async {
     final pages = <Uint8List>[];
     late ui.PictureRecorder recorder;
     late Canvas canvas;
-    var y = 220.0;
+    var y = 190.0;
     void startPage() {
       if (pages.length >= 100) {
         throw StateError(
@@ -200,11 +262,11 @@ class TripBrochurePdf {
         Paint()..color = const Color(0xFFFFFFFF),
       );
       canvas.drawRect(
-        const Rect.fromLTWH(0, 0, 1240, 150),
+        const Rect.fromLTWH(0, 0, 1240, 142),
         Paint()..color = const Color(0xFF17442D),
       );
       canvas.drawRect(
-        const Rect.fromLTWH(0, 150, 1240, 8),
+        const Rect.fromLTWH(0, 142, 1240, 8),
         Paint()..color = const Color(0xFFED801C),
       );
       _paint(
@@ -212,20 +274,22 @@ class TripBrochurePdf {
         'Team Weekend Trekkers',
         36,
         const Color(0xFFFFFFFF),
-        const Offset(margin, 42),
+        const Offset(margin, 24),
         bold: true,
       );
       _paint(
         canvas,
-        'TRIP BROCHURE',
-        24,
-        const Color(0xFFFFFFFF),
-        const Offset(margin, 92),
+        'YOUR TRIP GUIDE  /  ITINERARY & ESSENTIALS',
+        20,
+        const Color(0xFFCEE8D9),
+        const Offset(margin, 82),
       );
-      y = 220;
+      y = 190;
     }
 
     Future<void> finishPage() async {
+      canvas.drawRect(const Rect.fromLTWH(margin, 1622, width - margin * 2, 92),
+        Paint()..color = const Color(0xFFEAF4EE));
       _paint(
         canvas,
         brochure.bookingUrl,
@@ -257,13 +321,28 @@ class TripBrochurePdf {
           rgb[target++] = rgba[source + 2];
         }
         pages.add(Uint8List.fromList(ZLibEncoder().convert(rgb)));
+        if (onPageRendered != null) {
+          final previewRecorder = ui.PictureRecorder();
+          Canvas(previewRecorder).drawImageRect(image,
+            const Rect.fromLTWH(0, 0, 1240, 1754),
+            const Rect.fromLTWH(0, 0, 620, 877), Paint()..filterQuality = FilterQuality.medium);
+          final previewPicture = previewRecorder.endRecording();
+          final preview = await previewPicture.toImage(620, 877);
+          previewPicture.dispose();
+          try {
+            final png = await preview.toByteData(format: ui.ImageByteFormat.png);
+            if (png == null) throw StateError('Unable to render PDF preview.');
+            onPageRendered(png.buffer.asUint8List(png.offsetInBytes, png.lengthInBytes), pages.length);
+          } finally { preview.dispose(); }
+        }
       } finally {
         image.dispose();
       }
     }
 
     startPage();
-    for (final block in brochure.blocks) {
+    for (var blockIndex = 0; blockIndex < brochure.blocks.length; blockIndex++) {
+      final block = brochure.blocks[blockIndex];
       final size = block.kind == 'title'
           ? 44.0
           : block.kind == 'heading'
@@ -276,14 +355,36 @@ class TripBrochurePdf {
             ? const Color(0xFF25382E)
             : const Color(0xFF17442D),
         bold: block.kind != 'body',
+        inset: block.kind == 'heading' ? 18 : 0,
       );
       try {
-        if (block.kind != 'body' && y + size * 3.5 > bottom) {
+        final metrics = painter.computeLineMetrics();
+        var keepHeight = metrics.fold<double>(0, (sum, line) => sum + line.height) + 56;
+        if (blockIndex + 1 < brochure.blocks.length && brochure.blocks[blockIndex + 1].kind == 'body') {
+          final next = _painter(brochure.blocks[blockIndex + 1].text, 26, const Color(0xFF25382E));
+          keepHeight += next.computeLineMetrics().take(2).fold<double>(0, (sum, line) => sum + line.height);
+          next.dispose();
+        }
+        if (block.kind != 'body') {
+          var sectionHeight = 0.0;
+          for (var lookahead = blockIndex + 1; lookahead < brochure.blocks.length && brochure.blocks[lookahead].kind == 'body'; lookahead++) {
+            final next = _painter(brochure.blocks[lookahead].text, 26, const Color(0xFF25382E));
+            sectionHeight += next.height + 10;
+            next.dispose();
+            if (sectionHeight > 420) break;
+          }
+          if (sectionHeight <= 420) keepHeight = painter.height + 56 + sectionHeight;
+        }
+        if (block.kind != 'body' && y + keepHeight > bottom && y > 190) {
           await finishPage();
           startPage();
         }
-        y += block.kind == 'heading' ? 22 : 8;
-        final lines = painter.computeLineMetrics();
+        if (block.kind == 'body' && painter.height + 10 <= bottom - 190 && y + painter.height + 10 > bottom) {
+          await finishPage();
+          startPage();
+        }
+        y += block.kind == 'heading' ? 26 : 10;
+        final lines = metrics;
         var index = 0;
         while (index < lines.length) {
           if (y + lines[index].height > bottom) {
@@ -300,12 +401,17 @@ class TripBrochurePdf {
             throw StateError('Unable to fit brochure text on a page.');
           }
           canvas.save();
+          final inset = block.kind == 'heading' ? 18.0 : 0.0;
+          if (block.kind == 'heading') {
+            canvas.drawRect(Rect.fromLTWH(margin, y - 2, width - margin * 2, partHeight + 4), Paint()..color = const Color(0xFFEDF5EF));
+            canvas.drawRect(Rect.fromLTWH(margin, y - 2, 5, partHeight + 4), Paint()..color = const Color(0xFFED801C));
+          }
           canvas.clipRect(
-            Rect.fromLTWH(margin, y, width - margin * 2, partHeight),
+            Rect.fromLTWH(margin + inset, y, width - margin * 2 - inset, partHeight),
           );
           painter.paint(
             canvas,
-            Offset(margin, y - (lines[first].baseline - lines[first].ascent)),
+            Offset(margin + inset, y - (lines[first].baseline - lines[first].ascent)),
           );
           canvas.restore();
           y += partHeight;
@@ -323,6 +429,7 @@ class TripBrochurePdf {
     double size,
     Color color, {
     bool bold = false,
+    double inset = 0,
   }) => TextPainter(
     text: TextSpan(
       text: text,
@@ -335,7 +442,7 @@ class TripBrochurePdf {
     ),
     textDirection: TextDirection.ltr,
     strutStyle: StrutStyle(fontSize: size, height: 1.4, forceStrutHeight: true),
-  )..layout(maxWidth: width - margin * 2);
+  )..layout(maxWidth: width - margin * 2 - inset);
 
   static void _paint(
     Canvas canvas,
@@ -410,3 +517,4 @@ class TripBrochurePdf {
     return output.takeBytes();
   }
 }
+

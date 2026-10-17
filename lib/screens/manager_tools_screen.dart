@@ -146,6 +146,18 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
             label: const Text('Publishing status'),
           ),
           OutlinedButton.icon(
+            key: const Key('dashboard-booking-review'),
+            onPressed: () => go(ManagerDestination.bookingReview),
+            icon: const Icon(Icons.fact_check_outlined),
+            label: const Text('Review bookings'),
+          ),
+          OutlinedButton.icon(
+            key: const Key('dashboard-payments'),
+            onPressed: () => go(ManagerDestination.payments),
+            icon: const Icon(Icons.payments_outlined),
+            label: const Text('UPI & coupons'),
+          ),
+          OutlinedButton.icon(
             onPressed: () async {
               try {
                 final opened = await launchUrl(
@@ -618,3 +630,4 @@ Future<void> bulkDates(BuildContext context, TripsProvider provider) async {
   provider.applyBulkDates(chosen, label, remove: remove);
   await provider.flushDraft();
 }
+

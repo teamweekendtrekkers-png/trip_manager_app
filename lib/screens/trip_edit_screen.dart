@@ -372,21 +372,30 @@ class _TripEditScreenState extends State<TripEditScreen>
             ),
           ),
           actions: [
-            if (_publishedTrip != null)
-              IconButton(
-                onPressed: _openLiveTrip,
-                tooltip: 'Open published trip',
-                icon: const Icon(Icons.open_in_new),
-              ),
-            IconButton(
-              onPressed: _findEditorField,
-              tooltip: 'Find an editor field',
-              icon: const Icon(Icons.search),
-            ),
-            IconButton(
+            TextButton.icon(
               icon: const Icon(Icons.save),
-              onPressed: _saveTrip,
-              tooltip: isEditing ? 'Update trip' : 'Create trip',
+              onPressed: _saving ? null : _saveTrip,
+              label: Text(_saving ? 'Saving…' : 'Save draft'),
+            ),
+            PopupMenuButton<String>(
+              key: const Key('editor-quick-actions'),
+              tooltip: 'Trip actions',
+              enabled: !_saving,
+              onSelected: (action) {
+                switch (action) {
+                  case 'pdf': _openBrochure();
+                  case 'preview': _previewDraft();
+                  case 'find': _findEditorField();
+                  case 'live': _openLiveTrip();
+                }
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'preview', child: ListTile(leading: Icon(Icons.preview_outlined), title: Text('Preview website draft'), contentPadding: EdgeInsets.zero)),
+                PopupMenuItem(value: 'pdf', enabled: !_contentLoading, child: const ListTile(leading: Icon(Icons.picture_as_pdf_outlined), title: Text('Preview / share PDF'), contentPadding: EdgeInsets.zero)),
+                const PopupMenuItem(value: 'find', child: ListTile(leading: Icon(Icons.search), title: Text('Find an editor field'), contentPadding: EdgeInsets.zero)),
+                if (_publishedTrip != null)
+                  const PopupMenuItem(value: 'live', child: ListTile(leading: Icon(Icons.open_in_new), title: Text('Open published trip'), contentPadding: EdgeInsets.zero)),
+              ],
             ),
           ],
         ),
@@ -1015,11 +1024,18 @@ class _TripEditScreenState extends State<TripEditScreen>
         bottomNavigationBar: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
+                Text('Save draft → Trips → Review & publish',
+                  key: const Key('editor-publish-help'),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall),
+                const SizedBox(height: 6),
+                Row(children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: _previewDraft,
+                    onPressed: _saving ? null : _previewDraft,
                     icon: const Icon(Icons.preview_outlined),
                     label: const Text('Preview draft'),
                   ),
@@ -1028,11 +1044,12 @@ class _TripEditScreenState extends State<TripEditScreen>
                 Expanded(
                   child: FilledButton.icon(
                     key: const Key('editor-save-draft'),
-                    onPressed: _saveTrip,
+                    onPressed: _saving ? null : _saveTrip,
                     icon: const Icon(Icons.save_outlined),
-                    label: const Text('Save draft'),
+                    label: Text(_saving ? 'Saving…' : 'Save draft'),
                   ),
                 ),
+                ]),
               ],
             ),
           ),
@@ -1391,9 +1408,9 @@ class _TripEditScreenState extends State<TripEditScreen>
                   ),
                   OutlinedButton.icon(
                     key: const Key('trip-brochure'),
-                    onPressed: _openBrochure,
+                    onPressed: _contentLoading ? null : _openBrochure,
                     icon: const Icon(Icons.picture_as_pdf),
-                    label: const Text('Brochure (PDF)'),
+                    label: Text(_contentLoading ? 'Loading trip sections…' : 'Brochure (PDF)'),
                   ),
                 ],
               ),
@@ -1451,7 +1468,17 @@ class _TripEditScreenState extends State<TripEditScreen>
     );
   }
 
-  void _openBrochure() {
+  void _openBrochure() async {
+    if (_sharedContent == null && context.read<SettingsProvider>().settings.isConfigured) {
+      await _loadSharedContent();
+      if (!mounted) return;
+      if (_sharedContent == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not load shared website sections. Reload them in Website sections before exporting the complete brochure.'),
+        ));
+        return;
+      }
+    }
     try {
       final draft = <String, dynamic>{
         ..._tripData,
@@ -1472,6 +1499,7 @@ class _TripEditScreenState extends State<TripEditScreen>
       final brochure = TripBrochure.fromTrip(
         TripPricing.forPublication(draft),
         whatsapp: context.read<SettingsProvider>().settings.whatsappNumber,
+        sharedContent: _sharedContent,
       );
       Navigator.push(
         context,
