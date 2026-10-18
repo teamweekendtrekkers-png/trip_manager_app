@@ -75,11 +75,13 @@ void main() {
         dio: github.dio,
       );
 
-      final invalidUpi = await service.updateUpiId('not-a-upi');
+      for (final value in ['not-a-upi', 'not a UPI']) {
+        final invalidUpi = await service.updateUpiId(value);
+        expect(invalidUpi.success, isFalse, reason: value);
+        expect(invalidUpi.error, contains('Invalid UPI'), reason: value);
+      }
       final invalidWhatsApp = await service.updateWhatsAppNumber('+91 123');
 
-      expect(invalidUpi.success, isFalse);
-      expect(invalidUpi.error, contains('Invalid UPI'));
       expect(invalidWhatsApp.success, isFalse);
       expect(invalidWhatsApp.error, contains('Invalid WhatsApp'));
       expect(github.requestCount, 0);

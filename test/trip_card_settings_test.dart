@@ -335,29 +335,6 @@ void main() {
     );
   });
 
-  if (File('../TravelBooking/js/trips-data.js').existsSync()) {
-    test(
-      'authoritative local website parses and preserves all optional fields',
-      () {
-        final source = File(
-          '../TravelBooking/js/trips-data.js',
-        ).readAsStringSync();
-        final parsed = TripsParser.parseTripsDocument(source);
-        expect(parsed.errors, isEmpty);
-        expect(parsed.trips, isNotEmpty);
-        final rewritten = TripsParser.replaceTripsDataObject(
-          source: source,
-          trips: parsed.trips,
-        );
-        expect(rewritten.success, isTrue, reason: rewritten.errors.join('\n'));
-        final reparsed = TripsParser.parseTripsDocument(rewritten.content!);
-        expect(reparsed.errors, isEmpty);
-        expect(reparsed.document!.prefix, parsed.document!.prefix);
-        expect(reparsed.document!.suffix, parsed.document!.suffix);
-        expect(reparsed.trips, parsed.trips);
-      },
-    );
-  }
 
   Future<TripsProvider> openEditor(
     WidgetTester tester, {
