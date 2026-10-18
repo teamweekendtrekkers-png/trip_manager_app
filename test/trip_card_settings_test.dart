@@ -400,7 +400,7 @@ void main() {
     await tester.pumpAndSettle();
     final button = find.descendant(
       of: find.byType(AppBar),
-      matching: find.byIcon(Icons.save),
+      matching: find.byWidgetPredicate((widget) => widget is TextButton),
     );
     await tester.ensureVisible(button);
     await tester.pumpAndSettle();
