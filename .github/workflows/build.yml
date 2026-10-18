@@ -14,9 +14,24 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      WEBSITE_REPO_PATH: .contract-website
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Checkout current website contract data
+        uses: actions/checkout@v4
+        with:
+          repository: teamweekendtrekkers-png/teamweekendtrekkerwebsite
+          ref: main
+          path: .contract-website
+          persist-credentials: false
+          sparse-checkout: |
+            js/trips-data.js
+            js/homepage-config.json
+          sparse-checkout-cone-mode: false
+      - name: Record website contract revision
+        run: git -C .contract-website rev-parse HEAD
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:

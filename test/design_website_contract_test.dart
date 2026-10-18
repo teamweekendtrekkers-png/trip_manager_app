@@ -6,7 +6,14 @@ import 'package:trip_manager_app/models/homepage_config.dart';
 import 'package:trip_manager_app/services/trips_parser.dart';
 
 void main() {
-  final website = Directory('../TravelBooking');
+  final website = Directory(
+    Platform.environment['WEBSITE_REPO_PATH'] ?? '../TravelBooking',
+  );
+  // Local app-only checkouts may omit the website. CI and explicit paths
+  // must fail on missing fixtures instead of silently losing this coverage.
+  final websiteRequired = Platform.environment['CI'] == 'true' ||
+      Platform.environment.containsKey('WEBSITE_REPO_PATH');
+  final skipWithoutWebsite = !websiteRequired && !website.existsSync();
   test(
     'authoritative website records retain dates and optional card metadata',
     () {
@@ -26,29 +33,11 @@ void main() {
       expect(reloaded.trips, hasLength(parsed.trips.length));
       expect(reloaded.document!.prefix, parsed.document!.prefix);
       expect(reloaded.document!.suffix, parsed.document!.suffix);
-      for (var index = 0; index < parsed.trips.length; index++) {
-        final before = parsed.trips[index];
-        final after = reloaded.trips[index];
-        expect(after['id'], before['id']);
-        for (final field in [
-          'availableDates',
-          'price',
-          'image',
-          'isActive',
-          'featured',
-          'cardImage',
-          'cardSummary',
-          'departureCity',
-          'experience',
-        ]) {
-          expect(after[field], before[field], reason: '${before['id']}.$field');
-          if (!before.containsKey(field)) {
-            expect(after.containsKey(field), isFalse);
-          }
-        }
-      }
+      // Full equality includes new optional fields, absence, empty lists,
+      // and editor aliases without maintaining another partial field list.
+      expect(reloaded.trips, parsed.trips);
     },
-    skip: !website.existsSync(),
+    skip: skipWithoutWebsite,
   );
 
   test(
@@ -71,6 +60,6 @@ void main() {
       );
       expect(data['hero'], original['hero']);
     },
-    skip: !website.existsSync(),
+    skip: skipWithoutWebsite,
   );
 }

@@ -4,45 +4,15 @@ import 'package:trip_manager_app/services/trips_parser.dart';
 
 void main() {
   group('Trip editor payload compatibility', () {
-    test('the editor-shaped payload generates every website field', () {
-      final generated = TripsParser.generateTripsDataJs(<Map<String, dynamic>>[
-        _editorPayload(),
-      ]);
-
-      for (final field in <String>[
-        'title:',
-        'location:',
-        'badge:',
-        'featured:',
-        'price:',
-        'image:',
-        'distance:',
-        'elevation:',
-        'difficulty:',
-        'bestTime:',
-        'duration:',
-        'availableDates:',
-        'about:',
-        'highlights:',
-        'itinerary:',
-        'includes:',
-        'excludes:',
-        'thingsToCarry:',
-        'boardingLocations:',
-        'galleryImages:',
-        'groupSize:',
-        'isActive:',
-      ]) {
-        expect(generated, contains(field), reason: 'missing $field');
-      }
-      expect(generated, contains('function getTripData(tripId)'));
-    });
-
     test('editor changes survive a production parser round-trip', () {
       final initial = TripsParser.generateTripsDataJs(<Map<String, dynamic>>[
         _editorPayload(),
       ]);
-      final editable = TripsParser.parseTripsData(initial).single
+      expect(initial, contains('"netravati-trek":'));
+      expect(initial, contains('function getTripData(tripId)'));
+      final document = TripsParser.parseTripsDocument(initial);
+      expect(document.isValid, isTrue, reason: document.errors.join('\n'));
+      final editable = document.trips.single
         ..['title'] = 'Updated Netravati Trek'
         ..['name'] = 'Updated Netravati Trek'
         ..['price'] = '₹5,000'
@@ -67,7 +37,33 @@ void main() {
         'New highlight 1',
         'New highlight 2',
       ]);
-      expect(parsedAgain['itinerary'], hasLength(2));
+      // Compare values, not only generated field names: omission of an
+      // editable field must fail even if generation and parsing agree.
+      final original = _editorPayload();
+      for (final field in [
+        'id', 'location', 'about', 'badge', 'image', 'distance', 'elevation',
+        'difficulty', 'bestTime', 'duration', 'groupSize', 'featured',
+        'isActive', 'thingsToCarry', 'boardingLocations',
+        'galleryImages',
+      ]) {
+        expect(parsedAgain[field], original[field], reason: field);
+      }
+      expect(parsedAgain['name'], parsedAgain['title']);
+      expect(parsedAgain['destination'], original['location']);
+      expect(parsedAgain['description'], original['about']);
+      expect(parsedAgain['date'], 'Aug 14-16, 2026');
+      expect(parsedAgain['priceNumeric'], 5000);
+      final itinerary = parsedAgain['itinerary'] as List;
+      final originalItinerary = original['itinerary'] as List;
+      expect(itinerary, hasLength(originalItinerary.length));
+      for (var index = 0; index < itinerary.length; index++) {
+        final before = originalItinerary[index] as Map;
+        final after = itinerary[index] as Map;
+        for (final field in ['day', 'title', 'activities']) {
+          expect(after[field], before[field], reason: 'itinerary[$index].$field');
+        }
+        expect(after['description'], (before['activities'] as List).join('\n'));
+      }
       expect(parsedAgain['inclusions'], <String>['Transport', 'Meals']);
       expect(parsedAgain['exclusions'], <String>['Personal expenses']);
     });
@@ -92,38 +88,11 @@ void main() {
         '2026-08-14/2026-08-16',
       );
     });
-
-    test('source-preserving publish changes only the trips object span', () {
-      final generated = TripsParser.generateTripsDataJs(<Map<String, dynamic>>[
-        _editorPayload(),
-      ]);
-      const prefix = '// hand-maintained website prefix\n';
-      const suffix = '\n// hand-maintained website suffix\n';
-      final declaration = RegExp(
-        r'const\s+tripsData\s*=\s*\{',
-      ).firstMatch(generated)!;
-      final source = '$prefix${generated.substring(declaration.start)}$suffix';
-      final trips = TripsParser.parseTripsData(source);
-      trips.single['price'] = '₹5,250';
-
-      final write = TripsParser.replaceTripsDataObject(
-        source: source,
-        trips: trips,
-      );
-
-      expect(write.success, isTrue, reason: write.error);
-      expect(write.content, startsWith(prefix));
-      expect(write.content, endsWith(suffix));
-      expect(
-        TripsParser.parseTripsData(write.content!).single['price'],
-        '₹5,250',
-      );
-    });
   });
 }
 
 Map<String, dynamic> _editorPayload() => <String, dynamic>{
-  'id': 'netravati',
+  'id': 'netravati-trek',
   'title': 'Netravati Peak Trek',
   'name': 'Netravati Peak Trek',
   'location': 'Western Ghats, Karnataka',
@@ -160,6 +129,13 @@ Map<String, dynamic> _editorPayload() => <String, dynamic>{
   'inclusions': <String>['Transport', 'Meals'],
   'exclusions': <String>['Personal expenses'],
   'thingsToCarry': <String>['Shoes'],
-  'boardingLocations': <Map<String, dynamic>>[],
-  'galleryImages': <String>[],
+  'boardingLocations': <Map<String, dynamic>>[
+    <String, dynamic>{
+      'name': 'Majestic',
+      'landmark': 'Metro station',
+      'time': '9 PM',
+      'mapLink': 'https://maps.test/majestic',
+    },
+  ],
+  'galleryImages': <String>['images/gallery/netravati/one.jpg'],
 };
