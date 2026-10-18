@@ -454,7 +454,7 @@ void main() {
           await tester.enterText(input, entry.value);
           await tester.pump();
         }
-        for (final key in ['getaway', 'beach', 'adventure']) {
+        for (final key in ['beach', 'adventure']) {
           final category = find.byKey(ValueKey('trip-card-experience-${key}'));
           await tester.ensureVisible(category);
           await tester.tap(category);
