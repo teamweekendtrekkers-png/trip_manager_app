@@ -531,6 +531,9 @@ Future<void> _chooseTripMenuAction(
     of: find.byKey(ValueKey<dynamic>(id)),
     matching: find.byType(PopupMenuButton<String>),
   );
+  // Let the transient save confirmation leave the tap target unobscured.
+  await tester.pump(const Duration(seconds: 6));
+  await tester.pumpAndSettle();
   await tester.ensureVisible(menu);
   await tester.tap(menu);
   await tester.pumpAndSettle();
