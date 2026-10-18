@@ -16,7 +16,7 @@ class TripCardSettingsEditor extends StatefulWidget {
   });
 
   final Map<String, dynamic> trip;
-  final void Function(String field, String? value) onChanged;
+  final void Function(String field, Object? value) onChanged;
   final Future<String?> Function()? onUploadCover;
   final VoidCallback? onChooseCover;
   final Widget Function(String path)? imagePreviewBuilder;
@@ -165,35 +165,48 @@ class _TripCardSettingsEditorState extends State<TripCardSettingsEditor> {
               'Departure city',
               'Optional, up to 80 characters. Enter the actual departure city.',
             ),
-            DropdownButtonFormField<String>(
+            FormField<String>(
               key: const Key('trip-card-experience'),
-              initialValue:
-                  TripCardSettings.experiences.containsKey(
-                    widget.trip['experience'],
-                  )
-                  ? widget.trip['experience'] as String
-                  : '',
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Experience category',
-                border: OutlineInputBorder(),
+              validator: (_) {
+                if (widget.trip.containsKey('experience')) {
+                  final error = TripCardSettings.fieldError('experience', widget.trip['experience']);
+                  if (error != null) return error;
+                }
+                final errors = TripCardSettings.validationErrors(widget.trip);
+                return errors.isEmpty ? null : errors.first;
+              },
+              builder: (state) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Experience categories', style: Theme.of(context).textTheme.titleMedium),
+                  const Text('Choose all that apply. No selection uses Other experiences on the website.'),
+                  const SizedBox(height: 8),
+                  Wrap(spacing: 8, runSpacing: 4, children: [
+                    for (final entry in TripCardSettings.experiences.entries)
+                      FilterChip(
+                        key: ValueKey('trip-card-experience-${entry.key}'),
+                        label: Text(entry.value),
+                        selected: TripCardSettings.selectedExperiencesFor(widget.trip).contains(entry.key),
+                        onSelected: (selected) {
+                          final values = [...TripCardSettings.selectedExperiencesFor(widget.trip)];
+                          if (selected) { values.add(entry.key); } else { values.remove(entry.key); }
+                          widget.onChanged('experience', null);
+                          widget.onChanged('experiences', values);
+                        },
+                      ),
+                  ]),
+                  if (state.hasError)
+                    Text(state.errorText!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                ],
               ),
-              items: [
-                const DropdownMenuItem(
-                  value: '',
-                  child: Text('Not specified (Other experiences)'),
-                ),
-                for (final entry in TripCardSettings.experiences.entries)
-                  DropdownMenuItem(value: entry.key, child: Text(entry.value)),
-              ],
-              validator: (_) => widget.trip.containsKey('experience')
-                  ? TripCardSettings.fieldError(
-                      'experience',
-                      widget.trip['experience'],
-                    )
-                  : null,
-              onChanged: (value) =>
-                  widget.onChanged('experience', value == '' ? null : value),
+            ),
+            SwitchListTile.adaptive(
+              key: const Key('trip-card-bestseller'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Bestseller'),
+              subtitle: const Text('Show a Bestseller badge on this trip’s website card.'),
+              value: widget.trip['isBestseller'] == true,
+              onChanged: (value) => widget.onChanged('isBestseller', value),
             ),
             const SizedBox(height: 16),
             ExpansionTile(
@@ -291,7 +304,6 @@ class TripCardPreview extends StatelessWidget {
       trip,
       referenceDate: referenceDate,
     );
-    final category = TripCardSettings.experienceFor(trip);
     final summary = '${trip['cardSummary'] ?? ''}'.trim();
     final location = '${trip['location'] ?? trip['destination'] ?? ''}'.trim();
     final departure = '${trip['departureCity'] ?? ''}'.trim();
@@ -327,8 +339,15 @@ class TripCardPreview extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (category != 'other')
-                      Text(TripCardSettings.experiences[category]!),
+                    for (final category in TripCardSettings.selectedExperiencesFor(trip))
+                      if (category != 'other')
+                        Text(TripCardSettings.experiences[category]!),
+                    if (trip['isBestseller'] == true)
+                      const Chip(
+                        label: Text('Bestseller'),
+                        backgroundColor: Color(0xFFFFF0BA),
+                        labelStyle: TextStyle(color: Color(0xFF713F12)),
+                      ),
                     Text(
                       '${trip['cardTitle'] ?? trip['title'] ?? trip['name'] ?? 'Trip name'}',
                       style: Theme.of(context).textTheme.titleMedium,

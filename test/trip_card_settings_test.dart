@@ -35,6 +35,32 @@ const _cardValues = <String, String>{
 };
 
 void main() {
+  test('multiple categories and Bestseller round-trip without altering legacy data', () {
+    final modern = {..._trip(), 'experiences': ['trek', 'adventure'], 'isBestseller': true};
+    final written = TripsParser.replaceTripsDataObject(
+      source: '// prefix\nconst tripsData = {};\n// suffix',
+      trips: [modern],
+    );
+    expect(written.success, isTrue, reason: written.errors.join('\n'));
+    expect(written.content, startsWith('// prefix\nconst tripsData = '));
+    expect(written.content, endsWith(';\n// suffix'));
+    final parsed = TripsParser.parseTripsDocument(written.content!);
+    expect(parsed.isValid, isTrue, reason: parsed.errors.join('\n'));
+    expect(parsed.trips.single['experiences'], ['trek', 'adventure']);
+    expect(parsed.trips.single['isBestseller'], isTrue);
+    final old = TripsParser.parseTripsDocument(TripsParser.generateTripsDataJs([{..._trip(), 'experience': 'beach'}])).trips.single;
+    expect(old['experience'], 'beach');
+    expect(old.containsKey('experiences'), isFalse);
+    expect(old.containsKey('isBestseller'), isFalse);
+    expect(TripCardSettings.selectedExperiencesFor(old), ['beach']);
+    for (final value in [null, 'trek', ['trek', 'trek'], ['unknown'], [1]]) {
+      expect(TripCardSettings.validationErrors({..._trip(), 'experiences': value}), isNotEmpty);
+      expect(TripsParser.replaceTripsDataObject(source: 'const tripsData = {};', trips: [{..._trip(), 'experiences': value}]).success, isFalse);
+      expect(TripsParser.parseTripsDocument('const tripsData = {a: {experiences: '+jsonEncode(value)+'}};').isValid, isFalse);
+    }
+    expect(TripCardSettings.validationErrors({..._trip(), 'isBestseller': 'true'}), isNotEmpty);
+  });
+
   test('new card fields round-trip and unmanaged source remains identical', () {
     const source = '// keep prefix\nconst tripsData = {};\n// keep helpers\n';
     final result = TripsParser.replaceTripsDataObject(
@@ -370,12 +396,16 @@ void main() {
   }
 
   Future<void> save(WidgetTester tester) async {
-    await tester.tap(
-      find.descendant(
-        of: find.byType(AppBar),
-        matching: find.byIcon(Icons.save),
-      ),
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    final button = find.descendant(
+      of: find.byType(AppBar),
+      matching: find.byWidgetPredicate((widget) => widget is TextButton),
     );
+    await tester.ensureVisible(button);
+    await tester.pumpAndSettle();
+    expect(button.hitTestable(), findsOneWidget);
+    await tester.tap(button);
     await tester.pumpAndSettle();
   }
 
@@ -428,11 +458,15 @@ void main() {
           await tester.enterText(input, entry.value);
           await tester.pump();
         }
-        final category = find.byKey(const Key('trip-card-experience'));
-        await tester.ensureVisible(category);
-        await tester.tap(category);
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Beaches').last);
+        for (final key in ['beach', 'adventure']) {
+          final category = find.byKey(ValueKey('trip-card-experience-${key}'));
+          await tester.ensureVisible(category);
+          await tester.tap(category);
+          await tester.pumpAndSettle();
+        }
+        final bestseller = find.byKey(const Key('trip-card-bestseller'));
+        await tester.ensureVisible(bestseller);
+        await tester.tap(bestseller);
         await tester.pumpAndSettle();
         final upload = find.byKey(const Key('trip-card-upload'));
         await tester.ensureVisible(upload);
@@ -466,7 +500,9 @@ void main() {
         );
         expect(provider.trips.single['cardSummary'], 'Coffee and waterfalls');
         expect(provider.trips.single['departureCity'], 'Bengaluru');
-        expect(provider.trips.single['experience'], 'beach');
+        expect(provider.trips.single.containsKey('experience'), isFalse);
+        expect(provider.trips.single['experiences'], ['beach', 'adventure']);
+        expect(provider.trips.single['isBestseller'], isTrue);
         expect(provider.trips.single['image'], '');
         expect(tester.takeException(), isNull);
       },
