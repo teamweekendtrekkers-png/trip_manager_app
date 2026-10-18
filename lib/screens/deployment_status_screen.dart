@@ -1,3 +1,4 @@
+import '../widgets/publishing_progress.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -323,6 +324,13 @@ class _DeploymentStatusScreenState extends State<DeploymentStatusScreen>
                 padding: const EdgeInsets.all(16),
                 children: [
                   _buildStatusHero(),
+                  if (_isTrackingCommit) ...[
+                    const SizedBox(height: 12),
+                    PublishingProgress(
+                      live: _monitorState?.isSuccess == true,
+                      running: _monitorState?.shouldPoll == true,
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   if (_builds.isNotEmpty) _buildBuildsHistory(),
                   const SizedBox(height: 16),
@@ -1072,3 +1080,4 @@ class _DeploymentStatusScreenState extends State<DeploymentStatusScreen>
     }
   }
 }
+

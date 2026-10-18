@@ -1,4 +1,4 @@
-import 'dart:convert';
+import '../services/booking_review_filter.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/settings_provider.dart';
@@ -19,6 +19,8 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
   String? error;
   bool busy = false;
   int offset = 0;
+  BookingReviewFilter filter = BookingReviewFilter.all;
+  List<Map<String, dynamic>> get visibleBookings => bookings.where((booking) => matchesBookingReview(booking, filter)).toList();
   @override
   void initState() {
     super.initState();
@@ -44,12 +46,7 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
     } catch (e) { if (mounted) setState(() => error = e.toString()); }
     finally { if (mounted) setState(() => busy = false); }
   }
-  Map? _payment(Map booking) {
-    final text = booking['special_requests']?.toString() ?? '';
-    if (!text.startsWith('[TWT_PAYMENT:')) return null;
-    try { return jsonDecode(text.substring(13, text.indexOf(']\n'))) as Map; }
-    catch (_) { return null; }
-  }
+  Map? _payment(Map booking) => bookingPaymentReport(booking);
   Future<void> _review(Map<String, dynamic> booking, String status) async {
     final note = TextEditingController();
     final yes = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
@@ -92,8 +89,24 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
         ] else ...[
           TextField(controller: search, enabled: !busy, decoration: InputDecoration(labelText: 'Find booking, customer, phone or transaction ID', suffixIcon: IconButton(tooltip: 'Search bookings', onPressed: busy ? null : () => _load(pageOffset: 0), icon: const Icon(Icons.search))), onSubmitted: (_) => _load(pageOffset: 0)),
           TextButton.icon(onPressed: busy ? null : () => _load(), icon: const Icon(Icons.refresh), label: const Text('Refresh bookings')),
-          if (bookings.isEmpty && !busy) const ListTile(title: Text('No bookings found')),
-          for (final booking in bookings) Builder(builder: (_) {
+          const SizedBox(height: 8),
+          const Text('Search covers all bookings. Status filters apply to this page (up to 50 bookings).'),
+          Wrap(spacing: 8, runSpacing: 4, children: [
+            for (final option in BookingReviewFilter.values)
+              ChoiceChip(label: Text(option.label), selected: filter == option,
+                onSelected: busy ? null : (_) => setState(() => filter = option)),
+          ]),
+          Text('${visibleBookings.length} of ${bookings.length} bookings on this page', key: const Key('booking-results-count')),
+          if (search.text.isNotEmpty || filter != BookingReviewFilter.all)
+            TextButton.icon(
+              key: const Key('clear-booking-filters'),
+              onPressed: busy ? null : () {
+                setState(() { filter = BookingReviewFilter.all; search.clear(); });
+                _load(pageOffset: 0);
+              }, icon: const Icon(Icons.filter_alt_off), label: const Text('Clear search & filters')),
+          if (visibleBookings.isEmpty && !busy) ListTile(title: const Text('No bookings found'),
+            subtitle: Text(bookings.isEmpty ? 'Try a different search.' : 'Choose All or try another page.')),
+          for (final booking in visibleBookings) Builder(builder: (_) {
             final report = _payment(booking);
             return Card(child: ExpansionTile(title: Text('${booking['booking_reference']} · ${booking['full_name']}'),
               subtitle: Text('${booking['trip_name']} · ${booking['departure_label']}\n${report == null ? 'Availability request' : 'Payment: ${booking['payment_review_status'] ?? 'pending'}'}'),

@@ -1,3 +1,5 @@
+import '../widgets/manager_setup_checklist.dart';
+import '../providers/trips_provider.dart';
 import '../widgets/app_version_card.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -20,6 +22,8 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _connectionKey = GlobalKey();
+  final _tokenFocus = FocusNode();
   late TextEditingController _tokenController;
   late TextEditingController _ownerController;
   late TextEditingController _repoController;
@@ -53,6 +57,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   void dispose() {
+    _tokenFocus.dispose();
     _tokenController.dispose();
     _ownerController.dispose();
     _repoController.dispose();
@@ -101,12 +106,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   padding: const EdgeInsets.all(16),
                   children: [
                     const AppVersionCard(),
+                    ManagerSetupChecklist(
+                      configured: provider.isConfigured,
+                      hasTrips: context.watch<TripsProvider?>()?.hasTrips ?? false,
+                      hasPublished: context.watch<TripsProvider?>()?.lastPublishedCommit != null,
+                      onConnection: () {
+                        final field = _connectionKey.currentContext;
+                        if (field != null) Scrollable.ensureVisible(field);
+                        _tokenFocus.requestFocus();
+                      },
+                      onTrips: () => Navigator.popUntil(context, (route) => route.isFirst),
+                      onPayments: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const CommerceSettingsScreen())),
+                      onPublish: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => DeploymentStatusScreen(savedCommitSha: context.read<TripsProvider?>()?.lastPublishedCommit))),
+                    ),
                     // GitHub Configuration Card
                     _buildCard(
                       title: 'GitHub Configuration',
                       icon: Icons.code,
                       children: [
                         TextFormField(
+                          key: _connectionKey,
+                          focusNode: _tokenFocus,
                           controller: _tokenController,
                           decoration: InputDecoration(
                             labelText: 'GitHub Personal Access Token',
@@ -815,3 +835,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 }
+

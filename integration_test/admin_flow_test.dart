@@ -531,6 +531,17 @@ Future<void> _chooseTripMenuAction(
     of: find.byKey(ValueKey<dynamic>(id)),
     matching: find.byType(PopupMenuButton<String>),
   );
+  // Dismiss the save notification before using a card it can cover.
+  await tester.pumpAndSettle();
+  final notification = find.byType(SnackBar);
+  if (notification.evaluate().isNotEmpty) {
+    await tester.drag(notification, const Offset(0, 300));
+    await tester.pumpAndSettle();
+    expect(notification, findsNothing);
+  }
+  await tester.ensureVisible(menu);
+  await tester.pumpAndSettle();
+  expect(menu.hitTestable(), findsOneWidget);
   await tester.tap(menu);
   await tester.pumpAndSettle();
   await tester.tap(find.text(action));
@@ -685,3 +696,4 @@ final class _MemorySettingsStore implements SettingsStore {
   @override
   Future<void> write(String key, String value) async => this.value = value;
 }
+

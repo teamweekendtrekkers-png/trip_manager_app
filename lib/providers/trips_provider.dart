@@ -1032,14 +1032,14 @@ class TripsProvider extends ChangeNotifier {
 
   List<Map<String, dynamic>> searchTrips(String query) {
     final ordered = orderedTrips;
-    if (query.isEmpty) return ordered;
-    final lowerQuery = query.toLowerCase();
-    return ordered.where((t) {
-      final name = (t['name'] ?? t['title'] ?? '').toString().toLowerCase();
-      final destination = (t['destination'] ?? t['location'] ?? '')
-          .toString()
-          .toLowerCase();
-      return name.contains(lowerQuery) || destination.contains(lowerQuery);
+    final terms = query.trim().toLowerCase().split(RegExp(r'\s+'))
+        .where((term) => term.isNotEmpty).toList();
+    if (terms.isEmpty) return ordered;
+    return ordered.where((trip) {
+      final searchable = [
+        'id', 'name', 'title', 'destination', 'location', 'departureCity',
+      ].map((field) => trip[field]?.toString() ?? '').join(' ').toLowerCase();
+      return terms.every(searchable.contains);
     }).toList();
   }
 
@@ -1154,3 +1154,4 @@ class _ManagedTarget {
     required this.featuredPath,
   });
 }
+
