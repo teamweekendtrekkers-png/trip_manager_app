@@ -8,6 +8,8 @@ import 'trip_pricing.dart';
 /// Handles object format: const tripsData = { tripId: {...}, tripId2: {...} }
 class TripsParser {
   static const Set<String> _supportedSourceTripFields = {
+    'experiences',
+    'isBestseller',
     'contentSections',
     'publicSlug',
     'previousSlugs',
@@ -242,7 +244,7 @@ class TripsParser {
       'about',
       'groupSize',
     };
-    const booleanFields = {'featured', 'isActive'};
+    const booleanFields = {'featured', 'isActive', 'isBestseller'};
     const stringListFields = {
       'previousSlugs',
       'availableDates',
@@ -456,6 +458,8 @@ class TripsParser {
       );
       result['priceNumeric'] = double.tryParse(priceText) ?? 0;
     }
+    if (source.containsKey('experiences')) result['experiences'] = List<String>.from(source['experiences'] as List);
+    if (source['isBestseller'] is bool) result['isBestseller'] = source['isBestseller'];
     if (source['featured'] is bool) result['featured'] = source['featured'];
     if (source['isActive'] is bool) result['isActive'] = source['isActive'];
     return result;
@@ -600,6 +604,10 @@ class TripsParser {
       if (trip.containsKey('featured')) {
         buffer.writeln('        featured: ${trip['featured']},');
       }
+      if (trip.containsKey('isBestseller')) {
+        buffer.writeln('        isBestseller: ${trip['isBestseller']},');
+      }
+      writeStringListField('experiences', const ['experiences']);
       writeStringField('price', const ['price']);
       if (trip.containsKey('originalPrice'))
         buffer.writeln('        originalPrice: ${trip['originalPrice']},');
@@ -762,7 +770,7 @@ class TripsParser {
     };
     const stringOrNumberFields = {'price', 'groupSize'};
     const numberFields = {'priceNumeric', 'discountedPrice', 'originalPrice'};
-    const booleanFields = {'featured', 'isActive'};
+    const booleanFields = {'featured', 'isActive', 'isBestseller'};
     const stringListFields = {
       'previousSlugs',
       'availableDates',

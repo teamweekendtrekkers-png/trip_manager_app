@@ -32,10 +32,19 @@ abstract final class TripCardSettings {
     return trip['image'] is String ? (trip['image'] as String).trim() : '';
   }
 
-  static String experienceFor(Map<String, dynamic> trip) =>
-      experiences.containsKey(trip['experience'])
-      ? trip['experience'] as String
-      : 'other';
+  static List<String> selectedExperiencesFor(Map<String, dynamic> trip) {
+    final values = trip['experiences'];
+    if (values is List) {
+      return values.whereType<String>().where(experiences.containsKey).toSet().toList();
+    }
+    final legacy = trip['experience'];
+    return legacy is String && experiences.containsKey(legacy) ? [legacy] : [];
+  }
+
+  static String experienceFor(Map<String, dynamic> trip) {
+    final selected = selectedExperiencesFor(trip);
+    return selected.isEmpty ? 'other' : selected.first;
+  }
 
   static String? fieldError(String field, Object? value) {
     if (value is! String) return '$field must be text.';
@@ -69,6 +78,16 @@ abstract final class TripCardSettings {
   }
 
   static List<String> validationErrors(Map<String, dynamic> trip) => [
+    if (trip.containsKey('isBestseller') && trip['isBestseller'] is! bool)
+      'isBestseller must be true or false.',
+    if (trip.containsKey('experiences'))
+      if (trip['experiences'] is! List)
+        'experiences must be a list.'
+      else if ((trip['experiences'] as List).any((value) => value is! String || !experiences.containsKey(value)) ||
+          (trip['experiences'] as List).toSet().length != (trip['experiences'] as List).length ||
+          (trip['experiences'] as List).length > experiences.length)
+        'Choose distinct supported experience categories.',
+
     for (final field in optionalFields)
       if (trip.containsKey(field))
         if (fieldError(field, trip[field]) case final String error)
