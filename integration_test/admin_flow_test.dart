@@ -531,10 +531,17 @@ Future<void> _chooseTripMenuAction(
     of: find.byKey(ValueKey<dynamic>(id)),
     matching: find.byType(PopupMenuButton<String>),
   );
-  // Let the transient save confirmation leave the tap target unobscured.
-  await tester.pump(const Duration(seconds: 6));
+  // Dismiss the save notification before using a card it can cover.
   await tester.pumpAndSettle();
+  final notification = find.byType(SnackBar);
+  if (notification.evaluate().isNotEmpty) {
+    await tester.drag(notification, const Offset(0, 300));
+    await tester.pumpAndSettle();
+    expect(notification, findsNothing);
+  }
   await tester.ensureVisible(menu);
+  await tester.pumpAndSettle();
+  expect(menu.hitTestable(), findsOneWidget);
   await tester.tap(menu);
   await tester.pumpAndSettle();
   await tester.tap(find.text(action));
