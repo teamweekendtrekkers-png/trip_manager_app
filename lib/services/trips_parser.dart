@@ -458,7 +458,7 @@ class TripsParser {
       );
       result['priceNumeric'] = double.tryParse(priceText) ?? 0;
     }
-    if (source.containsKey('experiences')) result['experiences'] = List<String>.from(source['experiences'] as List);
+    if (source['experiences'] is List) result['experiences'] = List<String>.from((source['experiences'] as List).whereType<String>());
     if (source['isBestseller'] is bool) result['isBestseller'] = source['isBestseller'];
     if (source['featured'] is bool) result['featured'] = source['featured'];
     if (source['isActive'] is bool) result['isActive'] = source['isActive'];

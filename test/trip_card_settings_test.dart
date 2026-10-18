@@ -396,12 +396,16 @@ void main() {
   }
 
   Future<void> save(WidgetTester tester) async {
-    await tester.tap(
-      find.descendant(
-        of: find.byType(AppBar),
-        matching: find.byIcon(Icons.save),
-      ),
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    final button = find.descendant(
+      of: find.byType(AppBar),
+      matching: find.byIcon(Icons.save),
     );
+    await tester.ensureVisible(button);
+    await tester.pumpAndSettle();
+    expect(button.hitTestable(), findsOneWidget);
+    await tester.tap(button);
     await tester.pumpAndSettle();
   }
 
