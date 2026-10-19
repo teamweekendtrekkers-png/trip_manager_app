@@ -115,4 +115,14 @@ void main() {
     expect(find.text('50 of 50 bookings on this page'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('pending-payment shortcut opens with pending filter selected', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: BookingReviewScreen(
+      service: ReviewFixture(), initialFilter: BookingReviewFilter.pending)));
+    await tester.tap(find.text('Refresh bookings'));
+    await tester.pumpAndSettle();
+    expect(find.text('1 of 50 bookings on this page'), findsOneWidget);
+    expect(tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Pending')).selected, true);
+    expect(tester.takeException(), isNull);
+  });
 }

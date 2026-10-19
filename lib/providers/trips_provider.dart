@@ -29,6 +29,11 @@ class TripsProvider extends ChangeNotifier {
   String? draftError;
   bool _draftRecoveryBlocked = false;
   String? lastPublishedCommit;
+  DateTime? lastPublishedAt;
+  Map<String, dynamic>? _savedDraftSnapshot;
+  bool get isDraftSaved => persistentDrafts && DraftStore.available &&
+      draftError == null && !_draftRecoveryBlocked &&
+      _savedDraftSnapshot != null && WorkspaceChanges.same(_snapshot(), _savedDraftSnapshot);
   final List<Map<String, dynamic>> _undo = [];
   bool get canUndo => _undo.isNotEmpty && !_isLoading;
   Map<String, List<FieldChange>> get changes =>
@@ -44,6 +49,13 @@ class TripsProvider extends ChangeNotifier {
   void _checkpoint() {
     _undo.add(_snapshot());
     if (_undo.length > 20) _undo.removeAt(0);
+  }
+
+  Object? get undoToken => _undo.isEmpty ? null : _undo.last;
+  bool undoIfCurrent(Object? token) {
+    if (token == null || !canUndo || !identical(token, undoToken)) return false;
+    undo();
+    return true;
   }
 
   void undo() {
@@ -85,7 +97,10 @@ class TripsProvider extends ChangeNotifier {
     try {
       if (_hasUnsavedChanges) {
         await DraftStore.write(scope, 'workspace', snapshot);
-        lastDraftSaved = DateTime.now();
+        if (scope == draftScope) {
+          lastDraftSaved = DateTime.now();
+          _savedDraftSnapshot = snapshot;
+        }
       } else {
         await DraftStore.remove(scope, 'workspace');
       }
@@ -134,6 +149,7 @@ class TripsProvider extends ChangeNotifier {
     if (record == null) return;
     try {
       final state = record['data'] as Map;
+      _savedDraftSnapshot = Map<String, dynamic>.from(state);
       final local = (state['trips'] as List)
           .map((t) => Map<String, dynamic>.from(t as Map))
           .toList();
@@ -177,6 +193,9 @@ class TripsProvider extends ChangeNotifier {
   }
 
   void _initService() {
+    _savedDraftSnapshot = null;
+    lastDraftSaved = null;
+    lastPublishedAt = DateTime.tryParse(DraftStore.read(draftScope, 'publication')?['data']?['publishedAt']?.toString() ?? '');
     lastPublishedCommit = DraftStore.read(
       draftScope,
       'publication',
@@ -758,6 +777,7 @@ class TripsProvider extends ChangeNotifier {
     );
     _baseTrips = _copyTrips(committedDocument.trips);
     lastPublishedCommit = result.commitSha;
+    lastPublishedAt = DateTime.now();
     _undo.clear();
     _tripsSource = tripsWrite.content;
     _featuredSource = featuredWrite.content;

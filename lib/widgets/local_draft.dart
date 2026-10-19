@@ -50,7 +50,8 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
   Map<String, dynamic>? _localBase,
       _lastDocument,
       _blockedDraft,
-      _savedDocument;
+      _savedDocument,
+      _persistedDocument;
   Timer? _saveTimer;
   AppLifecycleListener? _lifecycle;
   @override
@@ -76,15 +77,21 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
   String? localDraftError;
   DateTime? localSavedAt;
   final List<Map<String, dynamic>> _undoDocuments = [];
+  bool get isLocalDraftSaved => DraftStore.available &&
+      localDraftError == null && _blockedDraft == null &&
+      _persistedDocument != null &&
+      WorkspaceChanges.same(_persistedDocument, currentDocument);
   bool get hasLocalEdits =>
       _localBase != null && !WorkspaceChanges.same(_localBase, currentDocument);
   void startLocalDraft(Map<String, dynamic> remote) {
     _localBase = copyDocument(remote);
     _savedDocument = null;
+    _persistedDocument = null;
     final record = DraftStore.read(localScope, localSlot);
     if (record != null) {
       try {
         final data = record['data'] as Map;
+        _persistedDocument = copyDocument(data['draft'] as Map);
         _apply(
           recoverDocument(data['base'] as Map, data['draft'] as Map, remote),
         );
@@ -149,6 +156,7 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
       } else {
         await DraftStore.remove(localScope, localSlot);
       }
+      _persistedDocument = document;
       if (checkpoint) _savedDocument = document;
       if (mounted)
         super.setState(() {
@@ -266,6 +274,7 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
         _apply(copyDocument(target));
         _lastDocument = copyDocument(currentDocument!);
         _savedDocument = copyDocument(currentDocument!);
+        _persistedDocument = copyDocument(currentDocument!);
         _undoDocuments.clear();
         _blockedDraft = null;
         localDraftError = null;
@@ -328,7 +337,9 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
           Text(
             localDraftError ??
                 DraftStore.error ??
-                (localSavedAt == null
+                (hasLocalEdits && !isLocalDraftSaved
+                    ? (DraftStore.available ? 'Unsaved changes · saving on this device…' : 'Unsaved changes · local storage unavailable')
+                    : localSavedAt == null
                     ? 'Drafts save automatically on this device'
                     : 'Local draft saved ${localSavedAt!.toLocal().toString().split('.').first}'),
             style: TextStyle(

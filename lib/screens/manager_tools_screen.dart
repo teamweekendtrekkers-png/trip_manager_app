@@ -1,4 +1,6 @@
 import '../services/trip_attention.dart';
+import '../services/booking_review_filter.dart';
+import 'booking_review_screen.dart';
 import '../widgets/manager_setup_checklist.dart';
 import '../widgets/trip_editor_sections.dart';
 import 'trip_edit_screen.dart';
@@ -160,9 +162,11 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
           ),
           OutlinedButton.icon(
             key: const Key('dashboard-booking-review'),
-            onPressed: () => go(ManagerDestination.bookingReview),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => const BookingReviewScreen(initialFilter: BookingReviewFilter.pending),
+            )),
             icon: const Icon(Icons.fact_check_outlined),
-            label: const Text('Review bookings'),
+            label: const Text('Pending payments'),
           ),
           OutlinedButton.icon(
             key: const Key('dashboard-payments'),
@@ -296,7 +300,16 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
       ),
       for (final b in upcoming.take(6))
         for (final t in b.trips)
-          ListTile(title: Text(t.title), subtitle: Text(b.dateLabel)),
+          ListTile(
+            title: Text(t.title), subtitle: Text(b.dateLabel),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: p.isLoading || t.id == null ? null : () {
+              final index = p.getTripIndexById(t.id!);
+              if (index == null) return;
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) =>
+                TripEditScreen(trip: p.getTripById(t.id!)!, index: index, initialSection: TripEditorSection.dates)));
+            },
+          ),
       if (homepage != null) ...[
         const Divider(),
         const Text('Homepage selection is independent of Active and Featured.'),
@@ -321,7 +334,7 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
     ),
   );
   String _visibility(Map<String, dynamic> trip) {
-    if (trip['isActive'] == false) return 'Inactive: shown only with Show coming soon';
+    if (trip['isActive'] == false) return 'Inactive: included when trips without available dates are shown';
     if (homepage == null)
       return 'Upcoming Batches selection could not be loaded';
     final options = homepage!['upcomingBatches'] as Map;

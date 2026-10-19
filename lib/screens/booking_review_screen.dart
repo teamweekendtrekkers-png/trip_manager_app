@@ -6,7 +6,8 @@ import '../services/github_service.dart';
 import '../services/booking_review_service.dart';
 
 class BookingReviewScreen extends StatefulWidget {
-  const BookingReviewScreen({super.key, this.service});
+  const BookingReviewScreen({super.key, this.service, this.initialFilter = BookingReviewFilter.all});
+  final BookingReviewFilter initialFilter;
   final BookingReviewService? service;
   @override
   State<BookingReviewScreen> createState() => _BookingReviewScreenState();
@@ -24,6 +25,7 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
   @override
   void initState() {
     super.initState();
+    filter = widget.initialFilter;
     service = widget.service ?? BookingReviewService(GitHubService(settings: context.read<SettingsProvider>().settings));
   }
   @override

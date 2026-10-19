@@ -2604,13 +2604,24 @@ class _TripEditScreenState extends State<TripEditScreen>
       }
 
       (_formKey.currentContext as Element).visitChildren(find);
-      if (firstError != null)
+      if (firstError != null) {
+        void focusInput(Element element) {
+          if (element.widget is EditableText) {
+            (element.widget as EditableText).focusNode.requestFocus();
+            return;
+          }
+          element.visitChildren(focusInput);
+        }
+        focusInput(firstError!);
         Scrollable.ensureVisible(
           firstError!,
           duration: const Duration(milliseconds: 200),
         );
+      }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all required fields')),
+        SnackBar(content: Text(firstError is StatefulElement
+            ? ((firstError as StatefulElement).state as FormFieldState).errorText ?? 'Please check the highlighted field'
+            : 'Please check the highlighted fields')),
       );
       return;
     }

@@ -530,7 +530,7 @@ void main() {
       await tester.enterText(input, List.filled(161, 'x').join());
       await save(tester);
       expect(
-        find.text('Card summary must be at most 160 characters.'),
+        find.descendant(of: find.byType(SnackBar), matching: find.text('Card summary must be at most 160 characters.')),
         findsOneWidget,
       );
       expect(provider.hasUnsavedChanges, isFalse);
