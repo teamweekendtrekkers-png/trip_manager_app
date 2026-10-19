@@ -274,6 +274,7 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
         _apply(copyDocument(target));
         _lastDocument = copyDocument(currentDocument!);
         _savedDocument = copyDocument(currentDocument!);
+        _persistedDocument = copyDocument(currentDocument!);
         _undoDocuments.clear();
         _blockedDraft = null;
         localDraftError = null;
