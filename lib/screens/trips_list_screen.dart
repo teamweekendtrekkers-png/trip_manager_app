@@ -291,10 +291,10 @@ class _TripsListScreenState extends State<TripsListScreen> {
               : provider.error != null
               ? 'Needs attention'
               : provider.hasUnsavedChanges
-              ? 'Draft changes'
+              ? (provider.isDraftSaved ? 'Draft saved on device' : 'Unsaved changes')
               : !provider.hasCompleteRemoteSnapshot
               ? 'Load trips first'
-              : _publishedCommitSha != null
+              : (_publishedCommitSha ?? provider.lastPublishedCommit) != null
               ? 'Saved · check deployment'
               : 'Synced with GitHub',
           key: const Key('workspace-publish-state'),
@@ -305,11 +305,11 @@ class _TripsListScreenState extends State<TripsListScreen> {
               ? 'Publish failed — your draft is retained.'
               : (provider.hasUnsavedChanges
                     ? provider.draftError ??
-                          (provider.lastDraftSaved == null
-                              ? 'Draft changes: local saving in progress.'
+                          (!provider.isDraftSaved
+                              ? 'Changes are not saved on this device yet.'
                               : 'Local draft saved ${provider.lastDraftSaved!.toLocal().toString().split('.').first}. Publish when ready.')
-                    : _publishedCommitSha != null
-                    ? 'Open publishing status to verify the live website.'
+                    : ( _publishedCommitSha ?? provider.lastPublishedCommit) != null
+                    ? '${provider.lastPublishedAt == null ? '' : 'Published to GitHub ${provider.lastPublishedAt!.toLocal().toString().split('.').first}. '}Open publishing status to verify the live website.'
                     : 'Workspace edits are not live until published.'),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
@@ -833,6 +833,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                   'Draft',
                                   'Upcoming',
                                   'Inactive',
+                                  'Needs dates',
                                 ])
                                   Padding(
                                     padding: const EdgeInsets.only(right: 6),
@@ -923,6 +924,9 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                             TripDateUtils.getUpcomingDateRanges(
                                               t,
                                             ).isNotEmpty,
+                                      'Needs dates' =>
+                                        t['isActive'] != false &&
+                                            TripDateUtils.getUpcomingDateRanges(t).isEmpty,
                                       _ => true,
                                     },
                                   )
@@ -1131,7 +1135,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Trip'),
-        content: const Text('Are you sure you want to delete this trip?'),
+        content: const Text('Remove this trip from your workspace? The live website changes only after you review and publish. You can undo this deletion before publishing.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1153,9 +1157,21 @@ class _TripsListScreenState extends State<TripsListScreen> {
       _showTripUnavailable();
       return;
     }
+    final title = provider.getTripById(tripId)?['title']?.toString() ?? 'Trip';
+    final scope = provider.draftScope;
     provider.deleteTrip(index);
+    final token = provider.undoToken;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Trip deleted. Push to save changes.')),
+      SnackBar(
+        content: Text('$title removed from workspace.'),
+        action: SnackBarAction(label: 'Undo', onPressed: () {
+          if (scope != provider.draftScope || !provider.undoIfCurrent(token)) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Workspace changed. Use edit history to review earlier changes.'),
+            ));
+          }
+        }),
+      ),
     );
   }
 

@@ -38,7 +38,13 @@ void main() {
         'title': 'Recovered title',
         'name': 'Recovered title',
       });
+      expect(p.isDraftSaved, false);
       await p.flushDraft();
+      expect(p.isDraftSaved, true);
+      p.updateTrip(0, {...p.trips.single, 'location': 'New location'});
+      expect(p.isDraftSaved, false);
+      await p.flushDraft();
+      expect(p.isDraftSaved, true);
       p.dispose();
       final remote = fixtures.FakeGitHubService()
         ..queueSnapshot(base, tripsSha: 't1', featuredSha: 'f1');
