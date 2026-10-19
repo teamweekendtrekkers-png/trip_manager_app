@@ -338,7 +338,7 @@ mixin LocalDraft<T extends StatefulWidget> on State<T> {
             localDraftError ??
                 DraftStore.error ??
                 (hasLocalEdits && !isLocalDraftSaved
-                    ? 'Unsaved changes · saving on this device…'
+                    ? (DraftStore.available ? 'Unsaved changes · saving on this device…' : 'Unsaved changes · local storage unavailable')
                     : localSavedAt == null
                     ? 'Drafts save automatically on this device'
                     : 'Local draft saved ${localSavedAt!.toLocal().toString().split('.').first}'),
