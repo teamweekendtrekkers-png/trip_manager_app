@@ -1,3 +1,4 @@
+import 'inline_formatting.dart';
 import 'package:flutter/material.dart';
 import '../models/trip_content_settings.dart';
 import 'trip_price.dart';
@@ -51,7 +52,7 @@ class _DraftPreviewState extends State<DraftPreview> {
       );
   Widget text(String value, {bool heading = false}) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 6),
-    child: Text(
+    child: FormattedText(
       value,
       style: TextStyle(
         fontSize: heading ? 22 : 16,
@@ -80,7 +81,7 @@ class _DraftPreviewState extends State<DraftPreview> {
               : 'Next departure: ${dates.first.originalLabel}',
         ),
         image(
-          trip['cardImage']?.toString() ?? trip['image']?.toString(),
+          (trip['galleryImages'] as List?)?.whereType<String>().firstOrNull ?? trip['image']?.toString(),
           4 / 3,
           focus: trip['imageFocalPoint']?.toString() ?? 'center',
         ),

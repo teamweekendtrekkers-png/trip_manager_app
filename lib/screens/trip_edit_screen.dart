@@ -1,3 +1,6 @@
+import '../widgets/inline_formatting.dart';
+import '../widgets/gallery_order_editor.dart';
+import '../widgets/batch_color_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/local_draft.dart';
 import '../services/draft_store.dart';
@@ -446,6 +449,7 @@ class _TripEditScreenState extends State<TripEditScreen>
                                 TextFormField(
                                   key: const ValueKey('trip-name'),
                                   controller: _nameController,
+                                  contextMenuBuilder: formattingContextMenu,
                                   decoration: const InputDecoration(
                                     labelText: 'Trip Name *',
                                     border: OutlineInputBorder(),
@@ -458,6 +462,7 @@ class _TripEditScreenState extends State<TripEditScreen>
                                 TextFormField(
                                   key: const ValueKey('trip-destination'),
                                   controller: _destinationController,
+                                  contextMenuBuilder: formattingContextMenu,
                                   decoration: const InputDecoration(
                                     labelText: 'Destination *',
                                     border: OutlineInputBorder(),
@@ -528,6 +533,7 @@ class _TripEditScreenState extends State<TripEditScreen>
                                 TextFormField(
                                   key: const ValueKey('trip-about'),
                                   controller: _descriptionController,
+                                  contextMenuBuilder: formattingContextMenu,
                                   decoration: const InputDecoration(
                                     labelText: 'Trip Description / About',
                                     hintText:
@@ -931,6 +937,11 @@ class _TripEditScreenState extends State<TripEditScreen>
 
                             // Gallery Images Card
                             _buildGallerySection(),
+                            TripEditorPanel(section:TripEditorSection.photos,child:Card(child:Padding(padding:const EdgeInsets.all(16),child:BatchColorPicker(
+                              value:_tripData['batchColor'] as String?,
+                              onChanged:(value)=>setState(()=>_tripData['batchColor']=value),
+                            )))),
+
                             const SizedBox(height: 16),
 
                             // Optional card controls follow every existing editor section.
@@ -1346,7 +1357,7 @@ class _TripEditScreenState extends State<TripEditScreen>
                         style: const TextStyle(fontSize: 12),
                       ),
                     ),
-                    title: Text(item),
+                    title: FormattedText(item),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -1557,59 +1568,19 @@ class _TripEditScreenState extends State<TripEditScreen>
                 ],
               ),
               const SizedBox(height: 8),
+              const Text('Drag the handle to change gallery and slideshow order. The trip-card cover is selected separately. Recommended originals: 4:3. Cards use a 16:9 crop; original images are retained.'),
+              const SizedBox(height: 8),
               if (galleryImages.isEmpty)
                 Text(
                   'No gallery images yet. Tap icons to add photos.',
                   style: TextStyle(color: Colors.grey[500]),
                 )
               else
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemCount: galleryImages.length,
-                  itemBuilder: (context, index) {
-                    final imagePath = galleryImages[index];
-                    return Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            _getImageUrl(imagePath),
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => Container(
-                              color: Colors.grey[200],
-                              child: const Icon(Icons.broken_image),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          top: 4,
-                          right: 4,
-                          child: GestureDetector(
-                            onTap: () => _removeGalleryImage(index),
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.close,
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
+                GalleryOrderEditor(
+                  photos:galleryImages,
+                  imageBuilder:(imagePath)=>Image.network(_getImageUrl(imagePath),fit:BoxFit.cover,errorBuilder:(_,__,___)=>const ColoredBox(color:Colors.black12,child:Icon(Icons.broken_image))),
+                  onChanged:(photos)=>setState(()=>_tripData['galleryImages']=photos),
+                  onRemove:_removeGalleryImage,
                 ),
               const SizedBox(height: 8),
               // Manual path input
@@ -2251,6 +2222,7 @@ class _TripEditScreenState extends State<TripEditScreen>
       builder: (context) => AlertDialog(
         title: Text(initialValue.isEmpty ? 'Add Item' : 'Edit Item'),
         content: TextField(
+          contextMenuBuilder: formattingContextMenu,
           controller: controller,
           decoration: const InputDecoration(border: OutlineInputBorder()),
           autofocus: true,
@@ -2336,6 +2308,7 @@ class _TripEditScreenState extends State<TripEditScreen>
               children: [
                 TextField(
                   controller: dayController,
+                  contextMenuBuilder: formattingContextMenu,
                   decoration: const InputDecoration(
                     labelText: 'Day Label',
                     hintText: 'e.g., Day 0, Day 1',
@@ -2345,6 +2318,7 @@ class _TripEditScreenState extends State<TripEditScreen>
                 const SizedBox(height: 16),
                 TextField(
                   controller: titleController,
+                  contextMenuBuilder: formattingContextMenu,
                   decoration: const InputDecoration(
                     labelText: 'Title',
                     hintText: 'e.g., Trek to Summit',
@@ -2354,6 +2328,7 @@ class _TripEditScreenState extends State<TripEditScreen>
                 const SizedBox(height: 16),
                 TextField(
                   controller: activitiesController,
+                  contextMenuBuilder: formattingContextMenu,
                   decoration: const InputDecoration(
                     labelText: 'Activities (one per line)',
                     hintText:

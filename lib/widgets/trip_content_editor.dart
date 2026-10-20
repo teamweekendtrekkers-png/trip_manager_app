@@ -1,3 +1,4 @@
+import 'inline_formatting.dart';
 import 'package:flutter/material.dart';
 import '../models/trip_content_settings.dart';
 
@@ -24,7 +25,8 @@ class _TripContentEditorState extends State<TripContentEditor> {
     String? error;
     final route = DialogRoute<String>(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, set) => AlertDialog(
       title: const Text('Add website section'),
-      content: SizedBox(width: 420, child: TextField(key: const ValueKey('new-section-heading'), controller: controller, autofocus: true, maxLength: 120, decoration: InputDecoration(labelText: 'Section name', hintText: 'For example: Why choose us', helperText: 'Add your text and items after creating the section.', errorText: error))),
+      content: SizedBox(width: 420, child: TextField(
+                    contextMenuBuilder: formattingContextMenu,key: const ValueKey('new-section-heading'), controller: controller, autofocus: true, maxLength: 120, decoration: InputDecoration(labelText: 'Section name', hintText: 'For example: Why choose us', helperText: 'Add your text and items after creating the section.', errorText: error))),
       actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')), FilledButton(onPressed: () { final value = controller.text.trim(); if(value.isEmpty) {set(() => error = 'Enter a section name.'); return;} Navigator.pop(ctx,value); }, child: const Text('Create section'))],
     )));
     final heading = await Navigator.of(context,rootNavigator:true).push<String>(route);
@@ -109,6 +111,7 @@ class _TripContentEditorState extends State<TripContentEditor> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: TextField(
+                    contextMenuBuilder: formattingContextMenu,
                         controller: controllers[f],
                         minLines: 1,
                         maxLines: ['description', 'answer'].contains(f) ? 6 : 1,
@@ -380,6 +383,7 @@ class _TripContentEditorState extends State<TripContentEditor> {
                 if ((widget.shared && widget.value[key]?['mode'] != 'hidden') ||
                     widget.value[key]?['mode'] == 'custom') ...[
                   TextFormField(
+                    contextMenuBuilder: formattingContextMenu,
                     key: ValueKey('$key-heading'),
                     initialValue: effective(key)['heading'] as String,
                     decoration: const InputDecoration(
@@ -495,6 +499,7 @@ class _TripContentEditorState extends State<TripContentEditor> {
                   if (key == 'cancellation')
                     for (final field in ['refundNote', 'changeNote'])
                       TextFormField(
+                    contextMenuBuilder: formattingContextMenu,
                         key: ValueKey('$field-note'),
                         initialValue: effective(key)[field]?.toString() ?? '',
                         maxLines: 3,

@@ -1,3 +1,4 @@
+import 'inline_formatting.dart';
 import 'package:flutter/material.dart';
 
 /// Edits the isolated homepage draft, never trip records or live Google data.
@@ -23,6 +24,7 @@ class HomepageSectionsEditor extends StatelessWidget {
     key: PageStorageKey('text-scroll-$prefix-$field'),
     padding: const EdgeInsets.only(bottom: 12),
     child: TextFormField(
+                    contextMenuBuilder: formattingContextMenu,
       key: ValueKey('$prefix-$field'),
       initialValue: values[field] as String,
       minLines: 1,
