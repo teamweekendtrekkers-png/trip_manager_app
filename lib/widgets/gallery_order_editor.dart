@@ -36,7 +36,7 @@ class GalleryOrderEditor extends StatelessWidget{
      final photo=values.removeAt(index);values.insert(target,photo);onChanged(values);
     }),
     ReorderableDragStartListener(index:index,child:Tooltip(message:'Drag photo ${index+1}',child:const SizedBox(width:44,height:48,child:Icon(Icons.drag_handle)))),
-   ])))),
+   ]))));
   },
  );
 }

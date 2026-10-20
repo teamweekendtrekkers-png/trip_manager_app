@@ -57,7 +57,7 @@ Widget formattingContextMenu(BuildContext context,EditableTextState editable){
 
 List<InlineSpan> inlineSpans(String source,{bool bold=false,bool italic=false,int depth=0}){
   if(depth>12)return [TextSpan(text:source)];
-  final pattern=RegExp(r'(\*{1,3})(?=\S)([\s\S]*?\S|\S)\1'),spans=<InlineSpan>[];
+  final pattern=RegExp(r'(\*{1,3})(?=\S)([\s\S]*?\S|\S)\1(?!\*)'),spans=<InlineSpan>[];
   var cursor=0;
   TextStyle style(bool b,bool i)=>TextStyle(fontWeight:b?FontWeight.bold:null,fontStyle:i?FontStyle.italic:null);
   for(final match in pattern.allMatches(source)){

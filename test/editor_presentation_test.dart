@@ -13,6 +13,7 @@ void main(){
   value=toggleInlineStyle(value,InlineStyle.italic);expect(value.text,'🌞 Meet ***your*** guide');
   value=toggleInlineStyle(value,InlineStyle.both);expect(value.text,text);
   expect(plainInlineText('**bold** and *italic* and ***both***'),'bold and italic and both');
+  expect(plainInlineText('**Local *hosts***'),'Local hosts');
  });
  test('multiline activities retain their rows and empty selections are unchanged',(){
   const text='First activity\nSecond activity';

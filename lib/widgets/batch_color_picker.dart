@@ -12,6 +12,7 @@ const batchPalettes=<String,BatchPalette>{
  'amber':BatchPalette('Amber',Color(0xfffff7e8),Color(0xffd6b36a),Color(0xff805000)),
  'rose':BatchPalette('Rose',Color(0xfffdf0f2),Color(0xffd7a0ac),Color(0xff963e56)),
 };
+String defaultBatchColor(String? id){var hash=0;for(final code in (id??'').codeUnits)hash=(hash*31+code)&0x7fffffff;return batchPalettes.keys.elementAt(hash%batchPalettes.length);}
 class BatchColorPicker extends StatelessWidget{
  const BatchColorPicker({super.key,required this.value,required this.onChanged});
  final String? value;final ValueChanged<String> onChanged;

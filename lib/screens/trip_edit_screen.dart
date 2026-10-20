@@ -938,7 +938,7 @@ class _TripEditScreenState extends State<TripEditScreen>
                             // Gallery Images Card
                             _buildGallerySection(),
                             TripEditorPanel(section:TripEditorSection.photos,child:Card(child:Padding(padding:const EdgeInsets.all(16),child:BatchColorPicker(
-                              value:_tripData['batchColor'] as String?,
+                              value:_tripData['batchColor'] as String? ?? defaultBatchColor(_tripData['id']?.toString()),
                               onChanged:(value)=>setState(()=>_tripData['batchColor']=value),
                             )))),
 

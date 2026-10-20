@@ -600,8 +600,7 @@ class TripsParser {
         );
       }
 
-      writeStringField('publicSlug',
-      'batchColor', const ['publicSlug']);
+      writeStringField('publicSlug', const ['publicSlug']);
       writeStringField('departureTime', const ['departureTime']);
       writeStringListField('previousSlugs', const ['previousSlugs']);
       writeStringField('title', const ['title', 'name']);
