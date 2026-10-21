@@ -57,7 +57,7 @@ void main() {
         Directory('build/reviews').createSync(recursive:true);
         File('build/reviews/analytics-${width.toInt()}.png').writeAsBytesSync(bytes!.buffer.asUint8List()); image.dispose();
       });
-      await tester.ensureVisible(find.text('All devices'));await tester.tap(find.text('All devices'));await tester.pumpAndSettle();
+      tester.state<ScrollableState>(find.byType(Scrollable).first).position.jumpTo(0);await tester.pumpAndSettle();await tester.ensureVisible(find.text('All devices'));await tester.tap(find.text('All devices'));await tester.pumpAndSettle();
       await tester.tap(find.text('mobile').last);await tester.pumpAndSettle();expect(service.selectedDevice,'mobile');
       expect(tester.takeException(),isNull);
     });
