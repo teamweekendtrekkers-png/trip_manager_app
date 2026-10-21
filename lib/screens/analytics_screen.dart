@@ -86,12 +86,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             SizedBox(width: 185, child: DropdownButtonFormField<String>(isExpanded: true, initialValue: device, decoration: const InputDecoration(labelText: 'Device'), items: [for (final v in ['', 'mobile', 'tablet', 'desktop']) DropdownMenuItem(value: v, child: Text(v.isEmpty ? 'All devices' : v))], onChanged: busy ? null : (v) { setState(() => device = v!); load(); })),
           ]),
           const SizedBox(height: 12),
-          const Text('Dates use India time (IST). Anonymous analytics covers consenting sessions only. Browser blockers and privacy preferences can reduce counts. A session lasts up to 24 hours. This is directional data, not a visitor census.'),
+          const Text('Dates use India time (IST). Anonymous analytics covers sessions allowed by browser privacy settings. Browser blockers and privacy preferences can reduce counts. A session lasts up to 24 hours. This is directional data, not a visitor census.'),
           if (report != null) ...[
             Text('Tracking enabled: ${report!['launched_at']?.toString().split('T').first ?? '—'} · No historical backfill'),
             const SizedBox(height: 12),
             Wrap(spacing: 8, runSpacing: 8, children: [metric('Tracked sessions', '${number(report!['sessions'])}'), metric('Trip journeys', '$first'), metric('Journey → submission', percent(last, first)), metric('Direct checkout entries', '${number(report!['direct_checkout'])}')]),
-            if (first == 0 && !busy) section('No tracked trip journeys yet', [const Text('This is an empty report, not a booking error. New data appears when a visitor allows analytics and views a trip. Try a wider period or clear the filters.')]),
+            if (first == 0 && !busy) section('No tracked trip journeys yet', [const Text('This is an empty report, not a booking error. New data appears when a visitor views a trip with browser analytics allowed. Try a wider period or clear the filters.')]),
             section('Where visitors leave', [
               const Text('Ordered funnel: the same session and trip must reach each step in sequence within this period. One session can explore multiple trips. Direct checkout links are counted separately.'),
               const SizedBox(height: 12),
@@ -114,7 +114,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             ]),
             section('Team payment review', [
               if (report!['review'] == null) const Text('Select All devices to view team review totals. Customer bookings do not store analytics device or session identifiers.') else ...[
-                const Text('Actual payment reports created in this date range, including visitors who declined analytics. Status reflects the latest review. These are separate totals, not an anonymous funnel step.'), const SizedBox(height: 8),
+                const Text('Actual payment reports created in this date range, including visitors who opted out. Status reflects the latest review. These are separate totals, not an anonymous funnel step.'), const SizedBox(height: 8),
                 Text('${(report!['review'] as Map)['submitted']} submitted · ${(report!['review'] as Map)['pending']} pending · ${(report!['review'] as Map)['verified']} verified · ${(report!['review'] as Map)['rejected']} rejected'),
                 Text('Average time to latest review: ${(report!['review'] as Map)['average_review_hours'] ?? '—'} hours. Payment verification does not confirm seat availability.'),
               ],
