@@ -58,7 +58,7 @@ class BookingReviewService {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final error = response.body.contains('review_conflict')
         ? 'Another administrator changed this review. Refresh before trying again.'
-        : 'Booking review is unavailable. Check the database migration and try again.';
+        : name == 'twt_journey_report' ? 'Analytics is unavailable. Check the analytics database setup or try again.' : 'Booking review is unavailable. Check the database migration and try again.';
       throw StateError(error);
     }
     return jsonDecode(response.body);
@@ -67,6 +67,12 @@ class BookingReviewService {
   Future<List<Map<String, dynamic>>> load({String search = '', int offset = 0}) async {
     final result = await _rpc('twt_list_bookings', {'p_search': search.trim(), 'p_offset': offset});
     return (result as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
+  }
+
+  Future<Map<String, dynamic>> analytics({required String start, required String end, String trip = '', String device = ''}) async {
+    final result = await _rpc('twt_journey_report', {'p_start': start, 'p_end': end, 'p_trip': trip, 'p_device': device});
+    if (result is! Map) throw StateError('Analytics returned an invalid report.');
+    return Map<String, dynamic>.from(result);
   }
 
   Future<void> review(Map<String, dynamic> booking, String status, String note) async {

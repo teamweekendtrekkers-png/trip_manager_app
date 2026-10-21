@@ -17,6 +17,19 @@ class BookingConfig extends GitHubService {
   );
 }
 void main() {
+  test('analytics requires admin login and sends only aggregate filters', () async {
+    final service=BookingReviewService(BookingConfig(),client:MockClient((request) async {
+      if(request.url.path=='/auth/v1/token') return http.Response(jsonEncode({'access_token':'session','user':{'app_metadata':{'trip_manager_admin':true}}}),200);
+      expect(request.url.path,'/rest/v1/rpc/twt_journey_report');
+      expect(jsonDecode(request.body),{'p_start':'2026-10-01','p_end':'2026-10-21','p_trip':'theyyam','p_device':'mobile'});
+      expect(request.headers['Authorization'],'Bearer session');
+      return http.Response('{"sessions":12,"funnel":[]}',200);
+    }));
+    await expectLater(service.analytics(start:'2026-10-01',end:'2026-10-21'),throwsStateError);
+    await service.signIn('admin@example.com','password');
+    final result=await service.analytics(start:'2026-10-01',end:'2026-10-21',trip:'theyyam',device:'mobile');
+    expect(result['sessions'],12);service.dispose();
+  });
   test('GitHub access and a non-admin Supabase account cannot read bookings', () async {
     var calls = 0;
     final service = BookingReviewService(BookingConfig(), client: MockClient((request) async {
