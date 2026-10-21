@@ -63,29 +63,29 @@ const homepageSectionDefaultsJson = r'''
     "enabled": true,
     "eyebrow": "Your next adventure, made simple",
     "title": "How It Works",
-    "subtitle": "Three simple steps from your everyday routine to a memorable weekend.",
+    "subtitle": "Choose your trip, pay via UPI and submit payment details for team verification.",
     "items": [
       {
         "id": "pick",
         "icon": "📱",
-        "title": "Pick a Weekend",
-        "text": "Browse our trips and choose the destination and departure that suit you.",
+        "title": "Choose Your Trip",
+        "text": "Choose your destination, departure date and travellers, then review the price and inclusions.",
         "accent": "blue",
         "visible": true
       },
       {
         "id": "book",
         "icon": "🎟️",
-        "title": "Book Your Spot",
-        "text": "Check the itinerary and price, then book online or chat with our team for help.",
+        "title": "Pay via UPI",
+        "text": "Scan the QR code or copy the UPI ID to pay the available advance or full amount.",
         "accent": "orange",
         "visible": true
       },
       {
         "id": "explore",
         "icon": "🎒",
-        "title": "Show Up & Explore",
-        "text": "Pack your essentials, meet your travel crew and make memories along the way.",
+        "title": "Get Confirmed & Explore",
+        "text": "Submit your transaction ID. Our team verifies payment and availability before confirming your booking.",
         "accent": "green",
         "visible": true
       }
