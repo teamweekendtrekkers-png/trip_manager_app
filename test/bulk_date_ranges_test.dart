@@ -35,6 +35,7 @@ void main(){
   await tester.tap(find.text('Add ranges'));await tester.pumpAndSettle();
   expect(find.byType(InputChip),findsNWidgets(2));
   expect(find.text('1 duplicate range(s) skipped.'),findsOneWidget);
+  await tester.ensureVisible(find.text('Alpha'));
   await tester.tap(find.text('Alpha'));await tester.pumpAndSettle();
   await tester.tap(find.text('Add 2 range(s) to 1 trip(s)'));await tester.pumpAndSettle();
   expect(provider.trips[0]['availableDates'],hasLength(3));
