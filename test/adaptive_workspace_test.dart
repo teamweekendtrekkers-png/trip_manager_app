@@ -86,6 +86,7 @@ void main() {
     expect(find.byKey(const Key('manager-mobile-navigation')), findsOneWidget);
     expect(find.text('Website content'), findsOneWidget);
     expect(find.text('Departures'), findsWidgets);
+    await tester.scrollUntilVisible(find.text('Settings'), 200, scrollable: find.descendant(of: find.byKey(const Key('manager-mobile-navigation')), matching: find.byType(Scrollable)).first);
     expect(find.text('Settings'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

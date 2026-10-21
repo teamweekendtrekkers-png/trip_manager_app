@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'commerce_settings_screen.dart';
 import 'booking_review_screen.dart';
+import 'analytics_screen.dart';
 import 'departure_management_screen.dart';
 import 'trip_content_settings_screen.dart';
 import '../widgets/quick_trip_editor.dart';
@@ -253,6 +254,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
         builder: (_) => const CommerceSettingsScreen(),
       ),
       ManagerDestination.departureManagement => MaterialPageRoute<void>(builder: (_) => const DepartureManagementScreen()),
+      ManagerDestination.analytics => MaterialPageRoute<void>(builder: (_) => const AnalyticsScreen()),
       ManagerDestination.bookingReview => MaterialPageRoute<void>(builder: (_) => const BookingReviewScreen()),
       ManagerDestination.sharedContent => MaterialPageRoute<void>(
         builder: (_) => const TripContentSettingsScreen(),
@@ -377,6 +379,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
                 ManagerDestination.history,
                 ManagerDestination.payments,
                 ManagerDestination.bookingReview,
+                ManagerDestination.analytics,
                 ManagerDestination.departureManagement,
                 ManagerDestination.sharedContent,
                 ManagerDestination.deployment,
