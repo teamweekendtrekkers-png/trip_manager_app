@@ -11,6 +11,7 @@ class HomepageConfig {
 
   static const defaults = <String, dynamic>{
     'version': 1,
+    'tripGallery': {'autoSlide': true, 'intervalSeconds': 5},
     'discovery': {
       'enabled': true,
       'showSearch': true,
@@ -116,6 +117,15 @@ class HomepageConfig {
     FooterConfig.validate(data['footer'] as Map<String, dynamic>);
     if ((data['discovery'] as Map).values.any((value) => value is! bool)) {
       throw const FormatException('Discovery settings must be booleans.');
+    }
+    final gallery = data['tripGallery'] as Map;
+    if (gallery['autoSlide'] is! bool ||
+        gallery['intervalSeconds'] is! int ||
+        (gallery['intervalSeconds'] as int) < 3 ||
+        (gallery['intervalSeconds'] as int) > 30) {
+      throw const FormatException(
+        'Gallery slideshow needs an on/off choice and an interval from 3 to 30 seconds.',
+      );
     }
     final presentation = data['presentation'] as Map<String, dynamic>;
     if (!['forest', 'ocean', 'earth'].contains(presentation['preset']) ||

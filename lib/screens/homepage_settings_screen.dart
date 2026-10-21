@@ -56,7 +56,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
   bool get draftBusy => _busy;
   @override
   void applyDocument(Map<String, dynamic> value) {
-    _draft = copyDocument(value);
+    _draft = HomepageConfig.parse(jsonEncode(value)).toJson();
     _sectionsRevision++;
     for (final entry in _controllers.entries) {
       final parts = entry.key.split('.');
@@ -75,6 +75,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
       'Tagline': 'Hero|hero.tagline',
       'Description': 'Hero|hero.description',
       'Mobile cover and crop': 'Hero|presentation.heroMobileImage',
+      'Trip photo slideshow and timing': 'Trip gallery',
       'Upcoming trips and date selection': 'Upcoming Batches',
       'Trip discovery and Featured visibility': 'Destinations',
       'Statistics, How it works, Why choose us': 'Information',
@@ -261,6 +262,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
     final result = copyDocument(jsonDecode(_saved!) as Map);
     final keys = switch (_group) {
       'Hero' => ['hero', 'presentation'],
+      'Trip gallery' => ['tripGallery'],
       'Upcoming Batches' => ['upcomingBatches'],
       'Destinations' => ['discovery'],
       'Footer' => ['footer'],
@@ -971,6 +973,39 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                         onChanged: () => setState(() {}),
                       ),
                     const SizedBox(height: 16),
+                    if (_group == 'All' || _group == 'Trip gallery') ...[
+                      Text('Trip gallery',
+                          style: Theme.of(context).textTheme.titleLarge),
+                      const Text('Automatic photo sliding on every trip page. Saved gallery order is used.'),
+                      SwitchListTile(
+                        key: const Key('gallery-auto-slide'),
+                        title: const Text('Automatically slide photos'),
+                        value: _draft!['tripGallery']['autoSlide'] as bool,
+                        onChanged: (value) => setState(() {
+                          _draft!['tripGallery']['autoSlide'] = value;
+                        }),
+                      ),
+                      DropdownButtonFormField<int>(
+                        key: ValueKey('gallery-interval-${_draft!['tripGallery']['intervalSeconds']}'),
+                        initialValue: _draft!['tripGallery']['intervalSeconds'] as int,
+                        decoration: const InputDecoration(labelText: 'Time per photo'),
+                        items: [
+                          for (var seconds = 3; seconds <= 30; seconds++)
+                            DropdownMenuItem(
+                              value: seconds,
+                              child: Text('$seconds seconds'),
+                            ),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() {
+                              _draft!['tripGallery']['intervalSeconds'] = value;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                    ],
                     FilledButton.icon(
                       key: const Key('homepage-publish'),
                       onPressed: _busy || !_targetMatches ? null : _publish,
