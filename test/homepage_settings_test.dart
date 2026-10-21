@@ -1005,6 +1005,32 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('gallery timing publishes separately and keeps unfinished hero edits', (tester) async {
+    final github = await openEditor(tester);
+    await showKey(tester, 'homepage-hero-title');
+    await tester.enterText(find.byKey(const ValueKey('homepage-hero-title')), 'Unfinished headline');
+    await tester.tap(find.byTooltip('Find a website field'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Search fields'), 'slideshow');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Trip photo slideshow and timing'));
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'gallery-auto-slide');
+    await tapKey(tester, 'gallery-interval-5');
+    await tester.tap(find.text('7 seconds').last);
+    await tester.pumpAndSettle();
+    await publish(tester);
+    final saved = HomepageConfig.parse(github.calls.single.values.single).toJson();
+    expect(saved['tripGallery'], {'autoSlide': false, 'intervalSeconds': 7});
+    expect(saved['hero']['title'], config().toJson()['hero']['title']);
+    expect(saved['upcomingBatches'], config().toJson()['upcomingBatches']);
+    expect(github.calls.single.keys, [HomepageSettingsService.path]);
+    await tapKey(tester, 'homepage-group-All');
+    await showKey(tester, 'homepage-hero-title');
+    expect(tester.widget<TextField>(find.byKey(const ValueKey('homepage-hero-title'))).controller!.text, 'Unfinished headline');
+    expect(tester.takeException(), isNull);
+  });
   if (!Platform.isAndroid) {
     for (final dark in [false, true]) {
       testWidgets('homepage editor golden ${dark ? 'dark' : 'light'}', (
