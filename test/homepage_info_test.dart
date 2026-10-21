@@ -16,6 +16,14 @@ HomepageConfig edit(void Function(Map<String, dynamic>) change) {
 }
 
 void main() {
+  test('default instructions explain UPI payment reporting and manual confirmation', () {
+    final items = HomepageConfig.initial().toJson()['sections']['howItWorks']['items'] as List;
+    expect(items[1]['title'], 'Pay via UPI');
+    expect(items[1]['text'], contains('QR code'));
+    expect(items[1]['text'], contains('UPI ID'));
+    expect(items[2]['text'], contains('transaction ID'));
+    expect(items[2]['text'], contains('verifies payment and availability'));
+  });
   test(
     'old homepage settings gain new sections without losing legacy content',
     () {
@@ -204,6 +212,11 @@ void main() {
           final sections =
               HomepageConfig.initial().toJson()['sections']
                   as Map<String, dynamic>;
+          // Exercise editing an existing saved section with stable visual fixtures.
+          // Current payment-flow defaults are checked separately.
+          sections['howItWorks'] = jsonDecode(
+            File('test/fixtures/legacy_how_it_works.json').readAsStringSync(),
+          );
           final archived = jsonEncode(sections['whyUs']);
           await tester.pumpWidget(
             MaterialApp(
