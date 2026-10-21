@@ -17,6 +17,13 @@ void main() {
           data['tripGallery']);
     }
   });
+  test('destination slider has independent on/off and timing settings', () {
+    final data = HomepageConfig.initial().toJson();
+    data['destinationSlider'] = {'autoSlide': false, 'intervalSeconds': 8};
+    final saved = HomepageConfig.parse(jsonEncode(data)).toJson();
+    expect(saved['destinationSlider'], {'autoSlide': false, 'intervalSeconds': 8});
+    expect(saved['tripGallery'], {'autoSlide': true, 'intervalSeconds': 5});
+  });
   test('gallery rejects invalid timing and visibility values', () {
     for (final value in [2, 31, 4.5, '5', null]) {
       final data = HomepageConfig.initial().toJson();
