@@ -1,3 +1,4 @@
+import '../widgets/website_pages_editor.dart';
 import '../widgets/local_draft.dart';
 import '../widgets/change_review.dart';
 import '../services/workspace_changes.dart';
@@ -76,6 +77,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
       'Description': 'Hero|hero.description',
       'Mobile cover and crop': 'Hero|presentation.heroMobileImage',
       'Trip photo slideshow and timing': 'Trip gallery',
+      'About and Contact pages, banner headings and navigation': 'Pages',
       'Upcoming trips and date selection': 'Upcoming Batches',
       'Trip discovery and Featured visibility': 'Destinations',
       'Statistics, How it works, Why choose us': 'Information',
@@ -263,6 +265,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
     final keys = switch (_group) {
       'Hero' => ['hero', 'presentation'],
       'Trip gallery' => ['tripGallery'],
+      'Pages' => ['pages'],
       'Upcoming Batches' => ['upcomingBatches'],
       'Destinations' => ['discovery'],
       'Footer' => ['footer'],
@@ -973,6 +976,13 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                         onChanged: () => setState(() {}),
                       ),
                     const SizedBox(height: 16),
+                    if (_group == 'All' || _group == 'Pages')
+                      WebsitePagesEditor(
+                        key: ValueKey('website-pages-$_sectionsRevision'),
+                        pages: _draft!['pages'] as Map<String,dynamic>,
+                        initiallyExpanded: _group == 'Pages',
+                        onChanged: () => setState(() {}),
+                      ),
                     if (_group == 'All' || _group == 'Trip gallery') ...[
                       Text('Trip gallery',
                           style: Theme.of(context).textTheme.titleLarge),

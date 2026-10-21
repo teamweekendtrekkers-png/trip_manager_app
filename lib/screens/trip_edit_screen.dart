@@ -649,6 +649,28 @@ class _TripEditScreenState extends State<TripEditScreen>
                                   ),
                                 ),
                                 const SizedBox(height: 16),
+                                DropdownButtonFormField<int>(
+                                  key: ValueKey('trip-max-travellers-${_tripData['maxTravellers'] ?? 50}'),
+                                  initialValue: _tripData['maxTravellers'] is int &&
+                                          (_tripData['maxTravellers'] as int) >= 1 &&
+                                          (_tripData['maxTravellers'] as int) <= 50
+                                      ? _tripData['maxTravellers'] as int : 50,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Maximum travellers per booking',
+                                    helperText: 'Limit the traveller selector and checkout for this trip.',
+                                    helperMaxLines: 2,
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.people_outline),
+                                  ),
+                                  items: [
+                                    for (var count = 1; count <= 50; count++)
+                                      DropdownMenuItem(value: count, child: Text('$count travellers')),
+                                  ],
+                                  onChanged: (value) {
+                                    if (value != null) setState(() => _tripData['maxTravellers'] = value);
+                                  },
+                                ),
+                                const SizedBox(height: 16),
                                 TextFormField(
                                   controller: _pickupPointController,
                                   decoration: const InputDecoration(
@@ -1151,6 +1173,7 @@ class _TripEditScreenState extends State<TripEditScreen>
       'Photos': 'Display Image — card 16:9 (1200×675 px)',
       'Visibility': 'Visibility',
       'URL and booking cutoff': 'Website URL & Booking Cutoff',
+      'Maximum travellers per booking': 'Trip Details',
       'Duration, distance, elevation': 'Website Display Fields',
       'Itinerary, packing, inclusions': 'Itinerary & guidance',
       'FAQs, cancellation, highlights': 'Website sections',

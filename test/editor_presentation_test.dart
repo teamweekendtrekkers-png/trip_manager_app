@@ -36,11 +36,11 @@ void main(){
   final trip=parsed.trips.single;
   trip['description']='Meet **local hosts** and *explore*';
   trip['about']=trip['description'];
-  trip['galleryImages']=['images/b.jpg','images/a.jpg'];trip['cardImage']='images/cover.jpg';trip['batchColor']='violet';
+  trip['galleryImages']=['images/b.jpg','images/a.jpg'];trip['cardImage']='images/cover.jpg';trip['batchColor']='violet';trip['maxTravellers']=6;
   final result=TripsParser.replaceTripsDataObject(source:source,trips:[trip]);
   expect(result.success,isTrue,reason:result.errors.join('\n'));
   final saved=TripsParser.parseTripsDocument(result.content!).trips.single;
-  expect(saved['about'],trip['about']);expect(saved['galleryImages'],trip['galleryImages']);expect(saved['cardImage'],'images/cover.jpg');expect(saved['batchColor'],'violet');
+  expect(saved['about'],trip['about']);expect(saved['galleryImages'],trip['galleryImages']);expect(saved['cardImage'],'images/cover.jpg');expect(saved['batchColor'],'violet');expect(saved['maxTravellers'],6);
   expect(result.content,contains('// Preserve this footer.'));
   trip['batchColor']='red;display:none';expect(TripsParser.replaceTripsDataObject(source:source,trips:[trip]).success,isFalse);
  });

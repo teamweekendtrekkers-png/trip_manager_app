@@ -1,3 +1,4 @@
+import 'website_page_defaults.dart';
 import 'dart:convert';
 import '../services/trip_date_utils.dart';
 import 'homepage_section_defaults.dart';
@@ -11,6 +12,7 @@ class HomepageConfig {
 
   static const defaults = <String, dynamic>{
     'version': 1,
+    'pages': websitePagesDefaults,
     'tripGallery': {'autoSlide': true, 'intervalSeconds': 5},
     'discovery': {
       'enabled': true,
@@ -126,6 +128,9 @@ class HomepageConfig {
       throw const FormatException(
         'Gallery slideshow needs an on/off choice and an interval from 3 to 30 seconds.',
       );
+    }
+    if ((data['pages'] as Map).values.any((value) => value is! String || value.length > 4000)) {
+      throw const FormatException('Website page fields must be text up to 4000 characters.');
     }
     final presentation = data['presentation'] as Map<String, dynamic>;
     if (!['forest', 'ocean', 'earth'].contains(presentation['preset']) ||

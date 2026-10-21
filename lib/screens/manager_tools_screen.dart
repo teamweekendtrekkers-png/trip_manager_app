@@ -593,8 +593,10 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
 
 Future<void> bulkDates(BuildContext context, TripsProvider provider) async {
   final chosen = <String>{};
-  DateTimeRange? range;
+  final ranges = <String>[];
+  final scope = provider.draftScope;
   bool remove = false;
+  String? feedback;
   final approved = await showDialog<bool>(
     context: context,
     builder: (ctx) => StatefulBuilder(
@@ -604,41 +606,91 @@ Future<void> bulkDates(BuildContext context, TripsProvider provider) async {
           width: 580,
           child: SingleChildScrollView(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'Changes are saved to the workspace only. Existing unrelated dates are preserved.',
-                ),
+                const Text('Add several ranges, then apply them to the selected trips. Changes stay in your draft; unrelated dates are preserved.'),
                 SwitchListTile(
-                  title: const Text('Remove date range instead of adding'),
+                  title: const Text('Remove date ranges instead of adding'),
                   value: remove,
-                  onChanged: (v) => set(() => remove = v),
+                  onChanged: (value) => set(() => remove = value),
                 ),
-                OutlinedButton(
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.date_range),
                   onPressed: () async {
                     final value = await showDateRangePicker(
-                      context: ctx,
-                      firstDate: DateTime(1900),
-                      lastDate: DateTime(2199, 12, 31),
+                      context: ctx, firstDate: DateTime(1900), lastDate: DateTime(2199,12,31),
                     );
-                    if (value != null) set(() => range = value);
+                    if (value == null || !ctx.mounted) return;
+                    final label = TripDateUtils.formatCanonical(TripDateUtils.fromDates(value.start,value.end));
+                    set(() {
+                      if (ranges.any((item) => TripDateUtils.parse(item)?.key == TripDateUtils.parse(label)?.key)) {
+                        feedback = 'That range is already selected.';
+                      } else {
+                        ranges.add(label); feedback = null;
+                      }
+                    });
                   },
-                  child: Text(
-                    range == null
-                        ? 'Choose a departure range'
-                        : TripDateUtils.formatCanonical(
-                            TripDateUtils.fromDates(range!.start, range!.end),
-                          ),
-                  ),
+                  label: const Text('Add departure range'),
                 ),
-                for (final t in provider.trips)
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.playlist_add),
+                  label: const Text('Paste multiple ranges'),
+                  onPressed: () async {
+                    var pasted = '';
+                    final text = await showDialog<String>(
+                      context: ctx,
+                      builder: (pasteContext) => AlertDialog(
+                        title: const Text('Paste date ranges'),
+                        content: TextField(
+                          onChanged: (value) => pasted = value, minLines: 4, maxLines: 8,
+                          decoration: const InputDecoration(
+                            labelText: 'One range per line',
+                            hintText: 'Oct 23-25, 2026\nOct 30-Nov 1, 2026',
+                          ),
+                        ),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(pasteContext), child: const Text('Cancel')),
+                          FilledButton(onPressed: () => Navigator.pop(pasteContext,pasted),child: const Text('Add ranges')),
+                        ],
+                      ),
+                    );
+                    if (text == null || !ctx.mounted) return;
+                    final lines = text.split('\n').map((line) => line.trim()).where((line) => line.isNotEmpty).toList();
+                    final invalid = lines.where((line) => TripDateUtils.parse(line) == null).toList();
+                    set(() {
+                      if (invalid.isNotEmpty) {
+                        feedback = 'No ranges added. Check: ${invalid.join('; ')}';
+                        return;
+                      }
+                      var duplicates = 0;
+                      for (final line in lines) {
+                        final range = TripDateUtils.parse(line)!;
+                        if (ranges.any((item) => TripDateUtils.parse(item)?.key == range.key)) {
+                          duplicates++;
+                        } else {
+                          ranges.add(TripDateUtils.formatCanonical(range));
+                        }
+                      }
+                      feedback = duplicates > 0 ? '$duplicates duplicate range(s) skipped.' : null;
+                    });
+                  },
+                ),
+                if (feedback != null) Text(feedback!, key: const Key('bulk-range-feedback')),
+                Wrap(spacing: 8, runSpacing: 4, children: [
+                  for (final label in ranges)
+                    InputChip(
+                      key: ValueKey('bulk-range-$label'), label: Text(label),
+                      onDeleted: () => set(() => ranges.remove(label)),
+                    ),
+                ]),
+                Text('${ranges.length} date range(s) selected'),
+                for (final trip in provider.trips)
                   CheckboxListTile(
-                    title: Text(t['title']?.toString() ?? t['id'].toString()),
-                    value: chosen.contains(t['id']),
-                    onChanged: (v) => set(() {
-                      if (v == true)
-                        chosen.add(t['id'].toString());
-                      else
-                        chosen.remove(t['id']);
+                    title: Text(trip['title']?.toString() ?? trip['id'].toString()),
+                    value: chosen.contains(trip['id']),
+                    onChanged: (value) => set(() {
+                      if (value == true) chosen.add(trip['id'].toString());
+                      else chosen.remove(trip['id']);
                     }),
                   ),
               ],
@@ -646,26 +698,20 @@ Future<void> bulkDates(BuildContext context, TripsProvider provider) async {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx,false),child: const Text('Cancel')),
           FilledButton(
-            onPressed: range == null || chosen.isEmpty
-                ? null
-                : () => Navigator.pop(ctx, true),
-            child: Text(
-              '${remove ? 'Remove from' : 'Add to'} ${chosen.length} trips',
-            ),
+            onPressed: ranges.isEmpty || chosen.isEmpty ? null : () => Navigator.pop(ctx,true),
+            child: Text('${remove ? 'Remove' : 'Add'} ${ranges.length} range(s) ${remove ? 'from' : 'to'} ${chosen.length} trip(s)'),
           ),
         ],
       ),
     ),
   );
-  if (approved != true || range == null || !context.mounted) return;
-  final selected = TripDateUtils.fromDates(range!.start, range!.end),
-      label = TripDateUtils.formatCanonical(selected);
-  provider.applyBulkDates(chosen, label, remove: remove);
+  if (approved != true || ranges.isEmpty || !context.mounted) return;
+  if (provider.draftScope != scope || provider.isLoading) {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('The workspace changed. Reopen bulk editing before applying dates.')));
+    return;
+  }
+  provider.applyBulkDateRanges(chosen,ranges,remove:remove);
   await provider.flushDraft();
 }
-
