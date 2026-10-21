@@ -7,11 +7,13 @@ import 'trip_pricing.dart';
 /// Parser for the trips-data.js JavaScript file
 /// Handles object format: const tripsData = { tripId: {...}, tripId2: {...} }
 class TripsParser {
+  static const _batchColors = {'forest','teal','blue','violet','amber','rose'};
   static const Set<String> _supportedSourceTripFields = {
     'experiences',
     'isBestseller',
     'contentSections',
     'publicSlug',
+      'batchColor',
     'previousSlugs',
     'departureTime',
     'title',
@@ -227,8 +229,10 @@ class TripsParser {
         source,
       ).map((error) => 'Trip "$tripId": $error'),
     );
+    if(source.containsKey('batchColor')&&!_batchColors.contains(source['batchColor']))errors.add('Invalid upcoming batch colour.');
     const stringFields = {
       'publicSlug',
+      'batchColor',
       'departureTime',
       'title',
       'location',
@@ -383,6 +387,7 @@ class TripsParser {
       'closedDepartures',
       'contentSections',
       'publicSlug',
+      'batchColor',
       'previousSlugs',
       'departureTime',
       'title',
@@ -612,6 +617,7 @@ class TripsParser {
       if (trip.containsKey('originalPrice'))
         buffer.writeln('        originalPrice: ${trip['originalPrice']},');
       writeStringField('image', const ['image']);
+      if (trip.containsKey('batchColor')) writeStringField('batchColor', const ['batchColor']);
       for (final field in TripCardSettings.optionalFields) {
         writeStringField(field, [field]);
       }
@@ -751,6 +757,7 @@ class TripsParser {
 
     const stringFields = {
       'publicSlug',
+      'batchColor',
       'departureTime',
       'title',
       'name',
@@ -787,6 +794,7 @@ class TripsParser {
 
     for (var index = 0; index < trips.length; index++) {
       final trip = trips[index];
+      if(trip.containsKey('batchColor')&&!_batchColors.contains(trip['batchColor']))errors.add('Invalid upcoming batch colour.');
       final rawId = trip['id'];
       final id = rawId is String ? rawId : '';
       final label = id.isEmpty ? 'at position ${index + 1}' : '"$id"';
