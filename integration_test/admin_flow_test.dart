@@ -131,6 +131,7 @@ void registerAdminFlowTests() {
       );
       await tester.pumpWidget(_buildListApp(trips: trips, settings: restored));
       await tester.pumpAndSettle();
+      await _enterTrips(tester);
       expect(find.text('Original Alpha'), findsOneWidget);
 
       trips.updateTrip(0, <String, dynamic>{
@@ -146,7 +147,9 @@ void registerAdminFlowTests() {
       ]);
       await tester.pump();
 
-      await tester.tap(find.byTooltip('Refresh (Pull)'));
+      await tester.tap(find.byTooltip('More tools'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Refresh trips'));
       await tester.pumpAndSettle();
       expect(find.text('Refresh and Merge?'), findsOneWidget);
       await tester.tap(find.text('Refresh & Merge'));
@@ -179,6 +182,7 @@ void registerAdminFlowTests() {
         _buildListApp(trips: providers.trips, settings: providers.settings),
       );
       await tester.pumpAndSettle();
+      await _enterTrips(tester);
       expect(find.text('Alpha Trek'), findsOneWidget);
       expect(find.text('Beta Trek'), findsOneWidget);
       await tester.scrollUntilVisible(
@@ -329,13 +333,13 @@ void registerAdminFlowTests() {
       expect(providers.trips.getTripById('beta')!['featured'], isTrue);
       expect(providers.trips.getTripById('alpha')!['featured'], isFalse);
 
-      await tester.tap(find.byTooltip('Show featured only'));
+      await _tapFeaturedFilter(tester);
       await tester.pump();
       expect(find.text('Beta Trek'), findsOneWidget);
       expect(find.text('Alpha Trek'), findsNothing);
 
       // Delete Alpha from a different filtered view and retain Beta.
-      await tester.tap(find.byTooltip('Show featured only'));
+      await _tapFeaturedFilter(tester);
       await tester.enterText(find.byType(TextField).first, 'Alpha');
       await tester.pump();
       await _chooseTripMenuAction(tester, 'alpha', 'Delete');
@@ -348,7 +352,9 @@ void registerAdminFlowTests() {
       // inactive, so the website-compatible result is empty.
       await tester.enterText(find.byType(TextField).first, '');
       await tester.pump();
-      await tester.tap(find.byTooltip('Preview Upcoming Batches'));
+      await tester.tap(find.byTooltip('More tools'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Preview departures'));
       await tester.pumpAndSettle();
       expect(find.text('Unsaved data preview'), findsOneWidget);
       expect(find.text('New dates coming soon'), findsOneWidget);
@@ -697,3 +703,34 @@ final class _MemorySettingsStore implements SettingsStore {
   Future<void> write(String key, String value) async => this.value = value;
 }
 
+Future<void> _enterTrips(WidgetTester tester) async {
+  final navigation = find.byKey(const Key('manager-bottom-navigation'));
+  final trips = navigation.evaluate().isNotEmpty
+      ? find.descendant(of: navigation, matching: find.text('Trips'))
+      : find.descendant(
+          of: find.byKey(const Key('manager-desktop-navigation')),
+          matching: find.text('Trips'),
+        );
+  await tester.tap(trips);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _tapFeaturedFilter(WidgetTester tester) async {
+  final desktop = find.byTooltip('Show featured only');
+  if (desktop.evaluate().isNotEmpty) {
+    await tester.tap(desktop);
+  } else {
+    await tester.tap(find.byTooltip('More tools'));
+    await tester.pumpAndSettle();
+    final showAll = find.widgetWithText(
+      PopupMenuItem<String>,
+      'Show all trips',
+    );
+    await tester.tap(
+      showAll.evaluate().isNotEmpty
+          ? showAll
+          : find.widgetWithText(PopupMenuItem<String>, 'Show featured only'),
+    );
+    await tester.pumpAndSettle();
+  }
+}
