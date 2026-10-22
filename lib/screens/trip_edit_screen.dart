@@ -348,6 +348,13 @@ class _TripEditScreenState extends State<TripEditScreen>
     super.dispose();
   }
 
+  void _changeEditingSection(TripEditorSection section) {
+    setState(() => _editingSection = section);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _editorScroll.hasClients) _editorScroll.jumpTo(0);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -362,16 +369,12 @@ class _TripEditScreenState extends State<TripEditScreen>
         appBar: AppBar(
           title: Text(isEditing ? 'Edit Trip' : 'New Trip'),
           bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(70),
+            preferredSize: Size.fromHeight(
+              _editingSection == TripEditorSection.all ? 70 : 84,
+            ),
             child: TripEditorSectionPicker(
               value: _editingSection,
-              onChanged: (section) {
-                setState(() => _editingSection = section);
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted && _editorScroll.hasClients)
-                    _editorScroll.jumpTo(0);
-                });
-              },
+              onChanged: _changeEditingSection,
             ),
           ),
           actions: [
@@ -386,18 +389,51 @@ class _TripEditScreenState extends State<TripEditScreen>
               enabled: !_saving,
               onSelected: (action) {
                 switch (action) {
-                  case 'pdf': _openBrochure();
-                  case 'preview': _previewDraft();
-                  case 'find': _findEditorField();
-                  case 'live': _openLiveTrip();
+                  case 'pdf':
+                    _openBrochure();
+                  case 'preview':
+                    _previewDraft();
+                  case 'find':
+                    _findEditorField();
+                  case 'live':
+                    _openLiveTrip();
                 }
               },
               itemBuilder: (_) => [
-                const PopupMenuItem(value: 'preview', child: ListTile(leading: Icon(Icons.preview_outlined), title: Text('Preview website draft'), contentPadding: EdgeInsets.zero)),
-                PopupMenuItem(value: 'pdf', enabled: !_contentLoading, child: const ListTile(leading: Icon(Icons.picture_as_pdf_outlined), title: Text('Preview / share PDF'), contentPadding: EdgeInsets.zero)),
-                const PopupMenuItem(value: 'find', child: ListTile(leading: Icon(Icons.search), title: Text('Find an editor field'), contentPadding: EdgeInsets.zero)),
+                const PopupMenuItem(
+                  value: 'preview',
+                  child: ListTile(
+                    leading: Icon(Icons.preview_outlined),
+                    title: Text('Preview website draft'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'pdf',
+                  enabled: !_contentLoading,
+                  child: const ListTile(
+                    leading: Icon(Icons.picture_as_pdf_outlined),
+                    title: Text('Preview / share PDF'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'find',
+                  child: ListTile(
+                    leading: Icon(Icons.search),
+                    title: Text('Find an editor field'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
                 if (_publishedTrip != null)
-                  const PopupMenuItem(value: 'live', child: ListTile(leading: Icon(Icons.open_in_new), title: Text('Open published trip'), contentPadding: EdgeInsets.zero)),
+                  const PopupMenuItem(
+                    value: 'live',
+                    child: ListTile(
+                      leading: Icon(Icons.open_in_new),
+                      title: Text('Open published trip'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
               ],
             ),
           ],
@@ -650,24 +686,38 @@ class _TripEditScreenState extends State<TripEditScreen>
                                 ),
                                 const SizedBox(height: 16),
                                 DropdownButtonFormField<int>(
-                                  key: ValueKey('trip-max-travellers-${_tripData['maxTravellers'] ?? 50}'),
-                                  initialValue: _tripData['maxTravellers'] is int &&
-                                          (_tripData['maxTravellers'] as int) >= 1 &&
-                                          (_tripData['maxTravellers'] as int) <= 50
-                                      ? _tripData['maxTravellers'] as int : 50,
+                                  key: ValueKey(
+                                    'trip-max-travellers-${_tripData['maxTravellers'] ?? 50}',
+                                  ),
+                                  initialValue:
+                                      _tripData['maxTravellers'] is int &&
+                                          (_tripData['maxTravellers'] as int) >=
+                                              1 &&
+                                          (_tripData['maxTravellers'] as int) <=
+                                              50
+                                      ? _tripData['maxTravellers'] as int
+                                      : 50,
                                   decoration: const InputDecoration(
                                     labelText: 'Maximum travellers per booking',
-                                    helperText: 'Limit the traveller selector and checkout for this trip.',
+                                    helperText:
+                                        'Limit the traveller selector and checkout for this trip.',
                                     helperMaxLines: 2,
                                     border: OutlineInputBorder(),
                                     prefixIcon: Icon(Icons.people_outline),
                                   ),
                                   items: [
                                     for (var count = 1; count <= 50; count++)
-                                      DropdownMenuItem(value: count, child: Text('$count travellers')),
+                                      DropdownMenuItem(
+                                        value: count,
+                                        child: Text('$count travellers'),
+                                      ),
                                   ],
                                   onChanged: (value) {
-                                    if (value != null) setState(() => _tripData['maxTravellers'] = value);
+                                    if (value != null)
+                                      setState(
+                                        () =>
+                                            _tripData['maxTravellers'] = value,
+                                      );
                                   },
                                 ),
                                 const SizedBox(height: 16),
@@ -959,10 +1009,24 @@ class _TripEditScreenState extends State<TripEditScreen>
 
                             // Gallery Images Card
                             _buildGallerySection(),
-                            TripEditorPanel(section:TripEditorSection.photos,child:Card(child:Padding(padding:const EdgeInsets.all(16),child:BatchColorPicker(
-                              value:_tripData['batchColor'] as String? ?? defaultBatchColor(_tripData['id']?.toString()),
-                              onChanged:(value)=>setState(()=>_tripData['batchColor']=value),
-                            )))),
+                            TripEditorPanel(
+                              section: TripEditorSection.photos,
+                              child: Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: BatchColorPicker(
+                                    value:
+                                        _tripData['batchColor'] as String? ??
+                                        defaultBatchColor(
+                                          _tripData['id']?.toString(),
+                                        ),
+                                    onChanged: (value) => setState(
+                                      () => _tripData['batchColor'] = value,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
 
                             const SizedBox(height: 16),
 
@@ -1060,29 +1124,75 @@ class _TripEditScreenState extends State<TripEditScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Save draft → Trips → Review & publish',
+                Text(
+                  'Save draft keeps your edits in the workspace. Review & publish makes them public.',
                   key: const Key('editor-publish-help'),
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodySmall),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
                 const SizedBox(height: 6),
-                Row(children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _saving ? null : _previewDraft,
-                    icon: const Icon(Icons.preview_outlined),
-                    label: const Text('Preview draft'),
+                if (_editingSection != TripEditorSection.all) ...[
+                  Row(
+                    children: [
+                      TextButton.icon(
+                        key: const Key('editor-guided-back'),
+                        onPressed:
+                            _saving ||
+                                _editingSection == TripEditorSection.basics
+                            ? null
+                            : () => _changeEditingSection(
+                                TripEditorSection.values[_editingSection.index -
+                                    1],
+                              ),
+                        icon: const Icon(Icons.arrow_back, size: 18),
+                        label: const Text('Back'),
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        key: const Key('editor-guided-next'),
+                        onPressed: _saving
+                            ? null
+                            : _editingSection == TripEditorSection.website
+                            ? _previewDraft
+                            : () => _changeEditingSection(
+                                TripEditorSection.values[_editingSection.index +
+                                    1],
+                              ),
+                        icon: Icon(
+                          _editingSection == TripEditorSection.website
+                              ? Icons.preview_outlined
+                              : Icons.arrow_forward,
+                          size: 18,
+                        ),
+                        label: Text(
+                          _editingSection == TripEditorSection.website
+                              ? 'Review preview'
+                              : 'Next section',
+                        ),
+                      ),
+                    ],
                   ),
+                ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _saving ? null : _previewDraft,
+                        icon: const Icon(Icons.preview_outlined),
+                        label: const Text('Preview draft'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton.icon(
+                        key: const Key('editor-save-draft'),
+                        onPressed: _saving ? null : _saveTrip,
+                        icon: const Icon(Icons.save_outlined),
+                        label: Text(_saving ? 'Saving…' : 'Save draft'),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton.icon(
-                    key: const Key('editor-save-draft'),
-                    onPressed: _saving ? null : _saveTrip,
-                    icon: const Icon(Icons.save_outlined),
-                    label: Text(_saving ? 'Saving…' : 'Save draft'),
-                  ),
-                ),
-                ]),
               ],
             ),
           ),
@@ -1444,7 +1554,11 @@ class _TripEditScreenState extends State<TripEditScreen>
                     key: const Key('trip-brochure'),
                     onPressed: _contentLoading ? null : _openBrochure,
                     icon: const Icon(Icons.picture_as_pdf),
-                    label: Text(_contentLoading ? 'Loading trip sections…' : 'Brochure (PDF)'),
+                    label: Text(
+                      _contentLoading
+                          ? 'Loading trip sections…'
+                          : 'Brochure (PDF)',
+                    ),
                   ),
                 ],
               ),
@@ -1503,13 +1617,18 @@ class _TripEditScreenState extends State<TripEditScreen>
   }
 
   void _openBrochure() async {
-    if (_sharedContent == null && context.read<SettingsProvider>().settings.isConfigured) {
+    if (_sharedContent == null &&
+        context.read<SettingsProvider>().settings.isConfigured) {
       await _loadSharedContent();
       if (!mounted) return;
       if (_sharedContent == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Could not load shared website sections. Reload them in Website sections before exporting the complete brochure.'),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not load shared website sections. Reload them in Website sections before exporting the complete brochure.',
+            ),
+          ),
+        );
         return;
       }
     }
@@ -1591,7 +1710,9 @@ class _TripEditScreenState extends State<TripEditScreen>
                 ],
               ),
               const SizedBox(height: 8),
-              const Text('Drag the handle to change gallery and slideshow order. The trip-card cover is selected separately. Recommended originals: 4:3. Cards use a 16:9 crop; original images are retained.'),
+              const Text(
+                'Drag the handle to change gallery and slideshow order. The trip-card cover is selected separately. Recommended originals: 4:3. Cards use a 16:9 crop; original images are retained.',
+              ),
               const SizedBox(height: 8),
               if (galleryImages.isEmpty)
                 Text(
@@ -1600,10 +1721,18 @@ class _TripEditScreenState extends State<TripEditScreen>
                 )
               else
                 GalleryOrderEditor(
-                  photos:galleryImages,
-                  imageBuilder:(imagePath)=>Image.network(_getImageUrl(imagePath),fit:BoxFit.cover,errorBuilder:(_,__,___)=>const ColoredBox(color:Colors.black12,child:Icon(Icons.broken_image))),
-                  onChanged:(photos)=>setState(()=>_tripData['galleryImages']=photos),
-                  onRemove:_removeGalleryImage,
+                  photos: galleryImages,
+                  imageBuilder: (imagePath) => Image.network(
+                    _getImageUrl(imagePath),
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const ColoredBox(
+                      color: Colors.black12,
+                      child: Icon(Icons.broken_image),
+                    ),
+                  ),
+                  onChanged: (photos) =>
+                      setState(() => _tripData['galleryImages'] = photos),
+                  onRemove: _removeGalleryImage,
                 ),
               const SizedBox(height: 8),
               // Manual path input
@@ -2449,8 +2578,14 @@ class _TripEditScreenState extends State<TripEditScreen>
                   ..._tripData,
                   'departureTime': _departureTimeController.text,
                 }).isAfter((widget.referenceDate ?? DateTime.now()).toUtc());
-            final closed=range!=null&&(_tripData['closedDepartures'] as List? ?? []).contains(range.key);
-            final status = closed ? 'Bookings closed' : invalid
+            final closed =
+                range != null &&
+                (_tripData['closedDepartures'] as List? ?? []).contains(
+                  range.key,
+                );
+            final status = closed
+                ? 'Bookings closed'
+                : invalid
                 ? 'Invalid — edit or remove before saving'
                 : duplicate
                 ? 'Duplicate — edit or remove before saving'
@@ -2499,7 +2634,7 @@ class _TripEditScreenState extends State<TripEditScreen>
     );
   }
 
-  Future<void> _pickDateRange({int? index, bool duplicate=false}) async {
+  Future<void> _pickDateRange({int? index, bool duplicate = false}) async {
     final now = DateTime.now();
     final existing = index == null
         ? null
@@ -2527,7 +2662,11 @@ class _TripEditScreenState extends State<TripEditScreen>
       firstDate: firstDate,
       lastDate: lastDate,
       initialDateRange: DateTimeRange(start: initialStart, end: initialEnd),
-      helpText: duplicate ? 'Choose dates for the new departure' : index == null ? 'Add trip dates' : 'Edit trip dates',
+      helpText: duplicate
+          ? 'Choose dates for the new departure'
+          : index == null
+          ? 'Add trip dates'
+          : 'Edit trip dates',
     );
     if (picked == null || !mounted) return;
 
@@ -2548,9 +2687,14 @@ class _TripEditScreenState extends State<TripEditScreen>
       if (index == null || duplicate) {
         _availableDates.add(canonical);
       } else {
-        final oldKey=TripDateUtils.parse(_availableDates[index])?.key;
-        final closed=List<String>.from(_tripData['closedDepartures'] as List? ?? []);
-        if(closed.remove(oldKey)){closed.add(range.key);_tripData['closedDepartures']=closed;}
+        final oldKey = TripDateUtils.parse(_availableDates[index])?.key;
+        final closed = List<String>.from(
+          _tripData['closedDepartures'] as List? ?? [],
+        );
+        if (closed.remove(oldKey)) {
+          closed.add(range.key);
+          _tripData['closedDepartures'] = closed;
+        }
         _availableDates[index] = canonical;
       }
     });
@@ -2610,6 +2754,7 @@ class _TripEditScreenState extends State<TripEditScreen>
           }
           element.visitChildren(focusInput);
         }
+
         focusInput(firstError!);
         Scrollable.ensureVisible(
           firstError!,
@@ -2617,9 +2762,15 @@ class _TripEditScreenState extends State<TripEditScreen>
         );
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(firstError is StatefulElement
-            ? ((firstError as StatefulElement).state as FormFieldState).errorText ?? 'Please check the highlighted field'
-            : 'Please check the highlighted fields')),
+        SnackBar(
+          content: Text(
+            firstError is StatefulElement
+                ? ((firstError as StatefulElement).state as FormFieldState)
+                          .errorText ??
+                      'Please check the highlighted field'
+                : 'Please check the highlighted fields',
+          ),
+        ),
       );
       return;
     }
@@ -2800,4 +2951,3 @@ class _TripEditScreenState extends State<TripEditScreen>
     );
   }
 }
-

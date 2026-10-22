@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/trips_provider.dart';
 import 'screens/trips_list_screen.dart';
+import 'widgets/manager_navigation.dart';
 import 'models/app_settings.dart';
 import 'theme/app_theme.dart';
 import 'services/draft_store.dart';
@@ -50,7 +51,9 @@ class TripManagerApp extends StatelessWidget {
           themeMode: settings.settings.darkMode
               ? ThemeMode.dark
               : ThemeMode.light,
-          home: const TripsListScreen(),
+          home: const TripsListScreen(
+            initialDestination: ManagerDestination.dashboard,
+          ),
         );
       },
     );

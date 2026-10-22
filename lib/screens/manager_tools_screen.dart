@@ -23,10 +23,14 @@ class ManagerToolsScreen extends StatefulWidget {
     required this.tool,
     this.onNavigate,
     this.choosePhoto = false,
+    this.embedded = false,
+    this.githubService,
   });
   final ManagerDestination tool;
   final ValueChanged<ManagerDestination>? onNavigate;
   final bool choosePhoto;
+  final bool embedded;
+  final GitHubService? githubService;
   @override
   State<ManagerToolsScreen> createState() => _ManagerToolsScreenState();
 }
@@ -42,9 +46,9 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
   @override
   void initState() {
     super.initState();
-    service = GitHubService(
-      settings: context.read<SettingsProvider>().settings,
-    );
+    service =
+        widget.githubService ??
+        GitHubService(settings: context.read<SettingsProvider>().settings);
     _load();
   }
 
@@ -73,37 +77,54 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
   }
 
   void go(ManagerDestination destination) {
-    Navigator.pop(context);
+    if (!widget.embedded) Navigator.pop(context);
     widget.onNavigate?.call(destination);
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Text(widget.tool.label),
-      actions: [
-        IconButton(
-          onPressed: busy ? null : _load,
-          tooltip: 'Refresh tools',
-          icon: const Icon(Icons.refresh),
-        ),
-      ],
-    ),
-    body: Consumer<TripsProvider>(
-      builder: (ctx, p, _) => ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (busy) const LinearProgressIndicator(),
-          if (error.isNotEmpty)
-            Text(
-              error,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+  Widget build(BuildContext context) => widget.embedded
+      ? _content()
+      : Scaffold(
+          appBar: AppBar(
+            title: Text(widget.tool.label),
+            actions: [
+              IconButton(
+                onPressed: busy ? null : _load,
+                tooltip: 'Refresh tools',
+                icon: const Icon(Icons.refresh),
+              ),
+            ],
+          ),
+          body: _content(),
+        );
+
+  Widget _content() => Consumer<TripsProvider>(
+    builder: (ctx, p, _) => ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (busy) const LinearProgressIndicator(),
+        if (error.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Card(
+              child: ListTile(
+                leading: const Icon(Icons.wifi_off_outlined),
+                title: const Text('Some website details could not load'),
+                subtitle: const Text(
+                  'Your trip drafts are still available. Try again when connected.',
+                ),
+                trailing: IconButton(
+                  tooltip: 'Retry website details',
+                  onPressed: busy ? null : _load,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ),
             ),
-          if (widget.tool == ManagerDestination.dashboard) ..._dashboard(p),
-          if (widget.tool == ManagerDestination.library) ..._library(p),
-          if (widget.tool == ManagerDestination.history) ..._history(p),
-        ],
-      ),
+          ),
+        if (widget.tool == ManagerDestination.dashboard) ..._dashboard(p),
+        if (widget.tool == ManagerDestination.library) ..._library(p),
+        if (widget.tool == ManagerDestination.history) ..._history(p),
+      ],
     ),
   );
   List<Widget> _dashboard(TripsProvider p) {
@@ -118,63 +139,110 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
                   TripDateUtils.getUpcomingDateRanges(t).isEmpty,
             )
             .toList();
-    final attention = p.trips.where((trip) => tripAttention(trip).isNotEmpty).toList();
+    final attention = p.trips
+        .where((trip) => tripAttention(trip).isNotEmpty)
+        .toList();
     return [
+      Text(
+        'Your daily workspace',
+        style: Theme.of(
+          context,
+        ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+      ),
+      const SizedBox(height: 6),
+      Text(
+        'Start with bookings, update a trip, or resolve an item that needs attention.',
+        style: Theme.of(context).textTheme.bodyMedium,
+      ),
+      const SizedBox(height: 16),
       ManagerSetupChecklist(
         configured: context.read<SettingsProvider>().isConfigured,
-        hasTrips: p.hasTrips, hasPublished: p.lastPublishedCommit != null,
+        hasTrips: p.hasTrips,
+        hasPublished: p.lastPublishedCommit != null,
         onConnection: () => go(ManagerDestination.settings),
         onTrips: () => go(ManagerDestination.trips),
         onPayments: () => go(ManagerDestination.payments),
         onPublish: () => go(ManagerDestination.deployment),
       ),
       const SizedBox(height: 12),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          FilledButton.icon(
-            onPressed: p.isLoading
-                ? null
-                : () => Navigator.push(
-                    context,
-                    MaterialPageRoute<void>(
-                      builder: (_) => const TripEditScreen(),
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          final columns = width >= 900
+              ? 4
+              : width >= 300
+              ? 2
+              : 1;
+          final tileWidth = (width - (columns - 1) * 12) / columns;
+          return Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _task(
+                tileWidth,
+                Icons.add_circle_outline,
+                'Add trip',
+                'Create a trip step by step',
+                p.isLoading
+                    ? null
+                    : () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => const TripEditScreen(
+                            initialSection: TripEditorSection.basics,
+                          ),
+                        ),
+                      ),
+              ),
+              _task(
+                tileWidth,
+                Icons.route_outlined,
+                'Edit trips',
+                'Dates, prices, photos and content',
+                () => go(ManagerDestination.trips),
+              ),
+              _task(
+                tileWidth,
+                Icons.fact_check_outlined,
+                'Pending payments',
+                'Review customer submissions',
+                () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const BookingReviewScreen(
+                      initialFilter: BookingReviewFilter.pending,
                     ),
                   ),
-            icon: const Icon(Icons.add),
-            label: const Text('Add trip'),
-          ),
-          OutlinedButton.icon(
-            onPressed: () => go(ManagerDestination.trips),
-            icon: const Icon(Icons.edit_outlined),
-            label: const Text('Edit trips'),
-          ),
-          OutlinedButton.icon(
-            onPressed: () => go(ManagerDestination.batches),
-            icon: const Icon(Icons.calendar_month),
-            label: const Text('Departures'),
-          ),
-          OutlinedButton.icon(
-            onPressed: () => go(ManagerDestination.deployment),
-            icon: const Icon(Icons.cloud_sync),
-            label: const Text('Publishing status'),
-          ),
-          OutlinedButton.icon(
-            key: const Key('dashboard-booking-review'),
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => const BookingReviewScreen(initialFilter: BookingReviewFilter.pending),
-            )),
-            icon: const Icon(Icons.fact_check_outlined),
-            label: const Text('Pending payments'),
-          ),
-          OutlinedButton.icon(
+                ),
+                key: const Key('dashboard-booking-review'),
+              ),
+              _task(
+                tileWidth,
+                Icons.calendar_month_outlined,
+                'Departures',
+                'See upcoming trip dates',
+                () => go(ManagerDestination.batches),
+              ),
+            ],
+          );
+        },
+      ),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          TextButton.icon(
             key: const Key('dashboard-payments'),
             onPressed: () => go(ManagerDestination.payments),
             icon: const Icon(Icons.payments_outlined),
             label: const Text('UPI & coupons'),
           ),
-          OutlinedButton.icon(
+          TextButton.icon(
+            onPressed: () => go(ManagerDestination.deployment),
+            icon: const Icon(Icons.cloud_sync_outlined),
+            label: const Text('Publishing status'),
+          ),
+          TextButton.icon(
             onPressed: () async {
               try {
                 final opened = await launchUrl(
@@ -186,7 +254,9 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
                 if (mounted)
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Could not open website. Try again.'),
+                      content: Text(
+                        'Could not open the website. Please try again.',
+                      ),
                     ),
                   );
               }
@@ -197,10 +267,8 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
         ],
       ),
       const SizedBox(height: 16),
-      Text(
-        'Your daily workspace',
-        style: Theme.of(context).textTheme.headlineSmall,
-      ),
+      Text('At a glance', style: Theme.of(context).textTheme.titleLarge),
+      const SizedBox(height: 12),
       if (recentRuns.isNotEmpty)
         ListTile(
           leading: Icon(
@@ -227,8 +295,16 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
             upcoming.fold<int>(0, (n, b) => n + b.trips.length),
           ),
           _metric('Trips without bookable dates', missing.length),
-          _metric('Inactive trips', p.trips.where((t)=>t['isActive']==false).length),
-          _metric('Bookable trips', p.trips.where((t)=>TripDateUtils.getUpcomingDateRanges(t).isNotEmpty).length),
+          _metric(
+            'Inactive trips',
+            p.trips.where((t) => t['isActive'] == false).length,
+          ),
+          _metric(
+            'Bookable trips',
+            p.trips
+                .where((t) => TripDateUtils.getUpcomingDateRanges(t).isNotEmpty)
+                .length,
+          ),
           _metric('Unpublished trip changes', p.changes.length),
         ],
       ),
@@ -276,23 +352,39 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
         style: Theme.of(context).textTheme.titleLarge,
       ),
       if (attention.isEmpty)
-        const ListTile(leading: Icon(Icons.check_circle_outline), title: Text('Active trips have dates, prices and cover photos.')),
+        const ListTile(
+          leading: Icon(Icons.check_circle_outline),
+          title: Text('Active trips have dates, prices and cover photos.'),
+        ),
       for (final t in attention)
         ListTile(
           leading: const Icon(Icons.rule_outlined),
           title: Text(t['title']?.toString() ?? t['id'].toString()),
           subtitle: Text(tripAttention(t).join(' · ')),
           trailing: const Icon(Icons.chevron_right),
-          onTap: p.isLoading ? null : () {
-            final id = t['id']?.toString() ?? '';
-            final current = p.getTripById(id), index = p.getTripIndexById(id);
-            if (current == null || index == null) return;
-            final issues = tripAttention(current);
-            Navigator.push(context, MaterialPageRoute<void>(builder: (_) => TripEditScreen(
-              trip: current, index: index, initialSection: issues.contains('Add upcoming dates') || issues.contains('Check price')
-                  ? TripEditorSection.dates : TripEditorSection.photos,
-            )));
-          },
+          onTap: p.isLoading
+              ? null
+              : () {
+                  final id = t['id']?.toString() ?? '';
+                  final current = p.getTripById(id),
+                      index = p.getTripIndexById(id);
+                  if (current == null || index == null) return;
+                  final issues = tripAttention(current);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => TripEditScreen(
+                        trip: current,
+                        index: index,
+                        initialSection:
+                            issues.contains('Add upcoming dates') ||
+                                issues.contains('Check price')
+                            ? TripEditorSection.dates
+                            : TripEditorSection.photos,
+                      ),
+                    ),
+                  );
+                },
         ),
       Text(
         'Upcoming departures',
@@ -301,40 +393,111 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
       for (final b in upcoming.take(6))
         for (final t in b.trips)
           ListTile(
-            title: Text(t.title), subtitle: Text(b.dateLabel),
+            title: Text(t.title),
+            subtitle: Text(b.dateLabel),
             trailing: const Icon(Icons.chevron_right),
-            onTap: p.isLoading || t.id == null ? null : () {
-              final index = p.getTripIndexById(t.id!);
-              if (index == null) return;
-              Navigator.of(context).push(MaterialPageRoute(builder: (_) =>
-                TripEditScreen(trip: p.getTripById(t.id!)!, index: index, initialSection: TripEditorSection.dates)));
-            },
+            onTap: p.isLoading || t.id == null
+                ? null
+                : () {
+                    final index = p.getTripIndexById(t.id!);
+                    if (index == null) return;
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => TripEditScreen(
+                          trip: p.getTripById(t.id!)!,
+                          index: index,
+                          initialSection: TripEditorSection.dates,
+                        ),
+                      ),
+                    );
+                  },
           ),
-      if (homepage != null) ...[
-        const Divider(),
-        const Text('Homepage selection is independent of Active and Featured.'),
-        for (final t in p.trips.where((t) => t['isActive'] != false))
-          ListTile(
-            title: Text(t['title']?.toString() ?? ''),
-            subtitle: Text(_visibility(t)),
-          ),
-      ],
+      if (upcoming.isEmpty)
+        ListTile(
+          leading: const Icon(Icons.event_available_outlined),
+          title: const Text('No upcoming departures'),
+          subtitle: const Text('Add dates to an active trip to show it here.'),
+          onTap: () => go(ManagerDestination.trips),
+        ),
+      if (homepage != null)
+        ExpansionTile(
+          title: const Text('Website visibility details'),
+          subtitle: const Text('Check which trips appear in Upcoming Batches'),
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Homepage selection is independent of Active and Featured.',
+              ),
+            ),
+            for (final t in p.trips.where((t) => t['isActive'] != false))
+              ListTile(
+                title: Text(t['title']?.toString() ?? ''),
+                subtitle: Text(_visibility(t)),
+              ),
+          ],
+        ),
     ];
   }
 
-  Widget _metric(String label, int n) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Text('$n', style: Theme.of(context).textTheme.headlineMedium),
-          Text(label),
-        ],
+  Widget _task(
+    double width,
+    IconData icon,
+    String title,
+    String description,
+    VoidCallback? onTap, {
+    Key? key,
+  }) => SizedBox(
+    width: width,
+    child: Card(
+      key: key,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                icon,
+                color: onTap == null
+                    ? Theme.of(context).disabledColor
+                    : Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              Text(description, style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget _metric(String label, int n) => SizedBox(
+    width: MediaQuery.sizeOf(context).width < 480 ? 150 : 190,
+    child: Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Text('$n', style: Theme.of(context).textTheme.headlineMedium),
+            Text(label, textAlign: TextAlign.center),
+          ],
+        ),
       ),
     ),
   );
   String _visibility(Map<String, dynamic> trip) {
-    if (trip['isActive'] == false) return 'Inactive: included when trips without available dates are shown';
+    if (trip['isActive'] == false)
+      return 'Inactive: included when trips without available dates are shown';
     if (homepage == null)
       return 'Upcoming Batches selection could not be loaded';
     final options = homepage!['upcomingBatches'] as Map;
@@ -608,7 +771,9 @@ Future<void> bulkDates(BuildContext context, TripsProvider provider) async {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Add several ranges, then apply them to the selected trips. Changes stay in your draft; unrelated dates are preserved.'),
+                const Text(
+                  'Add several ranges, then apply them to the selected trips. Changes stay in your draft; unrelated dates are preserved.',
+                ),
                 SwitchListTile(
                   title: const Text('Remove date ranges instead of adding'),
                   value: remove,
@@ -618,15 +783,24 @@ Future<void> bulkDates(BuildContext context, TripsProvider provider) async {
                   icon: const Icon(Icons.date_range),
                   onPressed: () async {
                     final value = await showDateRangePicker(
-                      context: ctx, firstDate: DateTime(1900), lastDate: DateTime(2199,12,31),
+                      context: ctx,
+                      firstDate: DateTime(1900),
+                      lastDate: DateTime(2199, 12, 31),
                     );
                     if (value == null || !ctx.mounted) return;
-                    final label = TripDateUtils.formatCanonical(TripDateUtils.fromDates(value.start,value.end));
+                    final label = TripDateUtils.formatCanonical(
+                      TripDateUtils.fromDates(value.start, value.end),
+                    );
                     set(() {
-                      if (ranges.any((item) => TripDateUtils.parse(item)?.key == TripDateUtils.parse(label)?.key)) {
+                      if (ranges.any(
+                        (item) =>
+                            TripDateUtils.parse(item)?.key ==
+                            TripDateUtils.parse(label)?.key,
+                      )) {
                         feedback = 'That range is already selected.';
                       } else {
-                        ranges.add(label); feedback = null;
+                        ranges.add(label);
+                        feedback = null;
                       }
                     });
                   },
@@ -642,55 +816,85 @@ Future<void> bulkDates(BuildContext context, TripsProvider provider) async {
                       builder: (pasteContext) => AlertDialog(
                         title: const Text('Paste date ranges'),
                         content: TextField(
-                          onChanged: (value) => pasted = value, minLines: 4, maxLines: 8,
+                          onChanged: (value) => pasted = value,
+                          minLines: 4,
+                          maxLines: 8,
                           decoration: const InputDecoration(
                             labelText: 'One range per line',
                             hintText: 'Oct 23-25, 2026\nOct 30-Nov 1, 2026',
                           ),
                         ),
                         actions: [
-                          TextButton(onPressed: () => Navigator.pop(pasteContext), child: const Text('Cancel')),
-                          FilledButton(onPressed: () => Navigator.pop(pasteContext,pasted),child: const Text('Add ranges')),
+                          TextButton(
+                            onPressed: () => Navigator.pop(pasteContext),
+                            child: const Text('Cancel'),
+                          ),
+                          FilledButton(
+                            onPressed: () =>
+                                Navigator.pop(pasteContext, pasted),
+                            child: const Text('Add ranges'),
+                          ),
                         ],
                       ),
                     );
                     if (text == null || !ctx.mounted) return;
-                    final lines = text.split('\n').map((line) => line.trim()).where((line) => line.isNotEmpty).toList();
-                    final invalid = lines.where((line) => TripDateUtils.parse(line) == null).toList();
+                    final lines = text
+                        .split('\n')
+                        .map((line) => line.trim())
+                        .where((line) => line.isNotEmpty)
+                        .toList();
+                    final invalid = lines
+                        .where((line) => TripDateUtils.parse(line) == null)
+                        .toList();
                     set(() {
                       if (invalid.isNotEmpty) {
-                        feedback = 'No ranges added. Check: ${invalid.join('; ')}';
+                        feedback =
+                            'No ranges added. Check: ${invalid.join('; ')}';
                         return;
                       }
                       var duplicates = 0;
                       for (final line in lines) {
                         final range = TripDateUtils.parse(line)!;
-                        if (ranges.any((item) => TripDateUtils.parse(item)?.key == range.key)) {
+                        if (ranges.any(
+                          (item) => TripDateUtils.parse(item)?.key == range.key,
+                        )) {
                           duplicates++;
                         } else {
                           ranges.add(TripDateUtils.formatCanonical(range));
                         }
                       }
-                      feedback = duplicates > 0 ? '$duplicates duplicate range(s) skipped.' : null;
+                      feedback = duplicates > 0
+                          ? '$duplicates duplicate range(s) skipped.'
+                          : null;
                     });
                   },
                 ),
-                if (feedback != null) Text(feedback!, key: const Key('bulk-range-feedback')),
-                Wrap(spacing: 8, runSpacing: 4, children: [
-                  for (final label in ranges)
-                    InputChip(
-                      key: ValueKey('bulk-range-$label'), label: Text(label),
-                      onDeleted: () => set(() => ranges.remove(label)),
-                    ),
-                ]),
+                if (feedback != null)
+                  Text(feedback!, key: const Key('bulk-range-feedback')),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    for (final label in ranges)
+                      InputChip(
+                        key: ValueKey('bulk-range-$label'),
+                        label: Text(label),
+                        onDeleted: () => set(() => ranges.remove(label)),
+                      ),
+                  ],
+                ),
                 Text('${ranges.length} date range(s) selected'),
                 for (final trip in provider.trips)
                   CheckboxListTile(
-                    title: Text(trip['title']?.toString() ?? trip['id'].toString()),
+                    title: Text(
+                      trip['title']?.toString() ?? trip['id'].toString(),
+                    ),
                     value: chosen.contains(trip['id']),
                     onChanged: (value) => set(() {
-                      if (value == true) chosen.add(trip['id'].toString());
-                      else chosen.remove(trip['id']);
+                      if (value == true)
+                        chosen.add(trip['id'].toString());
+                      else
+                        chosen.remove(trip['id']);
                     }),
                   ),
               ],
@@ -698,10 +902,17 @@ Future<void> bulkDates(BuildContext context, TripsProvider provider) async {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx,false),child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-            onPressed: ranges.isEmpty || chosen.isEmpty ? null : () => Navigator.pop(ctx,true),
-            child: Text('${remove ? 'Remove' : 'Add'} ${ranges.length} range(s) ${remove ? 'from' : 'to'} ${chosen.length} trip(s)'),
+            onPressed: ranges.isEmpty || chosen.isEmpty
+                ? null
+                : () => Navigator.pop(ctx, true),
+            child: Text(
+              '${remove ? 'Remove' : 'Add'} ${ranges.length} range(s) ${remove ? 'from' : 'to'} ${chosen.length} trip(s)',
+            ),
           ),
         ],
       ),
@@ -709,9 +920,15 @@ Future<void> bulkDates(BuildContext context, TripsProvider provider) async {
   );
   if (approved != true || ranges.isEmpty || !context.mounted) return;
   if (provider.draftScope != scope || provider.isLoading) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('The workspace changed. Reopen bulk editing before applying dates.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'The workspace changed. Reopen bulk editing before applying dates.',
+        ),
+      ),
+    );
     return;
   }
-  provider.applyBulkDateRanges(chosen,ranges,remove:remove);
+  provider.applyBulkDateRanges(chosen, ranges, remove: remove);
   await provider.flushDraft();
 }
