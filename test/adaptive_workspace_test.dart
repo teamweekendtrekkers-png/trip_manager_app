@@ -40,19 +40,26 @@ void main() {
     expect(find.byKey(const Key('manager-desktop-navigation')), findsOneWidget);
     expect(find.byKey(const Key('manager-mobile-navigation')), findsNothing);
     expect(find.byKey(const Key('desktop-workspace-summary')), findsOneWidget);
-    expect(find.text('Website content'), findsOneWidget);
-    expect(find.text('Payments & coupons'), findsOneWidget);
-    final navigationScroll = find.descendant(of: find.byKey(const Key('manager-desktop-navigation')), matching: find.byType(Scrollable)).first;
-    await tester.scrollUntilVisible(find.text('Booking review'), 100, scrollable: navigationScroll);
-    expect(find.text('Booking review'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Manage departures'), 100, scrollable: navigationScroll);
-    expect(find.text('Manage departures'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Shared trip content'), 100, scrollable: navigationScroll);
-    expect(find.text('Shared trip content'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Data health'),120,scrollable:find.descendant(of:find.byKey(const Key('manager-desktop-navigation')),matching:find.byType(Scrollable)).first);
-    expect(find.text('Data health'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Publishing status'),100,scrollable:find.descendant(of:find.byKey(const Key('manager-desktop-navigation')),matching:find.byType(Scrollable)).first);
-    expect(find.text('Publishing status'), findsOneWidget);
+    final navigationScroll = find.descendant(
+      of: find.byKey(const Key('manager-desktop-navigation')),
+      matching: find.byType(Scrollable),
+    ).first;
+    for (final label in [
+      'Booking review',
+      'Manage departures',
+      'Website content',
+      'Shared trip content',
+      'Payments & coupons',
+      'Data health',
+      'Publishing status',
+    ]) {
+      await tester.scrollUntilVisible(
+        find.text(label),
+        100,
+        scrollable: navigationScroll,
+      );
+      expect(find.text(label), findsOneWidget);
+    }
     expect(find.text('2 Trips'), findsNothing);
     expect(find.text('2'), findsWidgets);
 
