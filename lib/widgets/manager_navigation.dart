@@ -99,7 +99,7 @@ const managerNavigationGroups = <String, List<ManagerDestination>>{
     ManagerDestination.departureManagement,
     ManagerDestination.batches,
   ],
-  'Website content': [
+  'Website & media': [
     ManagerDestination.homepage,
     ManagerDestination.library,
     ManagerDestination.sharedContent,
