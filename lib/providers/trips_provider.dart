@@ -895,10 +895,18 @@ class TripsProvider extends ChangeNotifier {
     return error.toString();
   }
 
-  void applyBulkDates(Set<String> ids, String label, {bool remove = false}) {
-    if (_isLoading) return;
-    final range = TripDateUtils.parse(label);
-    if (range == null) throw ArgumentError('Invalid departure range');
+  void applyBulkDates(Set<String> ids, String label, {bool remove = false}) =>
+      applyBulkDateRanges(ids, [label], remove: remove);
+
+  /// A bulk action makes one undo checkpoint and validates every range first.
+  void applyBulkDateRanges(Set<String> ids, List<String> labels, {bool remove = false}) {
+    if (_isLoading || ids.isEmpty || labels.isEmpty) return;
+    final ranges = <String, String>{};
+    for (final label in labels) {
+      final range = TripDateUtils.parse(label);
+      if (range == null) throw ArgumentError('Invalid departure range: $label');
+      ranges[range.key] = TripDateUtils.formatCanonical(range);
+    }
     _checkpoint();
     _trips = [
       for (final trip in _trips)
@@ -907,21 +915,17 @@ class TripsProvider extends ChangeNotifier {
         else
           {
             ...trip,
-            'availableDates': remove
-                ? (trip['availableDates'] as List? ?? [])
-                      .where(
-                        (d) =>
-                            TripDateUtils.parse(d.toString())?.key != range.key,
-                      )
-                      .toList()
-                : [
-                    ...(trip['availableDates'] as List? ?? []),
-                    if (!(trip['availableDates'] as List? ?? []).any(
-                      (d) =>
-                          TripDateUtils.parse(d.toString())?.key == range.key,
-                    ))
-                      label,
-                  ],
+            'availableDates': [
+              for (final date in (trip['availableDates'] as List? ?? []))
+                if (!remove || !ranges.containsKey(TripDateUtils.parse(date.toString())?.key))
+                  date,
+              if (!remove)
+                for (final entry in ranges.entries)
+                  if (!(trip['availableDates'] as List? ?? []).any(
+                    (date) => TripDateUtils.parse(date.toString())?.key == entry.key,
+                  ))
+                    entry.value,
+            ],
           },
     ];
     _hasUnsavedChanges = true;

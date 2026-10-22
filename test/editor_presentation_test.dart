@@ -6,6 +6,15 @@ import 'package:trip_manager_app/widgets/batch_color_picker.dart';
 import 'package:trip_manager_app/services/trips_parser.dart';
 
 void main(){
+ test('traveller caps reject out-of-range, fractional and nonnumeric settings',(){
+  const source = 'const tripsData = { demo: {title:"Demo",price:"₹999",image:"images/a.jpg",isActive:true} };';
+  for (final limit in [0, 51, 2.5, '6', null]) {
+   final trip = TripsParser.parseTripsDocument(source).trips.single;
+   trip['maxTravellers'] = limit;
+   expect(TripsParser.replaceTripsDataObject(source:source,trips:[trip]).success,isFalse);
+  }
+ });
+
  test('selected words toggle bold, italic, both and removal without losing emoji',(){
   final text='🌞 Meet your guide';
   var value=TextEditingValue(text:text,selection:TextSelection(baseOffset:text.indexOf('your'),extentOffset:text.indexOf('your')+4));
@@ -36,11 +45,11 @@ void main(){
   final trip=parsed.trips.single;
   trip['description']='Meet **local hosts** and *explore*';
   trip['about']=trip['description'];
-  trip['galleryImages']=['images/b.jpg','images/a.jpg'];trip['cardImage']='images/cover.jpg';trip['batchColor']='violet';
+  trip['galleryImages']=['images/b.jpg','images/a.jpg'];trip['cardImage']='images/cover.jpg';trip['batchColor']='violet';trip['maxTravellers']=6;
   final result=TripsParser.replaceTripsDataObject(source:source,trips:[trip]);
   expect(result.success,isTrue,reason:result.errors.join('\n'));
   final saved=TripsParser.parseTripsDocument(result.content!).trips.single;
-  expect(saved['about'],trip['about']);expect(saved['galleryImages'],trip['galleryImages']);expect(saved['cardImage'],'images/cover.jpg');expect(saved['batchColor'],'violet');
+  expect(saved['about'],trip['about']);expect(saved['galleryImages'],trip['galleryImages']);expect(saved['cardImage'],'images/cover.jpg');expect(saved['batchColor'],'violet');expect(saved['maxTravellers'],6);
   expect(result.content,contains('// Preserve this footer.'));
   trip['batchColor']='red;display:none';expect(TripsParser.replaceTripsDataObject(source:source,trips:[trip]).success,isFalse);
  });

@@ -10,6 +10,7 @@ class TripsParser {
   static const _batchColors = {'forest','teal','blue','violet','amber','rose'};
   static const Set<String> _supportedSourceTripFields = {
     'experiences',
+    'maxTravellers',
     'isBestseller',
     'contentSections',
     'publicSlug',
@@ -219,6 +220,14 @@ class TripsParser {
     );
   }
 
+  static List<String> _travellerLimitErrors(Map<String, dynamic> trip) {
+    final limit = trip['maxTravellers'];
+    return trip.containsKey('maxTravellers') &&
+            (limit is! int || limit < 1 || limit > 50)
+        ? ['Maximum travellers per booking must be a whole number from 1 to 50.']
+        : <String>[];
+  }
+
   static List<String> _validateSourceTrip(
     String tripId,
     Map<String, dynamic> source,
@@ -229,6 +238,7 @@ class TripsParser {
         source,
       ).map((error) => 'Trip "$tripId": $error'),
     );
+    errors.addAll(_travellerLimitErrors(source));
     if(source.containsKey('batchColor')&&!_batchColors.contains(source['batchColor']))errors.add('Invalid upcoming batch colour.');
     const stringFields = {
       'publicSlug',
@@ -385,6 +395,7 @@ class TripsParser {
     final result = <String, dynamic>{'id': tripId};
     const directlyRepresentedFields = {
       'closedDepartures',
+      'maxTravellers',
       'contentSections',
       'publicSlug',
       'batchColor',
@@ -670,6 +681,9 @@ class TripsParser {
 
       writeStringListField('galleryImages', const ['galleryImages']);
       writeStringField('groupSize', const ['groupSize']);
+      if (trip.containsKey('maxTravellers')) {
+        buffer.writeln('        maxTravellers: ${trip['maxTravellers']},');
+      }
       if (trip.containsKey('isActive')) {
         buffer.writeln('        isActive: ${trip['isActive']},');
       }
@@ -794,6 +808,7 @@ class TripsParser {
 
     for (var index = 0; index < trips.length; index++) {
       final trip = trips[index];
+      errors.addAll(_travellerLimitErrors(trip));
       if(trip.containsKey('batchColor')&&!_batchColors.contains(trip['batchColor']))errors.add('Invalid upcoming batch colour.');
       final rawId = trip['id'];
       final id = rawId is String ? rawId : '';

@@ -1,3 +1,4 @@
+import 'website_page_defaults.dart';
 import 'dart:convert';
 import '../services/trip_date_utils.dart';
 import 'homepage_section_defaults.dart';
@@ -11,7 +12,9 @@ class HomepageConfig {
 
   static const defaults = <String, dynamic>{
     'version': 1,
+    'pages': websitePagesDefaults,
     'tripGallery': {'autoSlide': true, 'intervalSeconds': 5},
+    'destinationSlider': {'autoSlide': true, 'intervalSeconds': 5},
     'discovery': {
       'enabled': true,
       'showSearch': true,
@@ -118,14 +121,19 @@ class HomepageConfig {
     if ((data['discovery'] as Map).values.any((value) => value is! bool)) {
       throw const FormatException('Discovery settings must be booleans.');
     }
-    final gallery = data['tripGallery'] as Map;
-    if (gallery['autoSlide'] is! bool ||
-        gallery['intervalSeconds'] is! int ||
-        (gallery['intervalSeconds'] as int) < 3 ||
-        (gallery['intervalSeconds'] as int) > 30) {
-      throw const FormatException(
-        'Gallery slideshow needs an on/off choice and an interval from 3 to 30 seconds.',
-      );
+    for (final section in ['tripGallery', 'destinationSlider']) {
+      final gallery = data[section] as Map;
+      if (gallery['autoSlide'] is! bool ||
+          gallery['intervalSeconds'] is! int ||
+          (gallery['intervalSeconds'] as int) < 3 ||
+          (gallery['intervalSeconds'] as int) > 30) {
+        throw const FormatException(
+          'Gallery slideshow needs an on/off choice and an interval from 3 to 30 seconds.',
+        );
+      }
+      }
+    if ((data['pages'] as Map).values.any((value) => value is! String || value.length > 4000)) {
+      throw const FormatException('Website page fields must be text up to 4000 characters.');
     }
     final presentation = data['presentation'] as Map<String, dynamic>;
     if (!['forest', 'ocean', 'earth'].contains(presentation['preset']) ||
