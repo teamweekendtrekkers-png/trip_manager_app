@@ -90,6 +90,51 @@ extension ManagerDestinationDetails on ManagerDestination {
   };
 }
 
+/// One shared order keeps phone and desktop navigation consistent.
+const managerNavigationGroups = <String, List<ManagerDestination>>{
+  'Daily work': [
+    ManagerDestination.dashboard,
+    ManagerDestination.trips,
+    ManagerDestination.bookingReview,
+    ManagerDestination.departureManagement,
+    ManagerDestination.batches,
+  ],
+  'Website & media': [
+    ManagerDestination.homepage,
+    ManagerDestination.library,
+    ManagerDestination.sharedContent,
+    ManagerDestination.payments,
+  ],
+  'Insights & management': [
+    ManagerDestination.analytics,
+    ManagerDestination.health,
+    ManagerDestination.deployment,
+    ManagerDestination.history,
+    ManagerDestination.settings,
+  ],
+};
+
+final managerNavigationOrder = List<ManagerDestination>.unmodifiable(
+  managerNavigationGroups.values.expand((destinations) => destinations),
+);
+
+class _NavigationGroupHeading extends StatelessWidget {
+  const _NavigationGroupHeading(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(24, 20, 16, 8),
+    child: Text(
+      label,
+      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
+}
+
 class ManagerSideNavigation extends StatelessWidget {
   const ManagerSideNavigation({
     super.key,
@@ -151,12 +196,15 @@ class ManagerSideNavigation extends StatelessWidget {
               Expanded(
                 child: ListView(
                   children: [
-                    for (final destination in ManagerDestination.values)
-                      _SideDestination(
-                        destination: destination,
-                        selected: destination == selected,
-                        onTap: () => onSelected(destination),
-                      ),
+                    for (final group in managerNavigationGroups.entries) ...[
+                      _NavigationGroupHeading(group.key),
+                      for (final destination in group.value)
+                        _SideDestination(
+                          destination: destination,
+                          selected: destination == selected,
+                          onTap: () => onSelected(destination),
+                        ),
+                    ],
                   ],
                 ),
               ),
@@ -184,10 +232,10 @@ class ManagerNavigationDrawer extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return NavigationDrawer(
       key: const Key('manager-mobile-navigation'),
-      selectedIndex: ManagerDestination.values.indexOf(selected),
+      selectedIndex: managerNavigationOrder.indexOf(selected),
       onDestinationSelected: (index) {
         Navigator.pop(context);
-        onSelected(ManagerDestination.values[index]);
+        onSelected(managerNavigationOrder[index]);
       },
       children: [
         Padding(
@@ -223,19 +271,36 @@ class ManagerNavigationDrawer extends StatelessWidget {
         ),
         const AppVersionCard(compact: true),
         const Divider(indent: 20, endIndent: 20),
-        for (final destination in ManagerDestination.values)
+        for (final group in managerNavigationGroups.entries) ...[
+          _NavigationGroupHeading(group.key),
+          for (final destination in group.value)
           NavigationDrawerDestination(
             icon: Icon(destination.icon),
             selectedIcon: Icon(destination.selectedIcon),
             label: SizedBox(
               width: 160,
-              child: Text(
-                destination.label,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    destination.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    destination.description,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
+        ],
       ],
     );
   }
