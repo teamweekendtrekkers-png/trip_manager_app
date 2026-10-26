@@ -65,11 +65,22 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      # Gradle 8.14 cannot run on the runner's newer Java 25 runtime.
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.38.5'
           channel: 'stable'
+      - name: Select Android build JDK
+        run: |
+          flutter config --jdk-dir "$JAVA_HOME"
+          java -version
+          flutter doctor --verbose
       - name: Install dependencies
         run: flutter pub get
       - name: Build Android APK
