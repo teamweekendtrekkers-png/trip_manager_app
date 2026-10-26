@@ -121,6 +121,73 @@ void main() {
     });
   }
 
+  for (final width in [320.0, 390.0, 1440.0]) {
+    testWidgets(
+      'Bookings shares navigation and preserves typed fields at $width',
+      (tester) async {
+        await _setSize(tester, Size(width, 900));
+        final providers = await _providers();
+        await tester.pumpWidget(_app(providers, home: true));
+        await tester.pumpAndSettle();
+        Future<void> tab(String label) async {
+          final shell = find.byKey(
+            Key(
+              width < managerDesktopBreakpoint
+                  ? 'manager-bottom-navigation'
+                  : 'manager-desktop-navigation',
+            ),
+          );
+          await tester.tap(
+            find.descendant(of: shell, matching: find.text(label)),
+          );
+          await tester.pumpAndSettle();
+        }
+
+        await tab('Trips');
+        await tester.enterText(find.byType(TextField).first, 'Coorg');
+        await tester.pumpAndSettle();
+        expect(find.text('Varkala Escape'), findsNothing);
+        await tab(
+          width < managerDesktopBreakpoint ? 'Bookings' : 'Booking review',
+        );
+        expect(find.text('Bookings & payment review'), findsOneWidget);
+        expect(find.byKey(const Key('workspace-publish')), findsNothing);
+        await tester.enterText(
+          find.widgetWithText(TextField, 'Administrator email'),
+          'manager@example.com',
+        );
+        await tab('Trips');
+        expect(find.text('Coorg Weekend'), findsOneWidget);
+        expect(find.text('Varkala Escape'), findsNothing);
+        await tab(
+          width < managerDesktopBreakpoint ? 'Bookings' : 'Booking review',
+        );
+        expect(find.text('manager@example.com'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'card Dates & price action opens quick edit without changing the trip',
+    (tester) async {
+      await _setSize(tester, const Size(390, 900));
+      final providers = await _providers();
+      await tester.pumpWidget(_app(providers));
+      await tester.pumpAndSettle();
+      final before = providers.trips.trips
+          .map((trip) => Map<String, dynamic>.from(trip))
+          .toList();
+      await tester.tap(find.text('Dates & price').first);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Quick edit'), findsWidgets);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(providers.trips.trips, before);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('guided editor keeps text when moving between sections', (
     tester,
   ) async {

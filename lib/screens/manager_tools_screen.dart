@@ -22,12 +22,14 @@ class ManagerToolsScreen extends StatefulWidget {
     super.key,
     required this.tool,
     this.onNavigate,
+    this.onPendingBookings,
     this.choosePhoto = false,
     this.embedded = false,
     this.githubService,
   });
   final ManagerDestination tool;
   final ValueChanged<ManagerDestination>? onNavigate;
+  final VoidCallback? onPendingBookings;
   final bool choosePhoto;
   final bool embedded;
   final GitHubService? githubService;
@@ -206,13 +208,14 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
                 Icons.fact_check_outlined,
                 'Pending payments',
                 'Review customer submissions',
-                () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const BookingReviewScreen(
-                      initialFilter: BookingReviewFilter.pending,
+                widget.onPendingBookings ??
+                    () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const BookingReviewScreen(
+                          initialFilter: BookingReviewFilter.pending,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
                 key: const Key('dashboard-booking-review'),
               ),
               _task(
@@ -266,6 +269,46 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
           ),
         ],
       ),
+      const SizedBox(height: 16),
+      Text(
+        'Needs attention (${attention.length})',
+        style: Theme.of(context).textTheme.titleLarge,
+      ),
+      if (attention.isEmpty)
+        const ListTile(
+          leading: Icon(Icons.check_circle_outline),
+          title: Text('Active trips have dates, prices and cover photos.'),
+        ),
+      for (final t in attention)
+        ListTile(
+          leading: const Icon(Icons.rule_outlined),
+          title: Text(t['title']?.toString() ?? t['id'].toString()),
+          subtitle: Text(tripAttention(t).join(' · ')),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: p.isLoading
+              ? null
+              : () {
+                  final id = t['id']?.toString() ?? '';
+                  final current = p.getTripById(id),
+                      index = p.getTripIndexById(id);
+                  if (current == null || index == null) return;
+                  final issues = tripAttention(current);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => TripEditScreen(
+                        trip: current,
+                        index: index,
+                        initialSection:
+                            issues.contains('Add upcoming dates') ||
+                                issues.contains('Check price')
+                            ? TripEditorSection.dates
+                            : TripEditorSection.photos,
+                      ),
+                    ),
+                  );
+                },
+        ),
       const SizedBox(height: 16),
       Text('At a glance', style: Theme.of(context).textTheme.titleLarge),
       const SizedBox(height: 12),
@@ -347,45 +390,6 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
           ),
         ],
       ),
-      Text(
-        'Needs attention (${attention.length})',
-        style: Theme.of(context).textTheme.titleLarge,
-      ),
-      if (attention.isEmpty)
-        const ListTile(
-          leading: Icon(Icons.check_circle_outline),
-          title: Text('Active trips have dates, prices and cover photos.'),
-        ),
-      for (final t in attention)
-        ListTile(
-          leading: const Icon(Icons.rule_outlined),
-          title: Text(t['title']?.toString() ?? t['id'].toString()),
-          subtitle: Text(tripAttention(t).join(' · ')),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: p.isLoading
-              ? null
-              : () {
-                  final id = t['id']?.toString() ?? '';
-                  final current = p.getTripById(id),
-                      index = p.getTripIndexById(id);
-                  if (current == null || index == null) return;
-                  final issues = tripAttention(current);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute<void>(
-                      builder: (_) => TripEditScreen(
-                        trip: current,
-                        index: index,
-                        initialSection:
-                            issues.contains('Add upcoming dates') ||
-                                issues.contains('Check price')
-                            ? TripEditorSection.dates
-                            : TripEditorSection.photos,
-                      ),
-                    ),
-                  );
-                },
-        ),
       Text(
         'Upcoming departures',
         style: Theme.of(context).textTheme.titleLarge,

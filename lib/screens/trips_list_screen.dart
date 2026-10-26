@@ -15,6 +15,7 @@ import 'trip_content_settings_screen.dart';
 import '../widgets/quick_trip_editor.dart';
 import '../widgets/trip_editor_sections.dart';
 import '../services/quick_edit_safety.dart';
+import '../services/booking_review_filter.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/trips_provider.dart';
@@ -46,6 +47,9 @@ class _TripsListScreenState extends State<TripsListScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   late ManagerDestination _workspace;
+  bool _visitedHome = false, _visitedBookings = false;
+  BookingReviewFilter _bookingFilter = BookingReviewFilter.all;
+  int _bookingFilterRequest = 0;
   String _searchQuery = '';
   bool _showFeaturedOnly = false;
   String _tripFilter = 'All';
@@ -75,6 +79,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
     _workspace = widget.initialDestination == ManagerDestination.dashboard
         ? ManagerDestination.dashboard
         : ManagerDestination.trips;
+    _visitedHome = _workspace == ManagerDestination.dashboard;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadTrips();
     });
@@ -240,8 +245,15 @@ class _TripsListScreenState extends State<TripsListScreen> {
   Future<void> _openDestination(ManagerDestination destination) async {
     if (!mounted) return;
     if (destination == ManagerDestination.trips ||
-        destination == ManagerDestination.dashboard) {
-      setState(() => _workspace = destination);
+        destination == ManagerDestination.dashboard ||
+        destination == ManagerDestination.bookingReview) {
+      setState(() {
+        _workspace = destination;
+        _visitedHome |= destination == ManagerDestination.dashboard;
+        _visitedBookings |= destination == ManagerDestination.bookingReview;
+      });
+      _searchFocusNode.unfocus();
+      FocusManager.instance.primaryFocus?.unfocus();
       return;
     }
     final provider = context.read<TripsProvider>();
@@ -320,8 +332,8 @@ class _TripsListScreenState extends State<TripsListScreen> {
               : !provider.hasCompleteRemoteSnapshot
               ? 'Load trips first'
               : (_publishedCommitSha ?? provider.lastPublishedCommit) != null
-              ? 'Saved · check deployment'
-              : 'Synced with GitHub',
+              ? 'Published · verify website'
+              : 'No unpublished changes',
           key: const Key('workspace-publish-state'),
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
@@ -353,8 +365,14 @@ class _TripsListScreenState extends State<TripsListScreen> {
             Expanded(child: status),
             IconButton(
               key: const Key('workspace-publish'),
-              tooltip: 'No trip changes to publish',
-              onPressed: null,
+              tooltip:
+                  (_publishedCommitSha ?? provider.lastPublishedCommit) != null
+                  ? 'Check website update'
+                  : 'No trip changes to publish',
+              onPressed:
+                  (_publishedCommitSha ?? provider.lastPublishedCommit) != null
+                  ? () => _openDestination(ManagerDestination.deployment)
+                  : null,
               icon: const Icon(Icons.cloud_done_outlined),
             ),
           ],
@@ -532,6 +550,8 @@ class _TripsListScreenState extends State<TripsListScreen> {
               child: Text(
                 _workspace == ManagerDestination.dashboard
                     ? 'Home'
+                    : _workspace == ManagerDestination.bookingReview
+                    ? 'Bookings'
                     : 'Trips workspace',
               ),
             ),
@@ -689,12 +709,15 @@ class _TripsListScreenState extends State<TripsListScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildPublishBar(provider),
+            if (_workspace != ManagerDestination.bookingReview)
+              _buildPublishBar(provider),
             if (!isDesktop)
               NavigationBar(
                 key: const Key('manager-bottom-navigation'),
                 selectedIndex: _workspace == ManagerDestination.dashboard
                     ? 0
+                    : _workspace == ManagerDestination.bookingReview
+                    ? 2
                     : 1,
                 onDestinationSelected: (index) {
                   if (index == 0)
@@ -731,12 +754,16 @@ class _TripsListScreenState extends State<TripsListScreen> {
       ),
       body: CallbackShortcuts(
         bindings: <ShortcutActivator, VoidCallback>{
-          const SingleActivator(LogicalKeyboardKey.keyF, control: true): () =>
-              _searchFocusNode.requestFocus(),
+          if (_workspace == ManagerDestination.trips)
+            const SingleActivator(LogicalKeyboardKey.keyF, control: true): () =>
+                _searchFocusNode.requestFocus(),
           const SingleActivator(LogicalKeyboardKey.keyN, control: true):
               _addNewTrip,
           const SingleActivator(LogicalKeyboardKey.keyS, control: true): () {
-            if (!provider.isLoading && provider.hasTrips) _saveTrips(provider);
+            if (_workspace != ManagerDestination.bookingReview &&
+                !provider.isLoading &&
+                provider.hasTrips)
+              _saveTrips(provider);
           },
         },
         child: Focus(
@@ -755,504 +782,540 @@ class _TripsListScreenState extends State<TripsListScreen> {
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 1320),
-                    child: _workspace == ManagerDestination.dashboard
-                        ? ManagerToolsScreen(
-                            tool: ManagerDestination.dashboard,
-                            embedded: true,
-                            githubService: widget.toolsService,
-                            onNavigate: _openDestination,
-                          )
-                        : Column(
-                            children: [
-                              _WorkspaceSummary(
-                                provider: provider,
-                                compact: !isDesktop,
-                              ),
-                              // Conflict banner
-                              Consumer<TripsProvider>(
-                                builder: (context, provider, _) {
-                                  if (provider.hasConflict) {
-                                    return Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.all(12),
-                                      color: Colors.red[100],
-                                      child: Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.warning,
-                                            color: Colors.red,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                const Text(
-                                                  'Conflict Detected',
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.red,
-                                                  ),
-                                                ),
-                                                Text(
-                                                  'Remote changes detected. Choose an action:',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: Colors.red[800],
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          TextButton(
-                                            onPressed: () =>
-                                                _handlePullAndMerge(provider),
-                                            child: const Text('Merge'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () =>
-                                                _handleForceOverwrite(provider),
-                                            style: TextButton.styleFrom(
-                                              foregroundColor: Colors.red,
-                                            ),
-                                            child: const Text('Overwrite'),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }
-                                  return const SizedBox.shrink();
+                    child: IndexedStack(
+                      index: _workspace == ManagerDestination.dashboard
+                          ? 0
+                          : _workspace == ManagerDestination.bookingReview
+                          ? 2
+                          : 1,
+                      children: [
+                        _visitedHome
+                            ? ManagerToolsScreen(
+                                key: const ValueKey('home-workspace'),
+                                tool: ManagerDestination.dashboard,
+                                embedded: true,
+                                githubService: widget.toolsService,
+                                onNavigate: _openDestination,
+                                onPendingBookings: () {
+                                  setState(() {
+                                    _bookingFilter =
+                                        BookingReviewFilter.pending;
+                                    _bookingFilterRequest++;
+                                  });
+                                  _openDestination(
+                                    ManagerDestination.bookingReview,
+                                  );
                                 },
-                              ),
-                              // Duplicate trip ID warning banner
-                              Consumer<TripsProvider>(
-                                builder: (context, provider, _) {
-                                  final duplicates = provider.trips
-                                      .where(
-                                        (t) => t['_duplicateWarning'] == true,
-                                      )
-                                      .toList();
-                                  if (duplicates.isNotEmpty) {
-                                    final ids = duplicates
-                                        .map((t) => t['id'])
-                                        .toSet()
-                                        .join(', ');
-                                    return Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.all(12),
-                                      color: Colors.orange[100],
-                                      child: Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.error_outline,
+                              )
+                            : const SizedBox.shrink(),
+                        Column(
+                          children: [
+                            _WorkspaceSummary(
+                              provider: provider,
+                              compact: !isDesktop,
+                            ),
+                            // Conflict banner
+                            Consumer<TripsProvider>(
+                              builder: (context, provider, _) {
+                                if (provider.hasConflict) {
+                                  return Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(12),
+                                    color: Colors.red[100],
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.warning,
+                                          color: Colors.red,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              const Text(
+                                                'Conflict Detected',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.red,
+                                                ),
+                                              ),
+                                              Text(
+                                                'Remote changes detected. Choose an action:',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.red[800],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              _handlePullAndMerge(provider),
+                                          child: const Text('Merge'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              _handleForceOverwrite(provider),
+                                          style: TextButton.styleFrom(
+                                            foregroundColor: Colors.red,
+                                          ),
+                                          child: const Text('Overwrite'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
+                            ),
+                            // Duplicate trip ID warning banner
+                            Consumer<TripsProvider>(
+                              builder: (context, provider, _) {
+                                final duplicates = provider.trips
+                                    .where(
+                                      (t) => t['_duplicateWarning'] == true,
+                                    )
+                                    .toList();
+                                if (duplicates.isNotEmpty) {
+                                  final ids = duplicates
+                                      .map((t) => t['id'])
+                                      .toSet()
+                                      .join(', ');
+                                  return Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(12),
+                                    color: Colors.orange[100],
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.error_outline,
+                                          color: Colors.orange,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              const Text(
+                                                'Duplicate Trip IDs Found',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.orange,
+                                                ),
+                                              ),
+                                              Text(
+                                                'IDs: $ids — website only uses the last occurrence.',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.orange[800],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.health_and_safety,
                                             color: Colors.orange,
                                           ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                const Text(
-                                                  'Duplicate Trip IDs Found',
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.orange,
-                                                  ),
-                                                ),
-                                                Text(
-                                                  'IDs: $ids — website only uses the last occurrence.',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: Colors.orange[800],
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    const DataHealthScreen(),
+                                              ),
+                                            );
+                                          },
+                                          tooltip: 'View Data Health',
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
+                            ),
+                            // Search bar
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: TextField(
+                                controller: _searchController,
+                                focusNode: _searchFocusNode,
+                                decoration: InputDecoration(
+                                  hintText:
+                                      'Search by trip, destination, or departure city',
+                                  labelText: 'Find a trip',
+                                  prefixIcon: const Icon(Icons.search),
+                                  suffixIcon: _searchQuery.isNotEmpty
+                                      ? IconButton(
+                                          icon: const Icon(Icons.clear),
+                                          tooltip: 'Clear search',
+                                          onPressed: () {
+                                            _searchController.clear();
+                                            setState(() {
+                                              _searchQuery = '';
+                                            });
+                                          },
+                                        )
+                                      : null,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  helperText: isDesktop
+                                      ? 'Ctrl+F to search · drag cards to reorder within a tier'
+                                      : null,
+                                ),
+                                onChanged: (value) {
+                                  setState(() {
+                                    _searchQuery = value;
+                                  });
+                                },
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    if (_hasFilters)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          right: 6,
+                                        ),
+                                        child: ActionChip(
+                                          key: const Key('clear-trip-filters'),
+                                          avatar: const Icon(
+                                            Icons.filter_alt_off,
+                                            size: 18,
                                           ),
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.health_and_safety,
-                                              color: Colors.orange,
-                                            ),
-                                            onPressed: () {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (_) =>
-                                                      const DataHealthScreen(),
-                                                ),
-                                              );
-                                            },
-                                            tooltip: 'View Data Health',
+                                          label: const Text('Clear filters'),
+                                          onPressed: _clearFilters,
+                                        ),
+                                      ),
+                                    for (final filter in [
+                                      'All',
+                                      'Active',
+                                      'Draft',
+                                      'Upcoming',
+                                      'Inactive',
+                                      'Needs dates',
+                                    ])
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          right: 6,
+                                        ),
+                                        child: ChoiceChip(
+                                          label: Text(
+                                            filter == 'Draft'
+                                                ? 'Unpublished'
+                                                : filter,
                                           ),
+                                          selected: _tripFilter == filter,
+                                          onSelected: (_) => setState(
+                                            () => _tripFilter = filter,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            // Trips list
+                            Expanded(
+                              child: Consumer<TripsProvider>(
+                                builder: (context, provider, child) {
+                                  if (provider.isLoading) {
+                                    return const Center(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          CircularProgressIndicator(),
+                                          SizedBox(height: 16),
+                                          Text('Loading trips from GitHub...'),
                                         ],
                                       ),
                                     );
                                   }
-                                  return const SizedBox.shrink();
-                                },
-                              ),
-                              // Search bar
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: TextField(
-                                  controller: _searchController,
-                                  focusNode: _searchFocusNode,
-                                  decoration: InputDecoration(
-                                    hintText:
-                                        'Search by trip, destination, or departure city',
-                                    labelText: 'Find a trip',
-                                    prefixIcon: const Icon(Icons.search),
-                                    suffixIcon: _searchQuery.isNotEmpty
-                                        ? IconButton(
-                                            icon: const Icon(Icons.clear),
-                                            tooltip: 'Clear search',
-                                            onPressed: () {
-                                              _searchController.clear();
-                                              setState(() {
-                                                _searchQuery = '';
-                                              });
-                                            },
-                                          )
-                                        : null,
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    helperText: isDesktop
-                                        ? 'Ctrl+F to search · drag cards to reorder within a tier'
-                                        : null,
-                                  ),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _searchQuery = value;
-                                    });
-                                  },
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                ),
-                                child: SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                    children: [
-                                      if (_hasFilters)
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                            right: 6,
-                                          ),
-                                          child: ActionChip(
-                                            key: const Key(
-                                              'clear-trip-filters',
-                                            ),
-                                            avatar: const Icon(
-                                              Icons.filter_alt_off,
-                                              size: 18,
-                                            ),
-                                            label: const Text('Clear filters'),
-                                            onPressed: _clearFilters,
-                                          ),
-                                        ),
-                                      for (final filter in [
-                                        'All',
-                                        'Active',
-                                        'Draft',
-                                        'Upcoming',
-                                        'Inactive',
-                                        'Needs dates',
-                                      ])
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                            right: 6,
-                                          ),
-                                          child: ChoiceChip(
-                                            label: Text(
-                                              filter == 'Draft'
-                                                  ? 'Unpublished'
-                                                  : filter,
-                                            ),
-                                            selected: _tripFilter == filter,
-                                            onSelected: (_) => setState(
-                                              () => _tripFilter = filter,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              // Trips list
-                              Expanded(
-                                child: Consumer<TripsProvider>(
-                                  builder: (context, provider, child) {
-                                    if (provider.isLoading) {
-                                      return const Center(
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            CircularProgressIndicator(),
-                                            SizedBox(height: 16),
-                                            Text(
-                                              'Loading trips from GitHub...',
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    }
 
-                                    if (provider.error != null &&
-                                        !provider.hasConflict) {
-                                      return Center(
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              Icons.error_outline,
-                                              size: 64,
-                                              color: Colors.red[300],
+                                  if (provider.error != null &&
+                                      !provider.hasConflict) {
+                                    return Center(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.error_outline,
+                                            size: 64,
+                                            color: Colors.red[300],
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            'Error loading trips',
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.titleLarge,
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 32,
                                             ),
-                                            const SizedBox(height: 16),
-                                            Text(
-                                              'Error loading trips',
-                                              style: Theme.of(
-                                                context,
-                                              ).textTheme.titleLarge,
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Padding(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 32,
-                                                  ),
-                                              child: Text(
-                                                provider.error!,
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                  color: Colors.grey[600],
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 16),
-                                            ElevatedButton.icon(
-                                              onPressed: _confirmAndRefresh,
-                                              icon: const Icon(Icons.refresh),
-                                              label: const Text('Retry'),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    }
-
-                                    var trips = _searchQuery.isEmpty
-                                        ? provider.orderedTrips
-                                        : provider.searchTrips(_searchQuery);
-
-                                    trips = trips
-                                        .where(
-                                          (t) => switch (_tripFilter) {
-                                            'Active' => t['isActive'] != false,
-                                            'Inactive' =>
-                                              t['isActive'] == false,
-                                            'Draft' =>
-                                              provider.changes.containsKey(
-                                                t['id'],
-                                              ),
-                                            'Upcoming' =>
-                                              t['isActive'] != false &&
-                                                  TripDateUtils.getUpcomingDateRanges(
-                                                    t,
-                                                  ).isNotEmpty,
-                                            'Needs dates' =>
-                                              t['isActive'] != false &&
-                                                  TripDateUtils.getUpcomingDateRanges(
-                                                    t,
-                                                  ).isEmpty,
-                                            _ => true,
-                                          },
-                                        )
-                                        .toList();
-                                    if (_showFeaturedOnly) {
-                                      trips = trips
-                                          .where((t) => t['featured'] == true)
-                                          .toList();
-                                    }
-
-                                    if (trips.isEmpty) {
-                                      return Center(
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              Icons.hiking,
-                                              size: 64,
-                                              color: Colors.grey[400],
-                                            ),
-                                            const SizedBox(height: 16),
-                                            Text(
-                                              _searchQuery.isNotEmpty
-                                                  ? 'No trips match your search'
-                                                  : 'No trips found',
-                                              style: Theme.of(
-                                                context,
-                                              ).textTheme.titleLarge,
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              _hasFilters
-                                                  ? 'Try another search or clear your filters.'
-                                                  : 'Tap + to add a new trip',
+                                            child: Text(
+                                              provider.error!,
+                                              textAlign: TextAlign.center,
                                               style: TextStyle(
                                                 color: Colors.grey[600],
                                               ),
                                             ),
-                                            const SizedBox(height: 16),
-                                            ElevatedButton.icon(
-                                              key: const Key(
-                                                'empty-trips-action',
-                                              ),
-                                              onPressed: _hasFilters
-                                                  ? _clearFilters
-                                                  : _confirmAndRefresh,
-                                              icon: Icon(
-                                                _hasFilters
-                                                    ? Icons.filter_alt_off
-                                                    : Icons.refresh,
-                                              ),
-                                              label: Text(
-                                                _hasFilters
-                                                    ? 'Show all trips'
-                                                    : 'Refresh',
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    }
-
-                                    // When a search or filter is active, trips is a filtered sublist.
-                                    // The itemBuilder index is the position in that sublist — NOT the
-                                    // position in provider.trips. We must resolve the real index via
-                                    // the trip's ID so that edit/delete/toggleFeatured operate on the
-                                    // correct trip in the full list instead of trashing trip #0.
-                                    final isFiltered =
-                                        _searchQuery.isNotEmpty ||
-                                        _showFeaturedOnly ||
-                                        _tripFilter != 'All';
-
-                                    return Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        Padding(
-                                          padding: const EdgeInsets.fromLTRB(
-                                            16,
-                                            6,
-                                            16,
-                                            4,
                                           ),
-                                          child: Text(
-                                            '${trips.length} of ${provider.tripCount} trips'
-                                            '${_showFeaturedOnly ? ' · Featured only' : ''}',
-                                            key: const Key(
-                                              'trip-results-count',
+                                          const SizedBox(height: 16),
+                                          ElevatedButton.icon(
+                                            onPressed: _confirmAndRefresh,
+                                            icon: const Icon(Icons.refresh),
+                                            label: const Text('Retry'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }
+
+                                  var trips = _searchQuery.isEmpty
+                                      ? provider.orderedTrips
+                                      : provider.searchTrips(_searchQuery);
+
+                                  trips = trips
+                                      .where(
+                                        (t) => switch (_tripFilter) {
+                                          'Active' => t['isActive'] != false,
+                                          'Inactive' => t['isActive'] == false,
+                                          'Draft' =>
+                                            provider.changes.containsKey(
+                                              t['id'],
                                             ),
+                                          'Upcoming' =>
+                                            t['isActive'] != false &&
+                                                TripDateUtils.getUpcomingDateRanges(
+                                                  t,
+                                                ).isNotEmpty,
+                                          'Needs dates' =>
+                                            t['isActive'] != false &&
+                                                TripDateUtils.getUpcomingDateRanges(
+                                                  t,
+                                                ).isEmpty,
+                                          _ => true,
+                                        },
+                                      )
+                                      .toList();
+                                  if (_showFeaturedOnly) {
+                                    trips = trips
+                                        .where((t) => t['featured'] == true)
+                                        .toList();
+                                  }
+
+                                  if (trips.isEmpty) {
+                                    return Center(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.hiking,
+                                            size: 64,
+                                            color: Colors.grey[400],
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            _searchQuery.isNotEmpty
+                                                ? 'No trips match your search'
+                                                : 'No trips found',
                                             style: Theme.of(
                                               context,
-                                            ).textTheme.bodySmall,
+                                            ).textTheme.titleLarge,
                                           ),
-                                        ),
-                                        Expanded(
-                                          child: RefreshIndicator(
-                                            onRefresh: _confirmAndRefresh,
-                                            child: ReorderableListView.builder(
-                                              key: ValueKey<String>(
-                                                '$_searchQuery|$_tripFilter|$_showFeaturedOnly',
-                                              ),
-                                              padding: const EdgeInsets.only(
-                                                bottom: 80,
-                                              ),
-                                              itemCount: trips.length,
-                                              buildDefaultDragHandles:
-                                                  !isFiltered,
-                                              onReorder: isFiltered
-                                                  ? (
-                                                      _,
-                                                      _,
-                                                    ) {} // Reordering while filtered would corrupt order
-                                                  : (oldIndex, newIndex) {
-                                                      final moved = provider
-                                                          .reorderTrips(
-                                                            oldIndex,
-                                                            newIndex,
-                                                          );
-                                                      if (!moved) {
-                                                        ScaffoldMessenger.of(
-                                                          context,
-                                                        ).showSnackBar(
-                                                          const SnackBar(
-                                                            content: Text(
-                                                              'Trips can only be reordered within the same visibility tier.',
-                                                            ),
-                                                          ),
-                                                        );
-                                                      }
-                                                    },
-                                              itemBuilder: (context, index) {
-                                                final trip = trips[index];
-                                                final tripId =
-                                                    trip['id']?.toString() ??
-                                                    '';
-                                                return KeyedSubtree(
-                                                  key: ValueKey<dynamic>(
-                                                    tripId.trim().isEmpty
-                                                        ? 'invalid-trip-$index'
-                                                        : tripId,
-                                                  ),
-                                                  child: _TripCard(
-                                                    trip: trip,
-                                                    upcomingLabel:
-                                                        TripVisibility.upcoming(
-                                                          trip,
-                                                          _homepageSelection,
-                                                        ),
-                                                    onTap: () =>
-                                                        _editTrip(tripId),
-                                                    onDelete: () =>
-                                                        _deleteTrip(tripId),
-                                                    onToggleFeatured: () =>
-                                                        _toggleFeatured(tripId),
-                                                    onQuickEdit: () =>
-                                                        _quickEditTrip(tripId),
-                                                    draftChanged: provider
-                                                        .changes
-                                                        .containsKey(tripId),
-                                                    onDuplicate: () {
-                                                      final id = provider
-                                                          .duplicateTrip(
-                                                            tripId,
-                                                          );
-                                                      if (id != null)
-                                                        _editTrip(id);
-                                                    },
-                                                  ),
-                                                );
-                                              },
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            _hasFilters
+                                                ? 'Try another search or clear your filters.'
+                                                : 'Tap + to add a new trip',
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
                                             ),
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(height: 16),
+                                          ElevatedButton.icon(
+                                            key: const Key(
+                                              'empty-trips-action',
+                                            ),
+                                            onPressed: _hasFilters
+                                                ? _clearFilters
+                                                : _confirmAndRefresh,
+                                            icon: Icon(
+                                              _hasFilters
+                                                  ? Icons.filter_alt_off
+                                                  : Icons.refresh,
+                                            ),
+                                            label: Text(
+                                              _hasFilters
+                                                  ? 'Show all trips'
+                                                  : 'Refresh',
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     );
-                                  },
-                                ),
+                                  }
+
+                                  // When a search or filter is active, trips is a filtered sublist.
+                                  // The itemBuilder index is the position in that sublist — NOT the
+                                  // position in provider.trips. We must resolve the real index via
+                                  // the trip's ID so that edit/delete/toggleFeatured operate on the
+                                  // correct trip in the full list instead of trashing trip #0.
+                                  final isFiltered =
+                                      _searchQuery.isNotEmpty ||
+                                      _showFeaturedOnly ||
+                                      _tripFilter != 'All';
+
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.fromLTRB(
+                                          16,
+                                          6,
+                                          16,
+                                          4,
+                                        ),
+                                        child: Text(
+                                          '${trips.length} of ${provider.tripCount} trips'
+                                          '${_showFeaturedOnly ? ' · Featured only' : ''}',
+                                          key: const Key('trip-results-count'),
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodySmall,
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: RefreshIndicator(
+                                          onRefresh: _confirmAndRefresh,
+                                          child: ReorderableListView.builder(
+                                            key: ValueKey<String>(
+                                              '$_searchQuery|$_tripFilter|$_showFeaturedOnly',
+                                            ),
+                                            padding: const EdgeInsets.only(
+                                              bottom: 80,
+                                            ),
+                                            itemCount: trips.length,
+                                            buildDefaultDragHandles:
+                                                !isFiltered,
+                                            onReorder: isFiltered
+                                                ? (
+                                                    _,
+                                                    _,
+                                                  ) {} // Reordering while filtered would corrupt order
+                                                : (oldIndex, newIndex) {
+                                                    final moved = provider
+                                                        .reorderTrips(
+                                                          oldIndex,
+                                                          newIndex,
+                                                        );
+                                                    if (!moved) {
+                                                      ScaffoldMessenger.of(
+                                                        context,
+                                                      ).showSnackBar(
+                                                        const SnackBar(
+                                                          content: Text(
+                                                            'Trips can only be reordered within the same visibility tier.',
+                                                          ),
+                                                        ),
+                                                      );
+                                                    }
+                                                  },
+                                            itemBuilder: (context, index) {
+                                              final trip = trips[index];
+                                              final tripId =
+                                                  trip['id']?.toString() ?? '';
+                                              return KeyedSubtree(
+                                                key: ValueKey<dynamic>(
+                                                  tripId.trim().isEmpty
+                                                      ? 'invalid-trip-$index'
+                                                      : tripId,
+                                                ),
+                                                child: _TripCard(
+                                                  trip: trip,
+                                                  upcomingLabel:
+                                                      TripVisibility.upcoming(
+                                                        trip,
+                                                        _homepageSelection,
+                                                      ),
+                                                  onTap: () =>
+                                                      _editTrip(tripId),
+                                                  onDelete: () =>
+                                                      _deleteTrip(tripId),
+                                                  onToggleFeatured: () =>
+                                                      _toggleFeatured(tripId),
+                                                  onQuickEdit: () =>
+                                                      _quickEditTrip(tripId),
+                                                  draftChanged: provider.changes
+                                                      .containsKey(tripId),
+                                                  onDuplicate: () {
+                                                    final id = provider
+                                                        .duplicateTrip(tripId);
+                                                    if (id != null)
+                                                      _editTrip(id);
+                                                  },
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
+                        ),
+                        _visitedBookings
+                            ? BookingReviewScreen(
+                                key: ValueKey(
+                                  Object.hash(
+                                    context
+                                        .watch<SettingsProvider>()
+                                        .settings
+                                        .repositoryOwner,
+                                    context
+                                        .watch<SettingsProvider>()
+                                        .settings
+                                        .repositoryName,
+                                    context
+                                        .watch<SettingsProvider>()
+                                        .settings
+                                        .branch,
+                                    context
+                                        .watch<SettingsProvider>()
+                                        .settings
+                                        .githubToken,
+                                  ),
+                                ),
+                                initialFilter: _bookingFilter,
+                                filterRequest: _bookingFilterRequest,
+                                embedded: true,
+                              )
+                            : const SizedBox.shrink(),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -1260,7 +1323,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
           ),
         ),
       ),
-      floatingActionButton: _workspace == ManagerDestination.dashboard
+      floatingActionButton: _workspace != ManagerDestination.trips
           ? null
           : Column(
               mainAxisSize: MainAxisSize.min,
@@ -2146,27 +2209,35 @@ class _TripCard extends StatelessWidget {
                         },
                       ),
                       const SizedBox(height: 6),
-                      Row(
+                      Wrap(
+                        spacing: 4,
+                        runSpacing: 0,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          Expanded(
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton.icon(
-                                onPressed: onTap,
-                                icon: const Icon(Icons.edit_outlined, size: 18),
-                                label: const Text('Edit trip'),
-                              ),
-                            ),
+                          TextButton.icon(
+                            onPressed: onTap,
+                            icon: const Icon(Icons.edit_outlined, size: 18),
+                            label: const Text('Edit trip'),
                           ),
-                          const Spacer(),
+                          TextButton.icon(
+                            onPressed: onQuickEdit,
+                            icon: const Icon(
+                              Icons.edit_calendar_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('Dates & price'),
+                          ),
                           Tooltip(
                             message: upcomingLabel,
-                            child: Icon(
-                              Icons.visibility_outlined,
-                              size: 18,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
+                            child: Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: Icon(
+                                Icons.visibility_outlined,
+                                size: 18,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ),
                         ],
