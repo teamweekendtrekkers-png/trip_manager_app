@@ -141,6 +141,35 @@ TripsProvider providerFor(FakeGitHubService service) =>
 void main() {
   group('TripsProvider safe publication', () {
     test(
+      'placeholder covers keep drafts and block the atomic publish',
+      () async {
+        final base = [trip('a')];
+        final service = FakeGitHubService()
+          ..queueSnapshot(
+            base,
+            tripsSha: 'loaded',
+            featuredSha: 'featured-loaded',
+          )
+          ..queueSnapshot(
+            base,
+            tripsSha: 'latest',
+            featuredSha: 'featured-latest',
+          );
+        final provider = providerFor(service);
+        await provider.loadTrips();
+        provider.updateTrip(0, {
+          ...provider.trips.single,
+          'image': 'images/trips/default.jpg',
+        });
+        final result = await provider.saveTrips();
+        expect(result.success, isFalse);
+        expect(result.error, contains('Edit trip → Photos'));
+        expect(service.atomicCalls, isEmpty);
+        expect(provider.trips.single['image'], 'images/trips/default.jpg');
+        expect(provider.hasUnsavedChanges, isTrue);
+      },
+    );
+    test(
       'merges and atomically publishes both customizable detail lists',
       () async {
         final base = [

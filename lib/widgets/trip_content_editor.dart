@@ -1,4 +1,5 @@
 import 'inline_formatting.dart';
+import 'text_formatting_tools.dart';
 import 'package:flutter/material.dart';
 import '../models/trip_content_settings.dart';
 
@@ -110,7 +111,10 @@ class _TripContentEditorState extends State<TripContentEditor> {
                   for (final f in fields)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: TextField(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                        TextField(
                     contextMenuBuilder: formattingContextMenu,
                         controller: controllers[f],
                         minLines: 1,
@@ -135,6 +139,10 @@ class _TripContentEditorState extends State<TripContentEditor> {
                               f,
                           border: const OutlineInputBorder(),
                         ),
+                      ),
+                        if (key != 'cancellation')
+                          TextFormattingTools(controller: controllers[f]!),
+                        ],
                       ),
                     ),
                   if (itemError != null) Text(itemError!, style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
