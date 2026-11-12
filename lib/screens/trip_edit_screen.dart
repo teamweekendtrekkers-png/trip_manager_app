@@ -1,4 +1,6 @@
 import '../widgets/inline_formatting.dart';
+import '../widgets/text_formatting_tools.dart';
+import '../widgets/trip_cover_picker.dart';
 import '../widgets/gallery_order_editor.dart';
 import '../widgets/batch_color_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -304,7 +306,7 @@ class _TripEditScreenState extends State<TripEditScreen>
       'name': '',
       'destination': '',
       'description': '',
-      'image': 'images/trips/default.jpg',
+      'image': '',
       'price': '₹0',
       'difficulty': 'Moderate',
       'groupSize': '',
@@ -580,6 +582,9 @@ class _TripEditScreenState extends State<TripEditScreen>
                                   maxLines: 8,
                                   minLines: 5,
                                 ),
+                                TextFormattingTools(
+                                  controller: _descriptionController,
+                                ),
                               ],
                             ),
                             const SizedBox(height: 16),
@@ -802,8 +807,15 @@ class _TripEditScreenState extends State<TripEditScreen>
                             _buildSectionCard(
                               title: 'Display Image — card 16:9 (1200×675 px)',
                               children: [
-                                TextButton.icon(
-                                  onPressed: () async {
+                                TripCoverPicker(
+                                  controller: _imageController,
+                                  galleryPhotos: List<String>.from(
+                                    _tripData['galleryImages'] ?? [],
+                                  ),
+                                  onUpload: () => _pickAndUploadMainImage(),
+                                  onCamera: () =>
+                                      _pickAndUploadMainImage(fromCamera: true),
+                                  onLibrary: () async {
                                     final photo = await Navigator.push<String>(
                                       context,
                                       MaterialPageRoute(
@@ -815,79 +827,25 @@ class _TripEditScreenState extends State<TripEditScreen>
                                       ),
                                     );
                                     if (photo != null && mounted)
-                                      setState(
-                                        () => _imageController.text = photo,
-                                      );
+                                      _imageController.text = photo;
                                   },
-                                  icon: const Icon(Icons.photo_library),
-                                  label: const Text(
-                                    'Choose from photo library',
-                                  ),
-                                ),
-                                Text(
-                                  'Recommended: 1800 × 1200 px (3:2). Keep the main subject near the centre so it also crops well on phones.',
-                                  style: TextStyle(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: TextFormField(
-                                        controller: _imageController,
-                                        decoration: const InputDecoration(
-                                          labelText:
-                                              'Image Path (e.g., images/trips/goa.jpg)',
-                                          border: OutlineInputBorder(),
-                                          prefixIcon: Icon(Icons.image),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.add_photo_alternate,
-                                      ),
-                                      onPressed: () =>
-                                          _pickAndUploadMainImage(),
-                                      color: Colors.green,
-                                      tooltip: 'Upload from gallery',
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.camera_alt),
-                                      onPressed: () => _pickAndUploadMainImage(
-                                        fromCamera: true,
-                                      ),
-                                      color: Colors.blue,
-                                      tooltip: 'Take photo',
-                                    ),
-                                  ],
-                                ),
-                                if (_imageController.text.isNotEmpty) ...[
-                                  const SizedBox(height: 16),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image.network(
-                                      _getImageUrl(_imageController.text),
-                                      height: 150,
-                                      width: double.infinity,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, _, _) => Container(
-                                        height: 150,
-                                        color: Colors.grey[200],
-                                        child: const Center(
-                                          child: Icon(
-                                            Icons.broken_image,
-                                            size: 48,
-                                          ),
+                                  previewBuilder: (path) => Image.network(
+                                    _getImageUrl(path),
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    errorBuilder: (_, _, _) => Container(
+                                      padding: const EdgeInsets.all(12),
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.surfaceContainerLow,
+                                      child: const Center(
+                                        child: Text(
+                                          'Photo could not load. Check your connection or choose another photo.',
                                         ),
                                       ),
                                     ),
                                   ),
-                                ],
+                                ),
                               ],
                             ),
                             const SizedBox(height: 16),
@@ -2489,6 +2447,7 @@ class _TripEditScreenState extends State<TripEditScreen>
                   ),
                   maxLines: 8,
                 ),
+                TextFormattingTools(controller: activitiesController),
               ],
             ),
           ),

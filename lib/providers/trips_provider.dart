@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../services/github_service.dart';
 import '../services/trip_merge_service.dart';
 import '../services/trips_parser.dart';
+import '../services/trip_cover.dart';
 import '../models/app_settings.dart';
 
 class TripsProvider extends ChangeNotifier {
@@ -690,6 +691,16 @@ class TripsProvider extends ChangeNotifier {
     Set<String>? retainedIds,
   }) async {
     if (!_isCurrentTarget(target)) return _cancelledSaveResult();
+    final missingCovers = trips
+        .where((trip) => isPlaceholderTripCover(trip['image']))
+        .toList();
+    if (missingCovers.isNotEmpty) {
+      return _finishFailure(
+        'Choose a cover photo before publishing:\n'
+        '${missingCovers.map((trip) => trip['title'] ?? trip['id']).join(', ')}.\n'
+        'Open Edit trip → Photos, then upload a photo or use a gallery photo. Your drafts are kept.',
+      );
+    }
     final tripsWrite = TripsParser.replaceTripsDataObject(
       source: latest.tripsFile!.content,
       trips: trips,
