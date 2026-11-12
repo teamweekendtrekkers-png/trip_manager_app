@@ -2,6 +2,7 @@ import '../models/homepage_config.dart';
 import '../services/homepage_settings_service.dart';
 import '../services/github_service.dart';
 import '../services/trip_visibility.dart';
+import '../services/trip_workspace_filter.dart';
 import '../services/draft_store.dart';
 import 'manager_tools_screen.dart';
 import '../widgets/change_review.dart';
@@ -53,6 +54,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
   String _searchQuery = '';
   bool _showFeaturedOnly = false;
   String _tripFilter = 'All';
+  TripWorkspaceSort _tripSort = TripWorkspaceSort.website;
   bool _publishing = false;
   String? _publishedCommitSha;
   String? _publishFailure;
@@ -531,6 +533,12 @@ class _TripsListScreenState extends State<TripsListScreen> {
     final isDesktop =
         MediaQuery.sizeOf(context).width >= managerDesktopBreakpoint;
     final provider = context.watch<TripsProvider>();
+    final searchResults = provider.searchTrips(_searchQuery)
+        .where((trip) => !_showFeaturedOnly || trip['featured'] == true)
+        .toList();
+    bool matchesFilter(Map<String, dynamic> trip, String filter) =>
+        matchesTripWorkspaceFilter(trip, filter,
+            hasDraft: provider.changes.containsKey(trip['id']));
     return Scaffold(
       drawer: isDesktop
           ? null
@@ -1007,17 +1015,18 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                       'Upcoming',
                                       'Inactive',
                                       'Needs dates',
+                                      'Needs photo',
                                     ])
                                       Padding(
                                         padding: const EdgeInsets.only(
                                           right: 6,
                                         ),
                                         child: ChoiceChip(
-                                          label: Text(
-                                            filter == 'Draft'
-                                                ? 'Unpublished'
-                                                : filter,
-                                          ),
+                                          label: Row(mainAxisSize: MainAxisSize.min, children: [
+                                            Text(filter == 'Draft' ? 'Unpublished' : filter),
+                                            const SizedBox(width: 5),
+                                            Text('(${searchResults.where((trip) => matchesFilter(trip, filter)).length})'),
+                                          ]),
                                           selected: _tripFilter == filter,
                                           onSelected: (_) => setState(
                                             () => _tripFilter = filter,
@@ -1089,38 +1098,10 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                     );
                                   }
 
-                                  var trips = _searchQuery.isEmpty
-                                      ? provider.orderedTrips
-                                      : provider.searchTrips(_searchQuery);
-
-                                  trips = trips
-                                      .where(
-                                        (t) => switch (_tripFilter) {
-                                          'Active' => t['isActive'] != false,
-                                          'Inactive' => t['isActive'] == false,
-                                          'Draft' =>
-                                            provider.changes.containsKey(
-                                              t['id'],
-                                            ),
-                                          'Upcoming' =>
-                                            t['isActive'] != false &&
-                                                TripDateUtils.getUpcomingDateRanges(
-                                                  t,
-                                                ).isNotEmpty,
-                                          'Needs dates' =>
-                                            t['isActive'] != false &&
-                                                TripDateUtils.getUpcomingDateRanges(
-                                                  t,
-                                                ).isEmpty,
-                                          _ => true,
-                                        },
-                                      )
-                                      .toList();
-                                  if (_showFeaturedOnly) {
-                                    trips = trips
-                                        .where((t) => t['featured'] == true)
-                                        .toList();
-                                  }
+                                  final trips = sortTripWorkspace(
+                                    searchResults.where((trip) => matchesFilter(trip, _tripFilter)).toList(),
+                                    _tripSort,
+                                  );
 
                                   if (trips.isEmpty) {
                                     return Center(
@@ -1183,7 +1164,8 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                   final isFiltered =
                                       _searchQuery.isNotEmpty ||
                                       _showFeaturedOnly ||
-                                      _tripFilter != 'All';
+                                      _tripFilter != 'All' ||
+                                      _tripSort != TripWorkspaceSort.website;
 
                                   return Column(
                                     crossAxisAlignment:
@@ -1196,13 +1178,26 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                           16,
                                           4,
                                         ),
-                                        child: Text(
-                                          '${trips.length} of ${provider.tripCount} trips'
-                                          '${_showFeaturedOnly ? ' · Featured only' : ''}',
-                                          key: const Key('trip-results-count'),
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.bodySmall,
+                                        child: Wrap(
+                                          alignment: WrapAlignment.spaceBetween,
+                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          spacing: 12,
+                                          children: [
+                                            Text('${trips.length} of ${provider.tripCount} trips'
+                                              '${_showFeaturedOnly ? ' · Featured only' : ''}',
+                                              key: const Key('trip-results-count')),
+                                            DropdownButton<TripWorkspaceSort>(
+                                              key: const Key('trip-sort'),
+                                              value: _tripSort,
+                                              isDense: false,
+                                              hint: const Text('Sort trips'),
+                                              onChanged: (value) {
+                                                if (value != null) setState(() => _tripSort = value);
+                                              },
+                                              items: [for (final sort in TripWorkspaceSort.values)
+                                                DropdownMenuItem(value: sort, child: Text(sort.label))],
+                                            ),
+                                          ],
                                         ),
                                       ),
                                       Expanded(
