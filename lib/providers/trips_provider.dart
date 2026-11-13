@@ -959,6 +959,8 @@ class TripsProvider extends ChangeNotifier {
     copy.remove('previousSlugs');
     copy.remove('date');
     copy.remove('closedDepartures');
+    copy.remove('confirmedDepartures');
+    copy.remove('soldOutDepartures');
     return addTrip(copy) == null ? newId : null;
   }
 

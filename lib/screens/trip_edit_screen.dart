@@ -2542,7 +2542,9 @@ class _TripEditScreenState extends State<TripEditScreen>
                 (_tripData['closedDepartures'] as List? ?? []).contains(
                   range.key,
                 );
-            final status = closed
+            final status = range != null && (_tripData['soldOutDepartures'] as List? ?? []).contains(range.key)
+                ? 'Sold out'
+                : closed
                 ? 'Bookings closed'
                 : invalid
                 ? 'Invalid — edit or remove before saving'
@@ -2550,7 +2552,7 @@ class _TripEditScreenState extends State<TripEditScreen>
                 ? 'Duplicate — edit or remove before saving'
                 : expired
                 ? 'Expired'
-                : 'Upcoming • ${range.weekdayLabel}';
+                : (_tripData['confirmedDepartures'] as List? ?? []).contains(range.key) ? 'Confirmed departure • ${range.weekdayLabel}' : 'Upcoming • ${range.weekdayLabel}';
             final statusColor = invalid || duplicate
                 ? theme.colorScheme.error
                 : expired
@@ -2647,12 +2649,9 @@ class _TripEditScreenState extends State<TripEditScreen>
         _availableDates.add(canonical);
       } else {
         final oldKey = TripDateUtils.parse(_availableDates[index])?.key;
-        final closed = List<String>.from(
-          _tripData['closedDepartures'] as List? ?? [],
-        );
-        if (closed.remove(oldKey)) {
-          closed.add(range.key);
-          _tripData['closedDepartures'] = closed;
+        for (final field in ['closedDepartures','confirmedDepartures','soldOutDepartures']) {
+          final values=List<String>.from(_tripData[field] as List? ?? []);
+          if(values.remove(oldKey)){values.add(range.key);_tripData[field]=values;}
         }
         _availableDates[index] = canonical;
       }

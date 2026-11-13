@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/trips_provider.dart';
 import '../services/trip_date_utils.dart';
+import '../services/departure_status.dart';
 import '../widgets/departure_tools.dart';
 import 'manager_tools_screen.dart' show bulkDates;
 
@@ -26,7 +27,7 @@ class DepartureManagementScreen extends StatelessWidget {
   Widget build(BuildContext context){
     final provider=context.watch<TripsProvider>();
     return Scaffold(appBar:AppBar(title:const Text('Manage departures')),body:Center(child:ConstrainedBox(constraints:const BoxConstraints(maxWidth:850),child:ListView(padding:const EdgeInsets.all(20),children:[
-      const Text('Close or reopen bookings without deleting a date, or duplicate a departure into a new range. Changes stay in your trip draft until you publish.'),
+      const Text('Confirm a departure only when it will run. Marking sold out closes new bookings. Changes stay in your draft until you publish.'),
       const SizedBox(height:12),
       OutlinedButton.icon(onPressed:provider.isLoading?null:()=>bulkDates(context,provider),icon:const Icon(Icons.edit_calendar),label:const Text('Bulk date edit')),
       if(provider.isLoading)const LinearProgressIndicator(),
@@ -36,11 +37,20 @@ class DepartureManagementScreen extends StatelessWidget {
         if((trip['availableDates'] as List? ?? []).isEmpty)const Padding(padding:EdgeInsets.all(16),child:Text('New dates coming soon. Add dates from Trips or Bulk date edit.'))
         else AbsorbPointer(absorbing:provider.isLoading,child:DepartureTools(
           dates:List<String>.from(trip['availableDates']),closedKeys:List<String>.from(trip['closedDepartures'] as List? ?? []),
+          confirmedKeys:List<String>.from(trip['confirmedDepartures'] as List? ?? []),
+          soldOutKeys:List<String>.from(trip['soldOutDepartures'] as List? ?? []),
+          onStatus:(key,status)async{
+            final index=provider.getTripIndexById(trip['id'].toString());
+            if(index==null||provider.isLoading)return;
+            provider.updateTrip(index,setDepartureStatus(provider.trips[index],key,status));
+            await provider.flushDraft();
+          },
           onToggle:(key)async{
             final id=trip['id'].toString(),index=provider.trips.indexWhere((t)=>t['id']==id);if(index<0||provider.isLoading)return;
             final draft=Map<String,dynamic>.from(provider.trips[index]);
             final closed=List<String>.from(draft['closedDepartures'] as List? ?? []);
-            if(!closed.remove(key))closed.add(key);draft['closedDepartures']=closed;
+            if(!closed.remove(key)){closed.add(key);}else{draft['soldOutDepartures']=List<String>.from(draft['soldOutDepartures'] as List? ?? [])..remove(key);}
+            draft['closedDepartures']=closed;
             provider.updateTrip(index,draft);await provider.flushDraft();
           },
           onDuplicate:(index)=>_duplicate(context,provider,trip['id'].toString(),trip['availableDates'][index].toString()),

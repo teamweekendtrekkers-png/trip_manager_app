@@ -32,6 +32,8 @@ class TripsParser {
     'duration',
     'availableDates',
     'closedDepartures',
+      'confirmedDepartures',
+      'soldOutDepartures',
     'about',
     'highlights',
     'itinerary',
@@ -263,6 +265,8 @@ class TripsParser {
       'previousSlugs',
       'availableDates',
     'closedDepartures',
+      'confirmedDepartures',
+      'soldOutDepartures',
       'highlights',
       'includes',
       'excludes',
@@ -395,6 +399,8 @@ class TripsParser {
     final result = <String, dynamic>{'id': tripId};
     const directlyRepresentedFields = {
       'closedDepartures',
+      'confirmedDepartures',
+      'soldOutDepartures',
       'maxTravellers',
       'contentSections',
       'publicSlug',
@@ -639,6 +645,9 @@ class TripsParser {
       writeStringField('duration', const ['duration']);
       writeStringListField('availableDates', const ['availableDates']);
       if (trip.containsKey('closedDepartures')) writeStringListField('closedDepartures', const ['closedDepartures']);
+      for (final field in ['confirmedDepartures', 'soldOutDepartures']) {
+        if (trip.containsKey(field)) writeStringListField(field, [field]);
+      }
       writeStringField('about', const ['about', 'description']);
       writeStringListField('highlights', const ['highlights']);
 
@@ -796,6 +805,8 @@ class TripsParser {
       'previousSlugs',
       'availableDates',
     'closedDepartures',
+      'confirmedDepartures',
+      'soldOutDepartures',
       'highlights',
       'includes',
       'inclusions',
