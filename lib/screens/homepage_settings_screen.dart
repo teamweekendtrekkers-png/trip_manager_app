@@ -943,7 +943,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                       const ListTile(
                         title: Text('Explore Destinations'),
                         subtitle: Text(
-                          'Open Trips → Website sections → Visibility to choose Featured trips. Active, Featured and Upcoming Batches selections are separate.',
+                          'Open Trips → Website sections → Visibility to choose Featured trips. Collections use each trip’s experience and duration. The photo strip uses active trip galleries. Manage dates and availability in Manage departures → Departure calendar. Publish your trip edits to update the website.',
                         ),
                       ),
                     const SizedBox(height: 16),
