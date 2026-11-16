@@ -28,6 +28,7 @@ class HomepageConfig {
       'heroMobileFocalPoint': 'center',
       'heroSlides': <String>[],
       'heroMotion': false,
+      'animationsEnabled': true,
     },
     'hero': {
       'backgroundImage': 'images/wix/hero1.jpg',
@@ -140,6 +141,7 @@ class HomepageConfig {
         !['center', 'top', 'bottom', 'left', 'right'].contains(presentation['heroFocalPoint']) ||
         !['center', 'top', 'bottom', 'left', 'right'].contains(presentation['heroMobileFocalPoint']) ||
         presentation['heroMotion'] is! bool ||
+        presentation['animationsEnabled'] is! bool ||
         presentation['heroMobileImage'] is! String ||
         (presentation['heroMobileImage'] != '' && !safeImage(presentation['heroMobileImage'] as String)) ||
         presentation['heroSlides'] is! List ||
@@ -237,7 +239,14 @@ class HomepageConfig {
 
   Map<String, dynamic> toJson() =>
       Map<String, dynamic>.from(jsonDecode(jsonEncode(_data)) as Map);
-  String encode() => '${const JsonEncoder.withIndent('  ').convert(_data)}\n';
+  String encode() {
+    final data = toJson();
+    // Keep the default document compatible with older manager installations.
+    if (data['presentation']['animationsEnabled'] == true) {
+      (data['presentation'] as Map).remove('animationsEnabled');
+    }
+    return '${const JsonEncoder.withIndent('  ').convert(data)}\n';
+  }
 
   List<Map<String, dynamic>> selectedTrips(
     List<Map<String, dynamic>> trips, {

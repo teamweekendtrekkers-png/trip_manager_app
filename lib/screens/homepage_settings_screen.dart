@@ -75,7 +75,8 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
       'Headline': 'Hero|hero.title',
       'Tagline': 'Hero|hero.tagline',
       'Description': 'Hero|hero.description',
-      'Mobile cover and crop': 'Hero|presentation.heroMobileImage',
+      'Mobile cover and crop': 'Appearance|presentation.heroMobileImage',
+      'Website animations and colours': 'Appearance',
       'Trip photo slideshow and timing': 'Trip gallery',
       'About and Contact pages, banner headings and navigation': 'Pages',
       'Upcoming trips and date selection': 'Upcoming Batches',
@@ -264,7 +265,8 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
     if (_group == 'All') return copyDocument(_draft!);
     final result = copyDocument(jsonDecode(_saved!) as Map);
     final keys = switch (_group) {
-      'Hero' => ['hero', 'presentation'],
+      'Hero' => ['hero'],
+      'Appearance' => ['presentation'],
       'Trip gallery' => ['tripGallery'],
       'Pages' => ['pages'],
       'Upcoming Batches' => ['upcomingBatches'],
@@ -569,7 +571,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Homepage Customization'),
+          title: const Text('Website content & appearance'),
           actions: [
             IconButton(
               onPressed: _busy ? null : _searchFields,
@@ -582,6 +584,20 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
               icon: const Icon(Icons.refresh),
             ),
           ],
+        ),
+        bottomNavigationBar: _draft == null ? null : SafeArea(
+          child: Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: FilledButton.icon(
+                      key: const Key('homepage-publish'),
+                      onPressed: _busy || !_targetMatches ? null : _publish,
+                      icon: const Icon(Icons.cloud_upload),
+                      label: Text(
+                        _group == 'All'
+                            ? 'Review & publish homepage'
+                            : 'Review & publish $_group only',
+                      ),
+                    ),
+          ),
         ),
         body: _draft == null
             ? Center(
@@ -618,6 +634,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                         for (final group in [
                           'All',
                           'Hero',
+                          'Appearance',
                           'Upcoming Batches',
                           'Destinations',
                           'Information',
@@ -653,7 +670,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                     ),
                     if (_busy) const LinearProgressIndicator(),
                     const Text(
-                      'Homepage-only settings. Trip records, featured trips, payments and booking links are unchanged. Image uploads add an asset; Publish applies it to the homepage.',
+                      'Choose a section to edit. Save a draft while you work, then review and publish your changes. Appearance controls apply across the website.',
                     ),
                     if (!_targetMatches)
                       const Text(
@@ -718,9 +735,11 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                       _text('hero', 'title', 'Headline', lines: 3),
                       _text('hero', 'tagline', 'Tagline', lines: 3),
                       _text('hero', 'description', 'Description', lines: 3),
+                    ],
+                    if (_group == 'All' || _group == 'Appearance') ...[
                       ExpansionTile(
-                        title: const Text('Website appearance and hero photos'),
-                        initiallyExpanded: _group == 'Hero',
+                        title: const Text('Colours, photos & animations'),
+                        initiallyExpanded: _group == 'Appearance',
                         children: [
                           SwitchListTile(
                             title: const Text('Use desktop cover on mobile'),
@@ -870,6 +889,13 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                             ),
                           ),
                           SwitchListTile(
+                            key: const Key('website-animations-enabled'),
+                            title: const Text('Website animations'),
+                            subtitle: const Text('Subtle transitions and effects. Reduced-motion preferences are always respected. Photo slideshow controls are separate.'),
+                            value: _draft!['presentation']['animationsEnabled'] as bool,
+                            onChanged: (value) => setState(() => _draft!['presentation']['animationsEnabled'] = value),
+                          ),
+                          SwitchListTile(
                             title: const Text('Slow hero photo crossfade'),
                             subtitle: const Text(
                               'One pass only. Text stays still; reduced motion uses one photo.',
@@ -910,12 +936,13 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                         ],
                       ),
                       const SizedBox(height: 16),
+                    ],
+                    if (_group == 'All' || _group == 'Upcoming Batches') ...[
                       Text(
                         'Upcoming Batches',
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
-                    ],
-                    if (_group == 'All' || _group == 'Upcoming Batches') ...[
+
                       SwitchListTile(
                         key: const Key('homepage-enabled'),
                         title: const Text('Show Upcoming Batches'),
@@ -1050,16 +1077,6 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                       ),
                       const SizedBox(height: 20),
                     ],
-                    FilledButton.icon(
-                      key: const Key('homepage-publish'),
-                      onPressed: _busy || !_targetMatches ? null : _publish,
-                      icon: const Icon(Icons.cloud_upload),
-                      label: Text(
-                        _group == 'All'
-                            ? 'Review & publish homepage'
-                            : 'Review & publish $_group only',
-                      ),
-                    ),
                     if (_savedCommit != null)
                       TextButton.icon(
                         onPressed: () => Navigator.push(

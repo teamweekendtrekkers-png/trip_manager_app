@@ -559,6 +559,22 @@ void main() {
       expect(find.text('Homepage settings published.'), findsOneWidget);
     },
   );
+  testWidgets('Appearance publishes animation setting without unrelated hero edits', (tester) async {
+    final github = await openEditor(tester);
+    await showKey(tester, 'homepage-hero-title');
+    await tester.enterText(find.byKey(const ValueKey('homepage-hero-title')), 'Keep as draft');
+    tester.state<ScrollableState>(find.byType(Scrollable).first).position.jumpTo(0);
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'homepage-group-Appearance');
+    await showKey(tester, 'website-animations-enabled');
+    await tester.tap(find.byKey(const Key('website-animations-enabled')));
+    await tester.pumpAndSettle();
+    await publish(tester);
+    final saved = HomepageConfig.parse(github.calls.single.values.single).toJson();
+    expect(saved['presentation']['animationsEnabled'], false);
+    expect(saved['hero']['title'], config().toJson()['hero']['title']);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('publishing Hero retains unfinished Upcoming Batches edits', (
     tester,
   ) async {
@@ -801,16 +817,7 @@ void main() {
         provider.settings.copyWith(branch: 'different'),
       );
       await tester.pumpAndSettle();
-      // The disabled button may be outside the lazy viewport. Inspect the
-      // configured child directly; this test checks authorization, not scrolling.
-      final list = tester.widget<ListView>(find.byType(ListView));
-      final children =
-          (list.childrenDelegate as SliverChildListDelegate).children;
-      final button =
-          children.firstWhere(
-                (child) => child.key == const Key('homepage-publish'),
-              )
-              as FilledButton;
+      final button = tester.widget<FilledButton>(find.byKey(const Key('homepage-publish')));
       expect(button.onPressed, isNull);
       expect(github.calls, isEmpty);
     },
