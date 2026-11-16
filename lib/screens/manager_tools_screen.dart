@@ -279,35 +279,65 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
           leading: Icon(Icons.check_circle_outline),
           title: Text('Active trips have dates, prices and cover photos.'),
         ),
+      if (attention.isNotEmpty)
+        const Padding(
+          padding: EdgeInsets.only(top: 4, bottom: 12),
+          child: Text(
+            'Choose an issue to fix it. Save your draft, then publish when ready.',
+          ),
+        ),
       for (final t in attention)
-        ListTile(
-          leading: const Icon(Icons.rule_outlined),
-          title: Text(t['title']?.toString() ?? t['id'].toString()),
-          subtitle: Text(tripAttention(t).join(' · ')),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: p.isLoading
-              ? null
-              : () {
-                  final id = t['id']?.toString() ?? '';
-                  final current = p.getTripById(id),
-                      index = p.getTripIndexById(id);
-                  if (current == null || index == null) return;
-                  final issues = tripAttention(current);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute<void>(
-                      builder: (_) => TripEditScreen(
-                        trip: current,
-                        index: index,
-                        initialSection:
-                            issues.contains('Add upcoming dates') ||
-                                issues.contains('Check price')
-                            ? TripEditorSection.dates
-                            : TripEditorSection.photos,
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  t['title']?.toString() ?? t['id'].toString(),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final issue in tripAttention(t))
+                      ActionChip(
+                        avatar: Icon(
+                          issue == 'Add a cover photo'
+                              ? Icons.photo_outlined
+                              : Icons.edit_outlined,
+                          size: 18,
+                        ),
+                        label: Text(issue),
+                        onPressed: p.isLoading
+                            ? null
+                            : () {
+                                final id = t['id']?.toString() ?? '';
+                                final current = p.getTripById(id);
+                                final index = p.getTripIndexById(id);
+                                if (current == null || index == null) return;
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => TripEditScreen(
+                                      trip: current,
+                                      index: index,
+                                      initialSection:
+                                          issue == 'Add a cover photo'
+                                          ? TripEditorSection.photos
+                                          : TripEditorSection.dates,
+                                    ),
+                                  ),
+                                );
+                              },
                       ),
-                    ),
-                  );
-                },
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       const SizedBox(height: 16),
       Text('At a glance', style: Theme.of(context).textTheme.titleLarge),

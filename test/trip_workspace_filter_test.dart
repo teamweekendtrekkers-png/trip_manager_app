@@ -2,6 +2,38 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:trip_manager_app/services/trip_workspace_filter.dart';
 
 void main() {
+  test(
+    'attention and price filters respect active trips and selling fares',
+    () {
+      bool matches(Map<String, dynamic> trip, String filter) =>
+          matchesTripWorkspaceFilter(
+            trip,
+            filter,
+            hasDraft: false,
+            referenceDate: DateTime.utc(2026, 11, 16),
+          );
+      for (final fare in [null, '', 'invalid', 0]) {
+        expect(matches({'price': fare}, 'Needs price'), isTrue);
+      }
+      expect(
+        matches({'price': '₹6,000', 'discountedPrice': 5000}, 'Needs price'),
+        isFalse,
+      );
+      expect(matches({'price': 0, 'isActive': false}, 'Needs price'), isFalse);
+      expect(matches({'isActive': false}, 'Needs attention'), isFalse);
+      final complete = <String, dynamic>{
+        'price': 5000,
+        'image': 'images/real.jpg',
+        'availableDates': ['Dec 20-22, 2026'],
+      };
+      expect(matches(complete, 'Needs attention'), isFalse);
+      expect(matches({...complete, 'price': 0}, 'Needs attention'), isTrue);
+      expect(
+        matches({...complete, 'availableDates': []}, 'Needs attention'),
+        isTrue,
+      );
+    },
+  );
   final now = DateTime.utc(2026, 11, 12);
   Map<String, dynamic> trip(
     String title, {
@@ -38,11 +70,7 @@ void main() {
       final late = trip('Late', dates: ['Dec 20-22, 2026']);
       final early = trip('Early', dates: ['Dec 01-03, 2026']);
       final closed = trip('Closed', dates: ['Nov 01-02, 2026']);
-      final hidden = trip(
-        'Hidden',
-        dates: ['Nov 20-22, 2026'],
-        active: false,
-      );
+      final hidden = trip('Hidden', dates: ['Nov 20-22, 2026'], active: false);
       final source = [late, closed, early, hidden];
       final sorted = sortTripWorkspace(
         source,
@@ -80,4 +108,3 @@ void main() {
     ]);
   });
 }
-

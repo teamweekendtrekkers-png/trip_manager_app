@@ -1090,7 +1090,10 @@ class _TripEditScreenState extends State<TripEditScreen>
                 ),
                 const SizedBox(height: 6),
                 if (_editingSection != TripEditorSection.all) ...[
-                  Row(
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    spacing: 8,
+                    runSpacing: 4,
                     children: [
                       TextButton.icon(
                         key: const Key('editor-guided-back'),
@@ -1105,7 +1108,6 @@ class _TripEditScreenState extends State<TripEditScreen>
                         icon: const Icon(Icons.arrow_back, size: 18),
                         label: const Text('Back'),
                       ),
-                      const Spacer(),
                       TextButton.icon(
                         key: const Key('editor-guided-next'),
                         onPressed: _saving

@@ -1,4 +1,6 @@
+import 'trip_attention.dart';
 import 'trip_cover.dart';
+import 'trip_pricing.dart';
 import 'trip_date_utils.dart';
 
 enum TripWorkspaceSort {
@@ -65,6 +67,11 @@ bool matchesTripWorkspaceFilter(
       return !active;
     case 'Draft':
       return hasDraft;
+    case 'Needs attention':
+      return tripAttention(trip, now: referenceDate).isNotEmpty;
+    case 'Needs price':
+      final price = TripPricing.selling(trip);
+      return active && (price == null || price <= 0);
     case 'Needs photo':
       return trip['image']?.toString().trim().isNotEmpty != true ||
           isPlaceholderTripCover(trip['image']);
