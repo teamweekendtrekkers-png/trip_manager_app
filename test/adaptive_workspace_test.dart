@@ -18,6 +18,22 @@ import 'package:trip_manager_app/screens/trip_edit_screen.dart';
 import 'package:trip_manager_app/widgets/trip_editor_sections.dart';
 
 void main() {
+  testWidgets('Home photo issue opens Photos directly on a small phone', (tester) async {
+    await _setSize(tester, const Size(320, 900));
+    final providers = await _providers();
+    await tester.pumpWidget(_app(providers, home: true));
+    await tester.pumpAndSettle();
+    final action = find.widgetWithText(ActionChip, 'Add a cover photo');
+    await tester.scrollUntilVisible(action, 220, scrollable: find.byType(Scrollable).first);
+    await Scrollable.ensureVisible(tester.element(action.first), alignment: 0.5);
+    await tester.pumpAndSettle();
+    await tester.tap(action.first);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TripEditScreen>(find.byType(TripEditScreen)).initialSection,
+      TripEditorSection.photos);
+    expect(providers.trips.hasUnsavedChanges, isFalse);
+  });
+
   for (final size in [const Size(390, 844), const Size(1440, 900)]) {
     testWidgets(
       'manager usability preview at ' + size.width.toInt().toString(),
@@ -436,3 +452,6 @@ Map<String, dynamic> _trip(String id, String title, {bool featured = false}) =>
       'inclusions': <String>[],
       'exclusions': <String>[],
     };
+
+
+

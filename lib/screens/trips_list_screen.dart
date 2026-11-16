@@ -1014,8 +1014,10 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                       'Draft',
                                       'Upcoming',
                                       'Inactive',
+                                      'Needs attention',
                                       'Needs dates',
                                       'Needs photo',
+                                      'Needs price',
                                     ])
                                       Padding(
                                         padding: const EdgeInsets.only(
