@@ -277,61 +277,66 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
             'Choose an issue to fix it. Save your draft, then publish when ready.',
           ),
         ),
-      for (final t in attention)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    t['title']?.toString() ?? t['id'].toString(),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+      if (attention.isNotEmpty)
+        ManagerCardGrid(
+          minWidth: 320,
+          maxColumns: 2,
+          children: [
+            for (final t in attention)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      for (final issue in tripAttention(t))
-                        ActionChip(
-                          avatar: Icon(
-                            issue == 'Add a cover photo'
-                                ? Icons.photo_outlined
-                                : Icons.edit_outlined,
-                            size: 18,
-                          ),
-                          label: Text(issue),
-                          onPressed: p.isLoading
-                              ? null
-                              : () {
-                                  final id = t['id']?.toString() ?? '';
-                                  final current = p.getTripById(id);
-                                  final index = p.getTripIndexById(id);
-                                  if (current == null || index == null) return;
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => TripEditScreen(
-                                        trip: current,
-                                        index: index,
-                                        initialSection:
-                                            issue == 'Add a cover photo'
-                                            ? TripEditorSection.photos
-                                            : TripEditorSection.dates,
-                                      ),
-                                    ),
-                                  );
-                                },
-                        ),
+                      Text(
+                        t['title']?.toString() ?? t['id'].toString(),
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final issue in tripAttention(t))
+                            ActionChip(
+                              avatar: Icon(
+                                issue == 'Add a cover photo'
+                                    ? Icons.photo_outlined
+                                    : Icons.edit_outlined,
+                                size: 18,
+                              ),
+                              label: Text(issue),
+                              onPressed: p.isLoading
+                                  ? null
+                                  : () {
+                                      final id = t['id']?.toString() ?? '';
+                                      final current = p.getTripById(id);
+                                      final index = p.getTripIndexById(id);
+                                      if (current == null || index == null)
+                                        return;
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute<void>(
+                                          builder: (_) => TripEditScreen(
+                                            trip: current,
+                                            index: index,
+                                            initialSection:
+                                                issue == 'Add a cover photo'
+                                                ? TripEditorSection.photos
+                                                : TripEditorSection.dates,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                            ),
+                        ],
+                      ),
                     ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
+          ],
         ),
       const SizedBox(height: 16),
       Text('At a glance', style: Theme.of(context).textTheme.titleLarge),
