@@ -503,24 +503,35 @@ void main() {
     FocusManager.instance.primaryFocus?.unfocus();
     await tester.pumpAndSettle();
     final finder = find.byKey(ValueKey(key));
+    final scroll = tester.state<ScrollableState>(find.descendant(of: find.byKey(const Key('homepage-editor-scroll')), matching: find.byType(Scrollable)).first).position;
     if (finder.evaluate().isEmpty) {
-      tester
-          .state<ScrollableState>(find.byType(Scrollable).first)
-          .position
-          .jumpTo(0);
+      scroll.jumpTo(0);
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        finder,
-        400,
-        scrollable: find.byType(Scrollable).first,
-        maxScrolls: 150,
-      );
+      for (var i = 0; finder.evaluate().isEmpty && i < 300; i++) {
+        scroll.jumpTo((scroll.pixels + 180).clamp(0, scroll.maxScrollExtent));
+        await tester.pumpAndSettle();
+      }
     }
+    expect(finder, findsOneWidget, reason: 'Missing $key');
     await tester.ensureVisible(finder);
     await tester.pumpAndSettle();
   }
 
   Future<void> tapKey(WidgetTester tester, String key) async {
+    if (key.startsWith('homepage-group-')) {
+      tester.state<ScrollableState>(find.descendant(of: find.byKey(const Key('homepage-editor-scroll')), matching: find.byType(Scrollable)).first).position.jumpTo(0);
+      await tester.pumpAndSettle();
+    }
+    if (key.startsWith('homepage-group-') && find.byKey(const Key('homepage-section-picker')).evaluate().isNotEmpty) {
+      final picker = find.byKey(const Key('homepage-section-picker'));
+      await tester.ensureVisible(picker);
+      await tester.tap(picker);
+      await tester.pumpAndSettle();
+      final group = key.substring('homepage-group-'.length);
+      await tester.tap(find.text(group == 'All' ? 'All sections' : group).last);
+      await tester.pumpAndSettle();
+      return;
+    }
     await showKey(tester, key);
     final finder = find.byKey(ValueKey(key));
     await tester.tap(finder);
