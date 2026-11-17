@@ -1,4 +1,5 @@
 import 'inline_formatting.dart';
+import 'google_review_controls.dart';
 import 'package:flutter/material.dart';
 
 /// Edits the isolated homepage draft, never trip records or live Google data.
@@ -8,10 +9,12 @@ class HomepageSectionsEditor extends StatelessWidget {
     required this.sections,
     required this.onChanged,
     this.onlySections,
+    this.loadGoogleReviews,
   });
   final Map<String, dynamic> sections;
   final VoidCallback onChanged;
   final Set<String>? onlySections;
+  final Future<Map<String, dynamic>> Function()? loadGoogleReviews;
 
   Widget _text(
     Map values,
@@ -24,7 +27,7 @@ class HomepageSectionsEditor extends StatelessWidget {
     key: PageStorageKey('text-scroll-$prefix-$field'),
     padding: const EdgeInsets.only(bottom: 12),
     child: TextFormField(
-                    contextMenuBuilder: formattingContextMenu,
+      contextMenuBuilder: formattingContextMenu,
       key: ValueKey('$prefix-$field'),
       initialValue: values[field] as String,
       minLines: 1,
@@ -115,8 +118,13 @@ class HomepageSectionsEditor extends StatelessWidget {
     }
     if (name == 'reviews') {
       widgets.addAll([
+        GoogleReviewControls(
+          section: section,
+          onChanged: onChanged,
+          loadFeed: loadGoogleReviews,
+        ),
         const Text(
-          'Curated Google reviews, not an automatic feed. Paste genuine review text and optionally its Google Maps share link. Select which reviews appear with Show review; use arrows to change their order. New reviews start hidden: fill in their name and text before publishing. Keep ratings accurate.',
+          'Manual selection and fallback reviews. Paste genuine review text and optionally its Google Maps share link. Select which reviews appear with Show review; use arrows to change their order. New reviews start hidden: fill in their name and text before publishing. Keep ratings accurate.',
         ),
         const SizedBox(height: 12),
         _text(

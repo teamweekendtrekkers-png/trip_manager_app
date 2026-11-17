@@ -241,6 +241,9 @@ class HomepageConfig {
       Map<String, dynamic>.from(jsonDecode(jsonEncode(_data)) as Map);
   String encode() {
     final data = toJson();
+    if (data['sections']['reviews']['source'] == 'manual') {
+      (data['sections']['reviews'] as Map).remove('source');
+    }
     // Keep the default document compatible with older manager installations.
     if (data['presentation']['animationsEnabled'] == true) {
       (data['presentation'] as Map).remove('animationsEnabled');

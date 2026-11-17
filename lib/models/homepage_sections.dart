@@ -60,6 +60,11 @@ class HomepageSections {
         );
       }
       if (name == 'reviews') {
+        if (!['manual', 'google'].contains(section['source'])) {
+          throw const FormatException(
+            'Choose manual or automatic Google reviews.',
+          );
+        }
         if (!safeGoogleMapsUrl(section['googleMapsUrl'] as String)) {
           throw const FormatException(
             'Use a valid HTTPS Google Maps or Google review link.',

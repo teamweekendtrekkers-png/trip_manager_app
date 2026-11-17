@@ -127,6 +127,7 @@ const homepageSectionDefaultsJson = r'''
     ]
   },
   "reviews": {
+    "source": "manual",
     "enabled": true,
     "title": "Google Reviews",
     "rating": "4.8",

@@ -1,4 +1,5 @@
 import '../widgets/website_pages_editor.dart';
+import '../services/google_review_service.dart';
 import '../widgets/local_draft.dart';
 import '../widgets/change_review.dart';
 import '../services/workspace_changes.dart';
@@ -986,6 +987,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                         _group == 'Information' ||
                         _group == 'Reviews')
                       HomepageSectionsEditor(
+                        loadGoogleReviews: () => GoogleReviewService(_service.github).check(),
                         onlySections: _group == 'Reviews'
                             ? {'reviews'}
                             : _group == 'Information'
