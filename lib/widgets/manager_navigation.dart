@@ -48,7 +48,8 @@ extension ManagerDestinationDetails on ManagerDestination {
     ManagerDestination.payments => 'UPI and discount codes',
     ManagerDestination.bookingReview => 'Review customer payment submissions',
     ManagerDestination.analytics => 'See booking steps and drop-offs',
-    ManagerDestination.departureManagement => 'Close, reopen and duplicate dates',
+    ManagerDestination.departureManagement =>
+      'Close, reopen and duplicate dates',
     ManagerDestination.sharedContent => 'FAQs, policies and trip highlights',
     ManagerDestination.health => 'Check website data',
     ManagerDestination.deployment => 'Monitor publishing',
@@ -192,7 +193,13 @@ class ManagerSideNavigation extends StatelessWidget {
                 ),
               ),
               const Divider(),
-              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: ManagerToolFinder(onSelected: onSelected),
+              ),
               Expanded(
                 child: ListView(
                   children: [
@@ -271,35 +278,44 @@ class ManagerNavigationDrawer extends StatelessWidget {
         ),
         const AppVersionCard(compact: true),
         const Divider(indent: 20, endIndent: 20),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          child: ManagerToolFinder(
+            onSelected: (destination) {
+              Navigator.pop(context);
+              onSelected(destination);
+            },
+          ),
+        ),
         for (final group in managerNavigationGroups.entries) ...[
           _NavigationGroupHeading(group.key),
           for (final destination in group.value)
-          NavigationDrawerDestination(
-            icon: Icon(destination.icon),
-            selectedIcon: Icon(destination.selectedIcon),
-            label: SizedBox(
-              width: 160,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    destination.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    destination.description,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
+            NavigationDrawerDestination(
+              icon: Icon(destination.icon),
+              selectedIcon: Icon(destination.selectedIcon),
+              label: SizedBox(
+                width: 160,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      destination.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                ],
+                    Text(
+                      destination.description,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
         ],
       ],
     );
@@ -341,3 +357,159 @@ class _SideDestination extends StatelessWidget {
   }
 }
 
+List<ManagerDestination> findManagerTools(String query) {
+  final terms = query
+      .toLowerCase()
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((s) => s.isNotEmpty);
+  const aliases = <ManagerDestination, String>{
+    ManagerDestination.dashboard: 'home daily tasks overview',
+    ManagerDestination.trips: 'edit create add price dates itinerary trip',
+    ManagerDestination.library: 'images pictures cover upload tags edit photos',
+    ManagerDestination.homepage:
+        'design appearance animation colours colors logo hero reviews website edit',
+    ManagerDestination.batches: 'calendar upcoming dates preview',
+    ManagerDestination.departureManagement:
+        'availability sold out close reopen duplicate dates calendar',
+    ManagerDestination.payments: 'upi qr discount coupon promo payment money',
+    ManagerDestination.bookingReview:
+        'customers travellers travelers booking confirm verify payment pending',
+    ManagerDestination.sharedContent:
+        'cancellation refund policy faq guidelines highlights',
+    ManagerDestination.deployment: 'publish deploy build live progress status',
+    ManagerDestination.history: 'undo restore previous version changes',
+    ManagerDestination.health: 'errors missing issues check validation',
+    ManagerDestination.settings:
+        'connect github account token repository contact setup',
+    ManagerDestination.analytics: 'reports insights conversion visits drop off',
+  };
+  return managerNavigationOrder.where((destination) {
+    final text =
+        (destination.label +
+                ' ' +
+                destination.description +
+                ' ' +
+                (aliases[destination] ?? ''))
+            .toLowerCase();
+    return terms.every(text.contains);
+  }).toList();
+}
+
+class ManagerToolFinder extends StatelessWidget {
+  const ManagerToolFinder({super.key, required this.onSelected});
+  final ValueChanged<ManagerDestination> onSelected;
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+    key: const Key('find-manager-tool'),
+    icon: const Icon(Icons.search),
+    label: const Text('Find a tool'),
+    onPressed: () async {
+      final destination = await showDialog<ManagerDestination>(
+        context: context,
+        builder: (_) => const _ToolFinderDialog(),
+      );
+      if (context.mounted && destination != null) onSelected(destination);
+    },
+  );
+}
+
+class _ToolFinderDialog extends StatefulWidget {
+  const _ToolFinderDialog();
+  @override
+  State<_ToolFinderDialog> createState() => _ToolFinderDialogState();
+}
+
+class _ToolFinderDialogState extends State<_ToolFinderDialog> {
+  final search = TextEditingController();
+  @override
+  void dispose() {
+    search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final results = findManagerTools(search.text);
+    return Dialog(
+      insetPadding: const EdgeInsets.all(16),
+      child: SizedBox(
+        width: 520,
+        height: (150 + results.length * 76).clamp(250, 500).toDouble(),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'What would you like to do?',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Close tool finder',
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: TextField(
+                key: const Key('manager-tool-search'),
+                controller: search,
+                autofocus: true,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  labelText: 'Search tools',
+                  hintText: 'Try photos, coupons or publishing',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: search.text.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Clear tool search',
+                          icon: const Icon(Icons.clear),
+                          onPressed: () => setState(search.clear),
+                        ),
+                ),
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) {
+                  final matches = findManagerTools(search.text);
+                  if (matches.isNotEmpty) Navigator.pop(context, matches.first);
+                },
+              ),
+            ),
+            Expanded(
+              child: results.isEmpty
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text(
+                          'No matching tools. Try a task like dates, photos or payments.',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: results.length,
+                      itemBuilder: (context, index) {
+                        final destination = results[index];
+                        return ListTile(
+                          leading: Icon(destination.icon),
+                          title: Text(destination.label),
+                          subtitle: Text(destination.description),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => Navigator.pop(context, destination),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
