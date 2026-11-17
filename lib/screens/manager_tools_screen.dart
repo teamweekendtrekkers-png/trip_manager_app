@@ -156,7 +156,12 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
         'Start with bookings, update a trip, or resolve an item that needs attention.',
         style: Theme.of(context).textTheme.bodyMedium,
       ),
-      const SizedBox(height: 16),
+      const SizedBox(height: 12),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: ManagerToolFinder(onSelected: go),
+      ),
+      const SizedBox(height: 12),
       ManagerSetupChecklist(
         configured: context.read<SettingsProvider>().isConfigured,
         hasTrips: p.hasTrips,

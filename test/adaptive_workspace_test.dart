@@ -18,19 +18,83 @@ import 'package:trip_manager_app/screens/trip_edit_screen.dart';
 import 'package:trip_manager_app/widgets/trip_editor_sections.dart';
 
 void main() {
-  testWidgets('Home photo issue opens Photos directly on a small phone', (tester) async {
+  testWidgets('tool finder routes appearance tasks from Home on a phone', (
+    tester,
+  ) async {
+    await _setSize(tester, const Size(390, 844));
+    await tester.runAsync(() async {
+      final sdk = Platform.environment['FLUTTER_ROOT'];
+      if (sdk == null) return;
+      for (final entry in {
+        'Roboto': 'Roboto-Regular.ttf',
+        'MaterialIcons': 'MaterialIcons-Regular.otf',
+      }.entries) {
+        final file = File('$sdk/bin/cache/artifacts/material_fonts/${entry.value}');
+        if (!file.existsSync()) continue;
+        final loader = FontLoader(entry.key)
+          ..addFont(Future.value(ByteData.sublistView(file.readAsBytesSync())));
+        await loader.load();
+      }
+    });
+    final providers = await _providers();
+    const boundaryKey = Key('tool-finder-preview');
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: boundaryKey,
+        child: _app(providers, home: true, previewFonts: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('find-manager-tool')).first);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('manager-tool-search')),
+      'animation',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Website content'), findsOneWidget);
+    await tester.runAsync(() async {
+      final boundary = tester.renderObject<RenderRepaintBoundary>(
+        find.byKey(boundaryKey),
+      );
+      final image = await boundary.toImage(pixelRatio: 1);
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      Directory('build/reviews').createSync(recursive: true);
+      File(
+        'build/reviews/tool-finder-390.png',
+      ).writeAsBytesSync(bytes!.buffer.asUint8List());
+    });
+    await tester.tap(find.text('Website content'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('manager-tool-search')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Home photo issue opens Photos directly on a small phone', (
+    tester,
+  ) async {
     await _setSize(tester, const Size(320, 900));
     final providers = await _providers();
     await tester.pumpWidget(_app(providers, home: true));
     await tester.pumpAndSettle();
     final action = find.widgetWithText(ActionChip, 'Add a cover photo');
-    await tester.scrollUntilVisible(action, 220, scrollable: find.byType(Scrollable).first);
-    await Scrollable.ensureVisible(tester.element(action.first), alignment: 0.5);
+    for (var attempt = 0; action.evaluate().isEmpty && attempt < 20; attempt++) {
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -220));
+      await tester.pumpAndSettle();
+    }
+    expect(action, findsWidgets);
+    await Scrollable.ensureVisible(
+      tester.element(action.first),
+      alignment: 0.5,
+    );
     await tester.pumpAndSettle();
     await tester.tap(action.first);
     await tester.pumpAndSettle();
-    expect(tester.widget<TripEditScreen>(find.byType(TripEditScreen)).initialSection,
-      TripEditorSection.photos);
+    expect(
+      tester.widget<TripEditScreen>(find.byType(TripEditScreen)).initialSection,
+      TripEditorSection.photos,
+    );
     expect(providers.trips.hasUnsavedChanges, isFalse);
   });
 
@@ -452,6 +516,3 @@ Map<String, dynamic> _trip(String id, String title, {bool featured = false}) =>
       'inclusions': <String>[],
       'exclusions': <String>[],
     };
-
-
-
