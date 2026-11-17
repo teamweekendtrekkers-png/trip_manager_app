@@ -1,3 +1,4 @@
+import '../widgets/manager_page_layout.dart';
 import '../services/trip_attention.dart';
 import '../services/booking_review_filter.dart';
 import 'booking_review_screen.dart';
@@ -101,32 +102,34 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
         );
 
   Widget _content() => Consumer<TripsProvider>(
-    builder: (ctx, p, _) => ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        if (busy) const LinearProgressIndicator(),
-        if (error.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Card(
-              child: ListTile(
-                leading: const Icon(Icons.wifi_off_outlined),
-                title: const Text('Some website details could not load'),
-                subtitle: const Text(
-                  'Your trip drafts are still available. Try again when connected.',
-                ),
-                trailing: IconButton(
-                  tooltip: 'Retry website details',
-                  onPressed: busy ? null : _load,
-                  icon: const Icon(Icons.refresh),
+    builder: (ctx, p, _) => ManagerPageBody(
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (busy) const LinearProgressIndicator(),
+          if (error.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Card(
+                child: ListTile(
+                  leading: const Icon(Icons.wifi_off_outlined),
+                  title: const Text('Some website details could not load'),
+                  subtitle: const Text(
+                    'Your trip drafts are still available. Try again when connected.',
+                  ),
+                  trailing: IconButton(
+                    tooltip: 'Retry website details',
+                    onPressed: busy ? null : _load,
+                    icon: const Icon(Icons.refresh),
+                  ),
                 ),
               ),
             ),
-          ),
-        if (widget.tool == ManagerDestination.dashboard) ..._dashboard(p),
-        if (widget.tool == ManagerDestination.library) ..._library(p),
-        if (widget.tool == ManagerDestination.history) ..._history(p),
-      ],
+          if (widget.tool == ManagerDestination.dashboard) ..._dashboard(p),
+          if (widget.tool == ManagerDestination.library) ..._library(p),
+          if (widget.tool == ManagerDestination.history) ..._history(p),
+        ],
+      ),
     ),
   );
   List<Widget> _dashboard(TripsProvider p) {
@@ -172,67 +175,50 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
         onPublish: () => go(ManagerDestination.deployment),
       ),
       const SizedBox(height: 12),
-      LayoutBuilder(
-        builder: (context, constraints) {
-          final width = constraints.maxWidth;
-          final columns = width >= 900
-              ? 4
-              : width >= 300
-              ? 2
-              : 1;
-          final tileWidth = (width - (columns - 1) * 12) / columns;
-          return Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _task(
-                tileWidth,
-                Icons.add_circle_outline,
-                'Add trip',
-                'Create a trip step by step',
-                p.isLoading
-                    ? null
-                    : () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) => const TripEditScreen(
-                            initialSection: TripEditorSection.basics,
-                          ),
-                        ),
-                      ),
-              ),
-              _task(
-                tileWidth,
-                Icons.route_outlined,
-                'Edit trips',
-                'Dates, prices, photos and content',
-                () => go(ManagerDestination.trips),
-              ),
-              _task(
-                tileWidth,
-                Icons.fact_check_outlined,
-                'Pending payments',
-                'Review customer submissions',
-                widget.onPendingBookings ??
-                    () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const BookingReviewScreen(
-                          initialFilter: BookingReviewFilter.pending,
-                        ),
+      ManagerCardGrid(
+        children: [
+          _task(
+            Icons.add_circle_outline,
+            'Add trip',
+            'Create a trip step by step',
+            p.isLoading
+                ? null
+                : () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => const TripEditScreen(
+                        initialSection: TripEditorSection.basics,
                       ),
                     ),
-                key: const Key('dashboard-booking-review'),
-              ),
-              _task(
-                tileWidth,
-                Icons.calendar_month_outlined,
-                'Departures',
-                'See upcoming trip dates',
-                () => go(ManagerDestination.batches),
-              ),
-            ],
-          );
-        },
+                  ),
+          ),
+          _task(
+            Icons.route_outlined,
+            'Edit trips',
+            'Dates, prices, photos and content',
+            () => go(ManagerDestination.trips),
+          ),
+          _task(
+            Icons.fact_check_outlined,
+            'Pending payments',
+            'Review customer submissions',
+            widget.onPendingBookings ??
+                () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const BookingReviewScreen(
+                      initialFilter: BookingReviewFilter.pending,
+                    ),
+                  ),
+                ),
+            key: const Key('dashboard-booking-review'),
+          ),
+          _task(
+            Icons.calendar_month_outlined,
+            'Departures',
+            'See upcoming trip dates',
+            () => go(ManagerDestination.batches),
+          ),
+        ],
       ),
       const SizedBox(height: 8),
       Wrap(
@@ -292,55 +278,58 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
           ),
         ),
       for (final t in attention)
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  t['title']?.toString() ?? t['id'].toString(),
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final issue in tripAttention(t))
-                      ActionChip(
-                        avatar: Icon(
-                          issue == 'Add a cover photo'
-                              ? Icons.photo_outlined
-                              : Icons.edit_outlined,
-                          size: 18,
-                        ),
-                        label: Text(issue),
-                        onPressed: p.isLoading
-                            ? null
-                            : () {
-                                final id = t['id']?.toString() ?? '';
-                                final current = p.getTripById(id);
-                                final index = p.getTripIndexById(id);
-                                if (current == null || index == null) return;
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => TripEditScreen(
-                                      trip: current,
-                                      index: index,
-                                      initialSection:
-                                          issue == 'Add a cover photo'
-                                          ? TripEditorSection.photos
-                                          : TripEditorSection.dates,
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    t['title']?.toString() ?? t['id'].toString(),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final issue in tripAttention(t))
+                        ActionChip(
+                          avatar: Icon(
+                            issue == 'Add a cover photo'
+                                ? Icons.photo_outlined
+                                : Icons.edit_outlined,
+                            size: 18,
+                          ),
+                          label: Text(issue),
+                          onPressed: p.isLoading
+                              ? null
+                              : () {
+                                  final id = t['id']?.toString() ?? '';
+                                  final current = p.getTripById(id);
+                                  final index = p.getTripIndexById(id);
+                                  if (current == null || index == null) return;
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => TripEditScreen(
+                                        trip: current,
+                                        index: index,
+                                        initialSection:
+                                            issue == 'Add a cover photo'
+                                            ? TripEditorSection.photos
+                                            : TripEditorSection.dates,
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
-                      ),
-                  ],
-                ),
-              ],
+                                  );
+                                },
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -364,9 +353,9 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
           ),
           onTap: () => go(ManagerDestination.deployment),
         ),
-      Wrap(
-        spacing: 12,
-        runSpacing: 12,
+      ManagerCardGrid(
+        minWidth: 150,
+        maxColumns: 5,
         children: [
           _metric(
             'Bookable departures',
@@ -480,57 +469,69 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
   }
 
   Widget _task(
-    double width,
     IconData icon,
     String title,
     String description,
     VoidCallback? onTap, {
     Key? key,
-  }) => SizedBox(
-    width: width,
-    child: Card(
-      key: key,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                icon,
-                color: onTap == null
-                    ? Theme.of(context).disabledColor
-                    : Theme.of(context).colorScheme.primary,
+  }) => Card(
+    key: key,
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: onTap == null
+                  ? Theme.of(context).disabledColor
+                  : Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 4),
-              Text(description, style: Theme.of(context).textTheme.bodySmall),
-            ],
-          ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right, size: 18),
+          ],
         ),
       ),
     ),
   );
 
-  Widget _metric(String label, int n) => SizedBox(
-    width: MediaQuery.sizeOf(context).width < 480 ? 150 : 190,
-    child: Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Text('$n', style: Theme.of(context).textTheme.headlineMedium),
-            Text(label, textAlign: TextAlign.center),
-          ],
-        ),
+  Widget _metric(String label, int n) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$n',
+            style: Theme.of(
+              context,
+            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          Text(label),
+        ],
       ),
     ),
   );

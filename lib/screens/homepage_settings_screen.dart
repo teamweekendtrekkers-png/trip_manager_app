@@ -1,3 +1,4 @@
+import '../widgets/manager_page_layout.dart';
 import '../widgets/website_pages_editor.dart';
 import '../services/google_review_service.dart';
 import '../widgets/local_draft.dart';
@@ -586,20 +587,34 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
             ),
           ],
         ),
-        bottomNavigationBar: _draft == null ? null : SafeArea(
-          child: Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: FilledButton.icon(
-                      key: const Key('homepage-publish'),
-                      onPressed: _busy || !_targetMatches ? null : _publish,
-                      icon: const Icon(Icons.cloud_upload),
-                      label: Text(
-                        _group == 'All'
-                            ? 'Review & publish homepage'
-                            : 'Review & publish $_group only',
-                      ),
+        bottomNavigationBar: _draft == null
+            ? null
+            : SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    ((MediaQuery.sizeOf(context).width - 960) / 2).clamp(
+                      16.0,
+                      double.infinity,
                     ),
-          ),
-        ),
+                    8,
+                    ((MediaQuery.sizeOf(context).width - 960) / 2).clamp(
+                      16.0,
+                      double.infinity,
+                    ),
+                    12,
+                  ),
+                  child: FilledButton.icon(
+                    key: const Key('homepage-publish'),
+                    onPressed: _busy || !_targetMatches ? null : _publish,
+                    icon: const Icon(Icons.cloud_upload),
+                    label: Text(
+                      _group == 'All'
+                          ? 'Review & publish homepage'
+                          : 'Review & publish $_group only',
+                    ),
+                  ),
+                ),
+              ),
         body: _draft == null
             ? Center(
                 child: _busy
@@ -625,30 +640,30 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
             : AbsorbPointer(
                 absorbing: _busy,
                 child: ListView(
+                  key: const Key('homepage-editor-scroll'),
                   controller: _homeScroll,
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: ((MediaQuery.sizeOf(context).width - 960) / 2)
+                        .clamp(16.0, double.infinity),
+                    vertical: 16,
+                  ),
                   children: [
                     localDraftBar(),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        for (final group in [
-                          'All',
-                          'Hero',
-                          'Appearance',
-                          'Upcoming Batches',
-                          'Destinations',
-                          'Information',
-                          'Reviews',
-                          'Footer',
-                        ])
-                          ChoiceChip(
-                            key: ValueKey('homepage-group-$group'),
-                            label: Text(group),
-                            selected: _group == group,
-                            onSelected: (_) => setState(() => _group = group),
-                          ),
+                    ManagerSectionPicker(
+                      sections: const [
+                        'All',
+                        'Hero',
+                        'Appearance',
+                        'Upcoming Batches',
+                        'Destinations',
+                        'Information',
+                        'Reviews',
+                        'Footer',
+                        'Pages',
+                        'Trip gallery',
                       ],
+                      selected: _group,
+                      onChanged: (group) => setState(() => _group = group),
                     ),
                     OutlinedButton.icon(
                       onPressed: () => Navigator.push(
@@ -892,9 +907,17 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                           SwitchListTile(
                             key: const Key('website-animations-enabled'),
                             title: const Text('Website animations'),
-                            subtitle: const Text('Subtle transitions and effects. Reduced-motion preferences are always respected. Photo slideshow controls are separate.'),
-                            value: _draft!['presentation']['animationsEnabled'] as bool,
-                            onChanged: (value) => setState(() => _draft!['presentation']['animationsEnabled'] = value),
+                            subtitle: const Text(
+                              'Subtle transitions and effects. Reduced-motion preferences are always respected. Photo slideshow controls are separate.',
+                            ),
+                            value:
+                                _draft!['presentation']['animationsEnabled']
+                                    as bool,
+                            onChanged: (value) => setState(
+                              () =>
+                                  _draft!['presentation']['animationsEnabled'] =
+                                      value,
+                            ),
                           ),
                           SwitchListTile(
                             title: const Text('Slow hero photo crossfade'),
@@ -987,7 +1010,8 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                         _group == 'Information' ||
                         _group == 'Reviews')
                       HomepageSectionsEditor(
-                        loadGoogleReviews: () => GoogleReviewService(_service.github).check(),
+                        loadGoogleReviews: () =>
+                            GoogleReviewService(_service.github).check(),
                         onlySections: _group == 'Reviews'
                             ? {'reviews'}
                             : _group == 'Information'
@@ -1009,26 +1033,39 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                     if (_group == 'All' || _group == 'Pages')
                       WebsitePagesEditor(
                         key: ValueKey('website-pages-$_sectionsRevision'),
-                        pages: _draft!['pages'] as Map<String,dynamic>,
+                        pages: _draft!['pages'] as Map<String, dynamic>,
                         initiallyExpanded: _group == 'Pages',
                         onChanged: () => setState(() {}),
                       ),
                     if (_group == 'All' || _group == 'Destinations') ...[
-                      Text('Explore Destinations slideshow',
-                          style: Theme.of(context).textTheme.titleLarge),
-                      const Text('Automatically browse homepage destination cards. Visitors can still swipe, use arrows or pause.'),
+                      Text(
+                        'Explore Destinations slideshow',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const Text(
+                        'Automatically browse homepage destination cards. Visitors can still swipe, use arrows or pause.',
+                      ),
                       SwitchListTile(
                         key: const Key('destination-auto-slide'),
-                        title: const Text('Automatically slide destination cards'),
-                        value: _draft!['destinationSlider']['autoSlide'] as bool,
+                        title: const Text(
+                          'Automatically slide destination cards',
+                        ),
+                        value:
+                            _draft!['destinationSlider']['autoSlide'] as bool,
                         onChanged: (value) => setState(() {
                           _draft!['destinationSlider']['autoSlide'] = value;
                         }),
                       ),
                       DropdownButtonFormField<int>(
-                        key: ValueKey('destination-interval-${_draft!['destinationSlider']['intervalSeconds']}'),
-                        initialValue: _draft!['destinationSlider']['intervalSeconds'] as int,
-                        decoration: const InputDecoration(labelText: 'Time per destination'),
+                        key: ValueKey(
+                          'destination-interval-${_draft!['destinationSlider']['intervalSeconds']}',
+                        ),
+                        initialValue:
+                            _draft!['destinationSlider']['intervalSeconds']
+                                as int,
+                        decoration: const InputDecoration(
+                          labelText: 'Time per destination',
+                        ),
                         items: [
                           for (var seconds = 3; seconds <= 30; seconds++)
                             DropdownMenuItem(
@@ -1039,7 +1076,8 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                         onChanged: (value) {
                           if (value != null) {
                             setState(() {
-                              _draft!['destinationSlider']['intervalSeconds'] = value;
+                              _draft!['destinationSlider']['intervalSeconds'] =
+                                  value;
                             });
                           }
                         },
@@ -1047,9 +1085,13 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                       const SizedBox(height: 20),
                     ],
                     if (_group == 'All' || _group == 'Trip gallery') ...[
-                      Text('Trip gallery',
-                          style: Theme.of(context).textTheme.titleLarge),
-                      const Text('Automatic photo sliding on every trip page. Saved gallery order is used.'),
+                      Text(
+                        'Trip gallery',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const Text(
+                        'Automatic photo sliding on every trip page. Saved gallery order is used.',
+                      ),
                       SwitchListTile(
                         key: const Key('gallery-auto-slide'),
                         title: const Text('Automatically slide photos'),
@@ -1059,9 +1101,14 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                         }),
                       ),
                       DropdownButtonFormField<int>(
-                        key: ValueKey('gallery-interval-${_draft!['tripGallery']['intervalSeconds']}'),
-                        initialValue: _draft!['tripGallery']['intervalSeconds'] as int,
-                        decoration: const InputDecoration(labelText: 'Time per photo'),
+                        key: ValueKey(
+                          'gallery-interval-${_draft!['tripGallery']['intervalSeconds']}',
+                        ),
+                        initialValue:
+                            _draft!['tripGallery']['intervalSeconds'] as int,
+                        decoration: const InputDecoration(
+                          labelText: 'Time per photo',
+                        ),
                         items: [
                           for (var seconds = 3; seconds <= 30; seconds++)
                             DropdownMenuItem(
