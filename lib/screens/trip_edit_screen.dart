@@ -1,4 +1,6 @@
 import '../widgets/inline_formatting.dart';
+import '../widgets/carry_library_dialog.dart';
+import '../services/carry_library.dart';
 import '../widgets/pickup_library_dialog.dart';
 import '../services/pickup_library.dart';
 import '../widgets/text_formatting_tools.dart';
@@ -1392,12 +1394,31 @@ class _TripEditScreenState extends State<TripEditScreen>
                   icon: const Icon(Icons.restore),
                   label: const Text('Use defaults'),
                 ),
+                if (field == 'thingsToCarry')
+                  OutlinedButton.icon(
+                    key: const Key('reuse-carry-items'),
+                    onPressed: _reuseCarryItems,
+                    icon: const Icon(Icons.playlist_add),
+                    label: const Text('Reuse things to carry'),
+                  ),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _reuseCarryItems() async {
+    final current = List<String>.from(_tripData['thingsToCarry'] ?? []);
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (_) => CarryLibraryDialog(current: current,
+        entries: buildCarryLibrary([...context.read<TripsProvider>().trips, _tripData])),
+    );
+    if (!mounted || result == null) return;
+    setState(() => _tripData['thingsToCarry'] = result);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Packing items added to this draft. Other trips are unchanged.')));
   }
 
   Widget _buildListSection({
