@@ -6,6 +6,7 @@ const double managerDesktopBreakpoint = 1100;
 enum ManagerDestination {
   dashboard,
   library,
+  reusableLibrary,
   history,
   trips,
   homepage,
@@ -24,6 +25,7 @@ extension ManagerDestinationDetails on ManagerDestination {
   String get label => switch (this) {
     ManagerDestination.dashboard => 'Dashboard',
     ManagerDestination.library => 'Photo library',
+    ManagerDestination.reusableLibrary => 'Reusable libraries',
     ManagerDestination.history => 'Version history',
     ManagerDestination.trips => 'Trips',
     ManagerDestination.homepage => 'Website content',
@@ -41,6 +43,7 @@ extension ManagerDestinationDetails on ManagerDestination {
   String get description => switch (this) {
     ManagerDestination.dashboard => 'Daily tasks and missing dates',
     ManagerDestination.library => 'Reuse photos and manage tags',
+    ManagerDestination.reusableLibrary => 'Pickup points and packing lists',
     ManagerDestination.history => 'Restore earlier versions as drafts',
     ManagerDestination.trips => 'Manage every trip',
     ManagerDestination.homepage => 'Edit website content',
@@ -59,6 +62,7 @@ extension ManagerDestinationDetails on ManagerDestination {
   IconData get icon => switch (this) {
     ManagerDestination.dashboard => Icons.dashboard_outlined,
     ManagerDestination.library => Icons.photo_library_outlined,
+    ManagerDestination.reusableLibrary => Icons.inventory_2_outlined,
     ManagerDestination.history => Icons.history,
     ManagerDestination.trips => Icons.route_outlined,
     ManagerDestination.homepage => Icons.web_outlined,
@@ -76,6 +80,7 @@ extension ManagerDestinationDetails on ManagerDestination {
   IconData get selectedIcon => switch (this) {
     ManagerDestination.dashboard => Icons.dashboard,
     ManagerDestination.library => Icons.photo_library,
+    ManagerDestination.reusableLibrary => Icons.inventory_2,
     ManagerDestination.history => Icons.history,
     ManagerDestination.trips => Icons.route,
     ManagerDestination.homepage => Icons.web,
@@ -103,6 +108,7 @@ const managerNavigationGroups = <String, List<ManagerDestination>>{
   'Website & media': [
     ManagerDestination.homepage,
     ManagerDestination.library,
+    ManagerDestination.reusableLibrary,
     ManagerDestination.sharedContent,
     ManagerDestination.payments,
   ],
@@ -367,6 +373,7 @@ List<ManagerDestination> findManagerTools(String query) {
     ManagerDestination.dashboard: 'home daily tasks overview',
     ManagerDestination.trips: 'edit create add price dates itinerary trip',
     ManagerDestination.library: 'images pictures cover upload tags edit photos',
+    ManagerDestination.reusableLibrary: 'pickup boarding packing carry things templates hide restore edit library',
     ManagerDestination.homepage:
         'design appearance animation colours colors logo hero reviews website edit',
     ManagerDestination.batches: 'calendar upcoming dates preview',

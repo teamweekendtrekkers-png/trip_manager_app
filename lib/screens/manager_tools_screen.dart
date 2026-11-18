@@ -162,7 +162,15 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
       const SizedBox(height: 12),
       Align(
         alignment: Alignment.centerLeft,
-        child: ManagerToolFinder(onSelected: go),
+        child: Wrap(spacing: 8, runSpacing: 8, children: [
+          ManagerToolFinder(onSelected: go),
+          OutlinedButton.icon(
+            key: const Key('dashboard-reusable-libraries'),
+            onPressed: () => go(ManagerDestination.reusableLibrary),
+            icon: const Icon(Icons.inventory_2_outlined),
+            label: const Text('Reusable libraries'),
+          ),
+        ]),
       ),
       const SizedBox(height: 12),
       ManagerSetupChecklist(
