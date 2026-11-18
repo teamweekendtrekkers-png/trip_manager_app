@@ -1,3 +1,4 @@
+import '../services/reusable_library_store.dart';
 import '../widgets/inline_formatting.dart';
 import '../widgets/carry_library_dialog.dart';
 import '../services/carry_library.dart';
@@ -1414,6 +1415,7 @@ class _TripEditScreenState extends State<TripEditScreen>
     final result = await showDialog<List<String>>(
       context: context,
       builder: (_) => CarryLibraryDialog(current: current,
+        store: ReusableLibraryStore(kind: 'carry', scope: DraftStore.scope(context.read<SettingsProvider>().settings)),
         entries: buildCarryLibrary([...context.read<TripsProvider>().trips, _tripData])),
     );
     if (!mounted || result == null) return;
@@ -2218,7 +2220,7 @@ class _TripEditScreenState extends State<TripEditScreen>
     ]);
     final result = await showDialog<List<Map<String, dynamic>>>(
       context: context,
-      builder: (_) => PickupLibraryDialog(entries: entries, current: current),
+      builder: (_) => PickupLibraryDialog(entries: entries, current: current, store: ReusableLibraryStore(kind: 'pickup', scope: DraftStore.scope(context.read<SettingsProvider>().settings))),
     );
     if (!mounted || result == null) return;
     setState(() => _tripData['boardingLocations'] = result);
