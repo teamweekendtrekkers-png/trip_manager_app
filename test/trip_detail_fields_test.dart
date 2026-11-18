@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:trip_manager_app/models/app_settings.dart';
@@ -148,6 +149,25 @@ const commonRules = ["Keep this exactly"];
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('reuse packing list saves target only and preserves formatting in publication', (tester) async {
+    final provider = await openEditor(tester);
+    provider.addTrip({..._trip(), 'id': 'winter-trip', 'title': 'Winter trip', 'thingsToCarry': ['Raincoat', '**Thermal jacket**', 'Torch']});
+    final unchanged = jsonEncode(provider.trips.last);
+    await tester.ensureVisible(find.byKey(const Key('reuse-carry-items'))); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('reuse-carry-items'))); await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('carry-library-search')), 'Winter trip'); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('carry-select-results'))); await tester.pumpAndSettle();
+    expect(find.text('Add 2 items'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('carry-library-add'))); await tester.pumpAndSettle();
+    await saveEditor(tester);
+    final expected = ['Raincoat', 'Power bank', '**Thermal jacket**', 'Torch'];
+    expect(provider.trips.first['thingsToCarry'], expected);
+    expect(jsonEncode(provider.trips.last), unchanged);
+    final reparsed = TripsParser.parseTripsData(TripsParser.generateTripsDataJs(provider.trips));
+    expect(reparsed.first['thingsToCarry'], expected);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('edits, adds and removes audience tags and saves both lists', (
     tester,
