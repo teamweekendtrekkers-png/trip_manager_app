@@ -18,6 +18,36 @@ import 'package:trip_manager_app/screens/trip_edit_screen.dart';
 import 'package:trip_manager_app/widgets/trip_editor_sections.dart';
 
 void main() {
+  testWidgets('Home opens reusable libraries without editing a trip', (
+    tester,
+  ) async {
+    await _setSize(tester, const Size(390, 844));
+    final providers = await _providers();
+    await tester.pumpWidget(_app(providers, home: true));
+    await tester.pumpAndSettle();
+    final before = providers.trips.trips.toString();
+    final shortcut = find.byKey(const Key('dashboard-reusable-libraries'));
+    await tester.scrollUntilVisible(shortcut, 200, scrollable: find.byType(Scrollable).first);
+    await tester.tap(shortcut);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Keep useful items ready for your next trip'),
+      findsOneWidget,
+    );
+    final carry = find.byKey(const Key('open-library-carry'));
+    await tester.drag(find.byType(ListView).last, const Offset(0, -400));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(carry);
+    await tester.pumpAndSettle();
+    await tester.tap(carry);
+    await tester.pumpAndSettle();
+    expect(find.text('Manage packing library'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(providers.trips.trips.toString(), before);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('tool finder routes appearance tasks from Home on a phone', (
     tester,
   ) async {
@@ -29,7 +59,9 @@ void main() {
         'Roboto': 'Roboto-Regular.ttf',
         'MaterialIcons': 'MaterialIcons-Regular.otf',
       }.entries) {
-        final file = File('$sdk/bin/cache/artifacts/material_fonts/${entry.value}');
+        final file = File(
+          '$sdk/bin/cache/artifacts/material_fonts/${entry.value}',
+        );
         if (!file.existsSync()) continue;
         final loader = FontLoader(entry.key)
           ..addFont(Future.value(ByteData.sublistView(file.readAsBytesSync())));
@@ -79,7 +111,11 @@ void main() {
     await tester.pumpWidget(_app(providers, home: true));
     await tester.pumpAndSettle();
     final action = find.widgetWithText(ActionChip, 'Add a cover photo');
-    for (var attempt = 0; action.evaluate().isEmpty && attempt < 20; attempt++) {
+    for (
+      var attempt = 0;
+      action.evaluate().isEmpty && attempt < 20;
+      attempt++
+    ) {
       await tester.drag(find.byType(Scrollable).first, const Offset(0, -220));
       await tester.pumpAndSettle();
     }

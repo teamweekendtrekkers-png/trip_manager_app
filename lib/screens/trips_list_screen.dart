@@ -29,6 +29,7 @@ import 'deployment_status_screen.dart';
 import 'upcoming_batches_screen.dart';
 import 'homepage_settings_screen.dart';
 import '../widgets/manager_navigation.dart';
+import 'reusable_libraries_screen.dart';
 import '../widgets/trip_price.dart';
 
 class TripsListScreen extends StatefulWidget {
@@ -276,6 +277,9 @@ class _TripsListScreenState extends State<TripsListScreen> {
       ManagerDestination.homepage => MaterialPageRoute<void>(
         builder: (_) => const HomepageSettingsScreen(),
       ),
+      ManagerDestination.reusableLibrary => MaterialPageRoute<void>(
+        builder: (_) => const ReusableLibrariesScreen(),
+      ),
       ManagerDestination.batches => MaterialPageRoute<void>(
         builder: (_) => UpcomingBatchesScreen(trips: trips),
       ),
@@ -438,6 +442,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
               for (final destination in [
                 ManagerDestination.dashboard,
                 ManagerDestination.library,
+                ManagerDestination.reusableLibrary,
                 ManagerDestination.history,
                 ManagerDestination.payments,
                 ManagerDestination.bookingReview,
