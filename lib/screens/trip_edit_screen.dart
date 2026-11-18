@@ -1,4 +1,6 @@
 import '../widgets/inline_formatting.dart';
+import '../widgets/pickup_library_dialog.dart';
+import '../services/pickup_library.dart';
 import '../widgets/text_formatting_tools.dart';
 import '../widgets/trip_cover_picker.dart';
 import '../widgets/gallery_order_editor.dart';
@@ -2020,6 +2022,13 @@ class _TripEditScreenState extends State<TripEditScreen>
               const SizedBox(height: 12),
 
               // Show default points if no custom locations
+              OutlinedButton.icon(
+                key: const Key('reuse-pickup-points'),
+                icon: const Icon(Icons.playlist_add),
+                label: const Text('Reuse pickup points'),
+                onPressed: _reusePickupPoints,
+              ),
+              const SizedBox(height: 12),
               if (!hasCustomLocations) ...[
                 const Text(
                   'Default Pickup Points (shown on website):',
@@ -2173,6 +2182,29 @@ class _TripEditScreenState extends State<TripEditScreen>
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _reusePickupPoints() async {
+    final current = List<Map<String, dynamic>>.from(
+      _tripData['boardingLocations'] ?? [],
+    );
+    final entries = buildPickupLibrary([
+      ...context.read<TripsProvider>().trips,
+      _tripData,
+    ]);
+    final result = await showDialog<List<Map<String, dynamic>>>(
+      context: context,
+      builder: (_) => PickupLibraryDialog(entries: entries, current: current),
+    );
+    if (!mounted || result == null) return;
+    setState(() => _tripData['boardingLocations'] = result);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Pickup points added to this draft. Review times, then save. Other trips are unchanged.',
         ),
       ),
     );
@@ -2544,7 +2576,11 @@ class _TripEditScreenState extends State<TripEditScreen>
                 (_tripData['closedDepartures'] as List? ?? []).contains(
                   range.key,
                 );
-            final status = range != null && (_tripData['soldOutDepartures'] as List? ?? []).contains(range.key)
+            final status =
+                range != null &&
+                    (_tripData['soldOutDepartures'] as List? ?? []).contains(
+                      range.key,
+                    )
                 ? 'Sold out'
                 : closed
                 ? 'Bookings closed'
@@ -2554,7 +2590,11 @@ class _TripEditScreenState extends State<TripEditScreen>
                 ? 'Duplicate — edit or remove before saving'
                 : expired
                 ? 'Expired'
-                : (_tripData['confirmedDepartures'] as List? ?? []).contains(range.key) ? 'Confirmed departure • ${range.weekdayLabel}' : 'Upcoming • ${range.weekdayLabel}';
+                : (_tripData['confirmedDepartures'] as List? ?? []).contains(
+                    range.key,
+                  )
+                ? 'Confirmed departure • ${range.weekdayLabel}'
+                : 'Upcoming • ${range.weekdayLabel}';
             final statusColor = invalid || duplicate
                 ? theme.colorScheme.error
                 : expired
@@ -2651,9 +2691,16 @@ class _TripEditScreenState extends State<TripEditScreen>
         _availableDates.add(canonical);
       } else {
         final oldKey = TripDateUtils.parse(_availableDates[index])?.key;
-        for (final field in ['closedDepartures','confirmedDepartures','soldOutDepartures']) {
-          final values=List<String>.from(_tripData[field] as List? ?? []);
-          if(values.remove(oldKey)){values.add(range.key);_tripData[field]=values;}
+        for (final field in [
+          'closedDepartures',
+          'confirmedDepartures',
+          'soldOutDepartures',
+        ]) {
+          final values = List<String>.from(_tripData[field] as List? ?? []);
+          if (values.remove(oldKey)) {
+            values.add(range.key);
+            _tripData[field] = values;
+          }
         }
         _availableDates[index] = canonical;
       }

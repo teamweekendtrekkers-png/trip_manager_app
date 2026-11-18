@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -47,6 +48,44 @@ void main() {
     of: find.byType(AppBar),
     matching: find.byIcon(Icons.save),
   );
+
+  testWidgets('reuse pickup points saves only the target trip draft', (tester) async {
+    tester.view.physicalSize = const Size(1080, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final destination = tripWithDates(['Jan 1-2, 2099']);
+    final pickup = <String, dynamic>{'name': 'Hebbal', 'landmark': 'Esteem Mall', 'time': '9:15 PM', 'mapLink': 'https://maps.app.goo.gl/example'};
+    final source = {...tripWithDates(['Jan 3-4, 2099']), 'id': 'north-trip', 'title': 'North trip', 'boardingLocations': [pickup]};
+    final provider = TripsProvider(AppSettings())..addTrip(destination)..addTrip(source);
+    provider.markChangesSaved();
+    final unchangedSource = jsonEncode(provider.trips.last);
+    await tester.pumpWidget(buildSubject(provider, destination));
+    await tester.tap(find.byKey(const Key('editor-section-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Dates & price').last);
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.byKey(const Key('reuse-pickup-points')), 300, scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byKey(const Key('reuse-pickup-points')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('pickup-library-search')), 'North trip');
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.ancestor(of: find.text('Hebbal'), matching: find.byType(CheckboxListTile)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hebbal'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('pickup-library-add')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('editor-save-draft')));
+    await tester.pumpAndSettle();
+    final copied = provider.trips.first['boardingLocations'] as List;
+    expect(copied, hasLength(5));
+    expect(copied.last, pickup);
+    expect(provider.trips.last['boardingLocations'], [pickup]);
+    expect(provider.changes.keys, contains(destination['id']));
+    expect(jsonEncode(provider.trips.last), unchangedSource);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'discount saves the selling fare and reopens both editor amounts',
