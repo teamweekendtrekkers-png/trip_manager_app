@@ -1,3 +1,5 @@
+import '../services/reusable_library_store.dart';
+import 'library_manager_dialog.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import '../services/pickup_library.dart';
@@ -8,8 +10,10 @@ class PickupLibraryDialog extends StatefulWidget {
     super.key,
     required this.entries,
     required this.current,
+    this.store,
   });
   final List<PickupLibraryEntry> entries;
+  final ReusableLibraryStore? store;
   final List<Map<String, dynamic>> current;
   @override
   State<PickupLibraryDialog> createState() => _PickupLibraryDialogState();
@@ -17,6 +21,26 @@ class PickupLibraryDialog extends StatefulWidget {
 
 class _PickupLibraryDialogState extends State<PickupLibraryDialog> {
   final selected = <String>{};
+  late final ReusableLibraryStore libraryStore =
+      widget.store ?? ReusableLibraryStore.memory('pickup');
+  Future<void> manageLibrary() async {
+    final changed = await showDialog<bool>(
+      context: context,
+      builder: (_) => LibraryManagerDialog(
+        store: libraryStore,
+        base: pickupRecords(widget.entries),
+      ),
+    );
+    if (changed == true && mounted)
+      setState(() {
+        final available = resolvePickupLibrary(
+          widget.entries,
+          libraryStore,
+        ).map((e) => e.id).toSet();
+        selected.removeWhere((id) => !available.contains(id));
+      });
+  }
+
   var query = '';
   var keepDefaults = true;
   List<Map<String, dynamic>> get base => widget.current.isNotEmpty
@@ -27,11 +51,10 @@ class _PickupLibraryDialogState extends State<PickupLibraryDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final entries = resolvePickupLibrary(widget.entries, libraryStore);
     final existing = base.map(pickupIdentity).toSet();
-    final shown = widget.entries
-        .where((entry) => entry.matches(query))
-        .toList();
-    final byId = {for (final entry in widget.entries) entry.id: entry};
+    final shown = entries.where((entry) => entry.matches(query)).toList();
+    final byId = {for (final entry in entries) entry.id: entry};
     final chosen = selected
         .where((id) => !existing.contains(id))
         .map((id) => byId[id])
@@ -78,6 +101,12 @@ class _PickupLibraryDialogState extends State<PickupLibraryDialog> {
                     return Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        TextButton.icon(
+                          key: const Key('manage-pickup-library'),
+                          onPressed: manageLibrary,
+                          icon: const Icon(Icons.edit_note),
+                          label: const Text('Manage library'),
+                        ),
                         if (widget.current.isEmpty)
                           CheckboxListTile(
                             contentPadding: EdgeInsets.zero,
@@ -122,7 +151,7 @@ class _PickupLibraryDialogState extends State<PickupLibraryDialog> {
                                 .isNotEmpty &&
                             safePickupMapLink(entry.point['mapLink']).isEmpty)
                           'Invalid Maps link will be omitted. Add a correct link after copying.',
-                        'Used by: ${sources.take(2).join(', ')}${sources.length > 2 ? ' +${sources.length - 2} more' : ''}',
+                        'From: ${sources.take(2).join(', ')}${sources.length > 2 ? ' +${sources.length - 2} more' : ''}',
                         if (alreadyAdded) 'Already included in this trip',
                       ].join('\n'),
                     ),

@@ -1,3 +1,5 @@
+import '../services/reusable_library_store.dart';
+import 'library_manager_dialog.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../services/carry_library.dart';
@@ -8,21 +10,44 @@ class CarryLibraryDialog extends StatefulWidget {
     super.key,
     required this.entries,
     required this.current,
+    this.store,
   });
   final List<CarryLibraryItem> entries;
+  final ReusableLibraryStore? store;
   final List<String> current;
   @override
   State<CarryLibraryDialog> createState() => _CarryLibraryDialogState();
 }
 
 class _CarryLibraryDialogState extends State<CarryLibraryDialog> {
+  late final ReusableLibraryStore libraryStore =
+      widget.store ?? ReusableLibraryStore.memory('carry');
+  Future<void> manageLibrary() async {
+    final changed = await showDialog<bool>(
+      context: context,
+      builder: (_) => LibraryManagerDialog(
+        store: libraryStore,
+        base: carryRecords(widget.entries),
+      ),
+    );
+    if (changed == true && mounted)
+      setState(() {
+        final available = resolveCarryLibrary(
+          widget.entries,
+          libraryStore,
+        ).map((e) => e.id).toSet();
+        selected.removeWhere((id) => !available.contains(id));
+      });
+  }
+
   var query = '';
   final selected = <String>{};
   @override
   Widget build(BuildContext context) {
+    final entries = resolveCarryLibrary(widget.entries, libraryStore);
     final existing = includedCarryItems(widget.current);
-    final shown = widget.entries.where((e) => e.matches(query)).toList();
-    final byId = {for (final entry in widget.entries) entry.id: entry};
+    final shown = entries.where((e) => e.matches(query)).toList();
+    final byId = {for (final entry in entries) entry.id: entry};
     final chosen = selected
         .where((id) => !existing.contains(id))
         .map((id) => byId[id])
@@ -73,6 +98,12 @@ class _CarryLibraryDialogState extends State<CarryLibraryDialog> {
                         Wrap(
                           spacing: 8,
                           children: [
+                            TextButton.icon(
+                              key: const Key('manage-carry-library'),
+                              onPressed: manageLibrary,
+                              icon: const Icon(Icons.edit_note),
+                              label: const Text('Manage library'),
+                            ),
                             TextButton(
                               key: const Key('carry-select-results'),
                               onPressed:
@@ -116,7 +147,7 @@ class _CarryLibraryDialogState extends State<CarryLibraryDialog> {
                     controlAffinity: ListTileControlAffinity.leading,
                     title: FormattedText(entry.text),
                     subtitle: Text(
-                      'Used by: ${sources.take(2).join(', ')}${sources.length > 2 ? ' +${sources.length - 2} more' : ''}${added ? '\nAlready included in this trip' : ''}',
+                      'From: ${sources.take(2).join(', ')}${sources.length > 2 ? ' +${sources.length - 2} more' : ''}${added ? '\nAlready included in this trip' : ''}',
                     ),
                     value: added || selected.contains(entry.id),
                     onChanged: added
