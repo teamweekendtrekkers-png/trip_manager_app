@@ -73,6 +73,8 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
   final _fieldFocus = <String, FocusNode>{};
   Future<void> _searchFields() async {
     final choices = {
+      'Trip display order and sorting': 'Destinations',
+      'Calendar holidays and special dates': 'Upcoming Batches',
       'Desktop cover': 'Hero|hero.backgroundImage',
       'Headline': 'Hero|hero.title',
       'Tagline': 'Hero|hero.tagline',
@@ -271,8 +273,8 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
       'Appearance' => ['presentation'],
       'Trip gallery' => ['tripGallery'],
       'Pages' => ['pages'],
-      'Upcoming Batches' => ['upcomingBatches'],
-      'Destinations' => ['discovery', 'destinationSlider'],
+      'Upcoming Batches' => ['upcomingBatches', 'calendarHolidays'],
+      'Destinations' => ['discovery', 'destinationSlider', 'tripDisplayOrder'],
       'Footer' => ['footer'],
       _ => <String>[],
     };
@@ -462,6 +464,207 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
         onChanged: (value) => setState(() => values[field] = value),
       ),
     );
+  }
+
+  static const _orderViews = {
+    'explore': 'Explore Trips',
+    'weekend': 'This Weekend',
+    'all': 'All Departures',
+  };
+
+  Widget _tripOrderSection() {
+    final orders = _draft!['tripDisplayOrder'] as Map<String, dynamic>;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Set the recommended order for each list. New trips appear after your chosen order.',
+        ),
+        const SizedBox(height: 8),
+        for (final entry in _orderViews.entries)
+          Card(
+            child: ListTile(
+              title: Text(entry.value),
+              subtitle: Text(switch (entry.key) {
+                'explore' => 'All trips in the homepage carousel',
+                'weekend' => 'Only departures for the current weekend',
+                _ => 'All trips, including trips without dates',
+              }),
+              leading: Icon(switch (entry.key) {
+                'explore' => Icons.explore_outlined,
+                'weekend' => Icons.event_outlined,
+                _ => Icons.route_outlined,
+              }),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _trips.isEmpty ? null : () => _editTripOrder(entry.key, entry.value),
+            ),
+          ),
+        if (_trips.isEmpty)
+          const Text('Load your trips before setting a display order.'),
+      ],
+    );
+  }
+
+  Future<void> _editTripOrder(String key, String label) async {
+    final orders = _draft!['tripDisplayOrder'] as Map<String, dynamic>;
+    final titles = {
+      for (final trip in _trips)
+        if (trip['id'] case final String id)
+          id: (trip['title'] ?? trip['name'] ?? id).toString(),
+    };
+    final existing = (orders[key] as List).whereType<String>().where(titles.containsKey);
+    final ids = <String>{...existing, ...titles.keys}.toList();
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, update) {
+          void move(int from, int to) => update(() {
+            final id = ids.removeAt(from);
+            ids.insert(to, id);
+          });
+          return AlertDialog(
+            title: Text(label),
+            content: SizedBox(
+              width: 520,
+              height: 420,
+              child: ReorderableListView.builder(
+                buildDefaultDragHandles: false,
+                itemCount: ids.length,
+                onReorder: (from, to) => move(from, to > from ? to - 1 : to),
+                itemBuilder: (context, index) {
+                  final id = ids[index];
+                  final title = titles[id]!;
+                  return ListTile(
+                    key: ValueKey(id),
+                    leading: ReorderableDragStartListener(
+                      index: index,
+                      child: const Icon(Icons.drag_handle),
+                    ),
+                    title: Text(title),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'Move $title up',
+                          onPressed: index > 0 ? () => move(index, index - 1) : null,
+                          icon: const Icon(Icons.keyboard_arrow_up),
+                        ),
+                        IconButton(
+                          tooltip: 'Move $title down',
+                          onPressed: index + 1 < ids.length ? () => move(index, index + 1) : null,
+                          icon: const Icon(Icons.keyboard_arrow_down),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, <String>[]),
+                child: const Text('Use workspace order'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, ids),
+                child: const Text('Apply order'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (mounted && result != null) setState(() => orders[key] = result);
+  }
+
+  Widget _calendarHolidaySection() {
+    final holidays = (_draft!['calendarHolidays'] as List).cast<Map>();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('Mark holidays and special occasions on the departure calendar.'),
+        const SizedBox(height: 8),
+        for (final holiday in holidays)
+          ListTile(
+            title: Text(holiday['name'] as String),
+            subtitle: Text(holiday['date'] as String),
+            contentPadding: EdgeInsets.zero,
+            trailing: IconButton(
+              tooltip: 'Remove ${holiday['name']}',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: () => setState(() {
+                _draft!['calendarHolidays'] = holidays
+                    .where((item) => item['date'] != holiday['date'])
+                    .toList();
+              }),
+            ),
+            onTap: () => _editHoliday(existing: holiday),
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: _editHoliday,
+            icon: const Icon(Icons.add),
+            label: const Text('Add holiday'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _editHoliday({Map? existing}) async {
+    final now = DateTime.now();
+    final initial = DateTime.tryParse(existing?['date']?.toString() ?? '') ?? now;
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(initial.year < 2020 ? initial.year : 2020),
+      lastDate: DateTime((initial.year > now.year ? initial.year : now.year) + 10, 12, 31),
+      helpText: 'Choose a holiday date',
+    );
+    if (!mounted || date == null) return;
+    final key = date.toIso8601String().substring(0, 10);
+    final controller = TextEditingController(text: existing?['name']?.toString() ?? '');
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Holiday on $key'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 80,
+          decoration: const InputDecoration(labelText: 'Holiday name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty) {
+                Navigator.pop(context, controller.text.trim());
+              }
+            },
+            child: const Text('Save holiday'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (!mounted || name == null) return;
+    setState(() {
+      final holidays = [
+        for (final item in (_draft!['calendarHolidays'] as List).cast<Map>())
+          if (item['date'] != key && item['date'] != existing?['date']) item,
+        {'date': key, 'name': name},
+      ]..sort((a, b) => (a['date'] as String).compareTo(b['date'] as String));
+      _draft!['calendarHolidays'] = holidays;
+    });
   }
 
   Widget _backgroundPreview() {
@@ -990,11 +1193,22 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                     ],
                     if (_group == 'All' || _group == 'Upcoming Batches')
                       _preview(),
+                    if (_group == 'All' || _group == 'Upcoming Batches')
+                      ExpansionTile(
+                        title: const Text('Calendar holidays'),
+                        children: [_calendarHolidaySection()],
+                      ),
+                    if (_group == 'All' || _group == 'Destinations')
+                      ExpansionTile(
+                        title: const Text('Trip display order'),
+                        initiallyExpanded: _group == 'Destinations',
+                        children: [_tripOrderSection()],
+                      ),
                     if (_group == 'Destinations')
                       const ListTile(
                         title: Text('Explore Destinations'),
                         subtitle: Text(
-                          'Open Trips → Website sections → Visibility to choose Featured trips. Collections use each trip’s experience and duration. The photo strip uses active trip galleries. Manage dates and availability in Manage departures → Departure calendar. Publish your trip edits to update the website.',
+                          'Use Trip display order to arrange the three lists. Collections use each trip’s experience and duration.',
                         ),
                       ),
                     const SizedBox(height: 16),

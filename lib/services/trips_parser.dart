@@ -18,6 +18,7 @@ class TripsParser {
       'batchColor',
     'previousSlugs',
     'departureTime',
+    'videoUrl',
     'title',
     'location',
     'badge',
@@ -223,6 +224,24 @@ class TripsParser {
     );
   }
 
+  static bool isTripVideoUrl(String input) {
+    final url = Uri.tryParse(input.trim());
+    if (url == null || url.scheme != 'https' || url.userInfo.isNotEmpty ||
+        (url.hasPort && url.port != 443)) return false;
+    final parts = url.pathSegments.where((part) => part.isNotEmpty).toList();
+    String? id;
+    if (url.host == 'youtu.be' && parts.length == 1) {
+      id = parts.first;
+    } else if (const ['youtube.com', 'www.youtube.com', 'm.youtube.com'].contains(url.host)) {
+      if (url.path == '/watch') {
+        id = url.queryParameters['v'];
+      } else if (parts.length == 2 && const ['shorts', 'embed'].contains(parts.first)) {
+        id = parts.last;
+      }
+    }
+    return id != null && RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(id);
+  }
+
   static List<String> _travellerLimitErrors(Map<String, dynamic> trip) {
     final limit = trip['maxTravellers'];
     return trip.containsKey('maxTravellers') &&
@@ -265,6 +284,7 @@ class TripsParser {
       'publicSlug',
       'batchColor',
       'departureTime',
+      'videoUrl',
       'title',
       'location',
       'badge',
@@ -427,6 +447,7 @@ class TripsParser {
       'batchColor',
       'previousSlugs',
       'departureTime',
+      'videoUrl',
       'title',
       'location',
       'badge',
@@ -639,6 +660,7 @@ class TripsParser {
 
       writeStringField('publicSlug', const ['publicSlug']);
       writeStringField('departureTime', const ['departureTime']);
+      writeStringField('videoUrl', const ['videoUrl']);
       writeStringListField('previousSlugs', const ['previousSlugs']);
       writeStringField('title', const ['title', 'name']);
       writeStringField('location', const ['location', 'destination']);
@@ -805,6 +827,7 @@ class TripsParser {
       'publicSlug',
       'batchColor',
       'departureTime',
+      'videoUrl',
       'title',
       'name',
       'location',

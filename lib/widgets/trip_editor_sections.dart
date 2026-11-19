@@ -33,6 +33,7 @@ TripEditorSection editorSectionFor(String title) => switch (title) {
   'Date & Pricing' ||
   'Departure Dates' ||
   'Boarding Locations' => TripEditorSection.dates,
+  'Trip video' => TripEditorSection.photos,
   'Visibility' ||
   'Website URL & Booking Cutoff' ||
   'Website Display Fields' => TripEditorSection.website,
