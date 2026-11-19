@@ -138,6 +138,7 @@ class _TripEditScreenState extends State<TripEditScreen>
   Map<String, TextEditingController> get _textFields => {
     'publicSlug': _slugController,
     'departureTime': _departureTimeController,
+    'videoUrl': _videoController,
     'title': _nameController,
     'location': _destinationController,
     'about': _descriptionController,
@@ -204,6 +205,7 @@ class _TripEditScreenState extends State<TripEditScreen>
   late TextEditingController _groupSizeController;
   late TextEditingController _pickupPointController;
   late TextEditingController _imageController;
+  late TextEditingController _videoController;
   // Website-specific fields
   late TextEditingController _badgeController;
   late TextEditingController _distanceController;
@@ -257,6 +259,7 @@ class _TripEditScreenState extends State<TripEditScreen>
       text: _tripData['pickupPoint'] ?? '',
     );
     _imageController = TextEditingController(text: _tripData['image'] ?? '');
+    _videoController = TextEditingController(text: _tripData['videoUrl']?.toString() ?? '');
     // Website-specific fields
     _badgeController = TextEditingController(
       text: _tripData['badge']?.toString() ?? 'Trek',
@@ -286,6 +289,7 @@ class _TripEditScreenState extends State<TripEditScreen>
       _elevationController,
       _bestTimeController,
       _imageController,
+      _videoController,
     ]) {
       controller.addListener(_updateCardPreview);
     }
@@ -347,6 +351,7 @@ class _TripEditScreenState extends State<TripEditScreen>
     _groupSizeController.dispose();
     _pickupPointController.dispose();
     _imageController.dispose();
+    _videoController.dispose();
     _badgeController.dispose();
     _distanceController.dispose();
     _elevationController.dispose();
@@ -855,6 +860,29 @@ class _TripEditScreenState extends State<TripEditScreen>
                             ),
                             const SizedBox(height: 16),
 
+                            _buildSectionCard(
+                              title: 'Trip video',
+                              children: [
+                                TextFormField(
+                                  key: const Key('trip-video-url'),
+                                  controller: _videoController,
+                                  keyboardType: TextInputType.url,
+                                  decoration: const InputDecoration(
+                                    labelText: 'YouTube video link',
+                                    helperText: 'Paste a video or Short to show it on this trip page.',
+                                    helperMaxLines: 2,
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  validator: (value) => value == null ||
+                                          value.trim().isEmpty ||
+                                          TripsParser.isTripVideoUrl(value)
+                                      ? null
+                                      : 'Enter a valid HTTPS YouTube video link.',
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
                             // Featured Toggle & Active Status
                             _buildSectionCard(
                               title: 'Visibility',
@@ -878,7 +906,7 @@ class _TripEditScreenState extends State<TripEditScreen>
                                 SwitchListTile(
                                   title: const Text('Featured Trip'),
                                   subtitle: const Text(
-                                    'Show on homepage carousel',
+                                    'Mark this trip as featured',
                                   ),
                                   value: _tripData['featured'] ?? false,
                                   onChanged: (v) {
@@ -1245,6 +1273,7 @@ class _TripEditScreenState extends State<TripEditScreen>
       'Dates': 'Departure Dates',
       'Price and discount': 'Date & Pricing',
       'Pickup locations': 'Boarding Locations',
+      'Trip video or YouTube': 'Trip video',
       'Photos': 'Display Image — card 16:9 (1200×675 px)',
       'Visibility': 'Visibility',
       'URL and booking cutoff': 'Website URL & Booking Cutoff',
@@ -2968,6 +2997,13 @@ class _TripEditScreenState extends State<TripEditScreen>
       return;
     }
 
+    final videoUrl = _videoController.text.trim();
+    if (videoUrl.isNotEmpty && !TripsParser.isTripVideoUrl(videoUrl)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid YouTube link in Photos → Trip video.')),
+      );
+      return;
+    }
     final normalizedDates = _availableDates
         .map(TripDateUtils.parse)
         .whereType<TripDateRange>()
@@ -2998,6 +3034,11 @@ class _TripEditScreenState extends State<TripEditScreen>
     final priceText = _priceController.text.trim();
     _tripData['price'] = priceText.startsWith('₹') ? priceText : '₹$priceText';
     _tripData['image'] = _imageController.text;
+    if (videoUrl.isEmpty) {
+      _tripData.remove('videoUrl');
+    } else {
+      _tripData['videoUrl'] = videoUrl;
+    }
     _tripData['groupSize'] = _groupSizeController.text;
     _tripData['pickupPoint'] = _pickupPointController.text;
 

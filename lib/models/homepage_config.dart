@@ -15,6 +15,16 @@ class HomepageConfig {
     'pages': websitePagesDefaults,
     'tripGallery': {'autoSlide': true, 'intervalSeconds': 5},
     'destinationSlider': {'autoSlide': true, 'intervalSeconds': 5},
+    'calendarHolidays': [
+      {'date': '2026-12-25', 'name': 'Christmas Day'},
+      {'date': '2027-01-01', 'name': 'New Year’s Day'},
+      {'date': '2027-01-26', 'name': 'Republic Day'},
+    ],
+    'tripDisplayOrder': {
+      'explore': <String>[],
+      'weekend': <String>[],
+      'all': <String>[],
+    },
     'discovery': {
       'enabled': true,
       'showSearch': true,
@@ -121,6 +131,26 @@ class HomepageConfig {
     FooterConfig.validate(data['footer'] as Map<String, dynamic>);
     if ((data['discovery'] as Map).values.any((value) => value is! bool)) {
       throw const FormatException('Discovery settings must be booleans.');
+    }
+    final holidays = data['calendarHolidays'];
+    final holidayDates = <String>{};
+    if (holidays is! List || holidays.any((item) {
+      if (item is! Map || item['date'] is! String || item['name'] is! String) return true;
+      final day = item['date'] as String;
+      final name = (item['name'] as String).trim();
+      final parsed = DateTime.tryParse(day);
+      return !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(day) ||
+          parsed == null || parsed.toIso8601String().substring(0, 10) != day ||
+          name.isEmpty || name.length > 80 || !holidayDates.add(day);
+    })) {
+      throw const FormatException('Calendar holidays need a valid date and name.');
+    }
+    for (final order in (data['tripDisplayOrder'] as Map).values) {
+      if (order is! List ||
+          order.any((id) => id is! String || !RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(id)) ||
+          order.toSet().length != order.length) {
+        throw const FormatException('Trip display orders need unique trip IDs.');
+      }
     }
     for (final section in ['tripGallery', 'destinationSlider']) {
       final gallery = data[section] as Map;

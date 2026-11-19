@@ -2,7 +2,7 @@ name: trip_manager_app
 description: "Trip Manager App for Team Weekend Trekkers - Manage trips from mobile"
 publish_to: 'none'
 
-version: 1.26.0+34
+version: 1.27.0+35
 
 environment:
   sdk: ^3.10.4
