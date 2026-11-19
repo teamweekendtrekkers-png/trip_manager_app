@@ -1049,6 +1049,26 @@ void main() {
     expect(tester.widget<TextField>(find.byKey(const ValueKey('homepage-hero-title'))).controller!.text, 'Unfinished headline');
     expect(tester.takeException(), isNull);
   });
+  testWidgets('publishes a separate recommended order for one trip list', (tester) async {
+    final github = await openEditor(tester);
+    await tapKey(tester, 'homepage-group-Destinations');
+    final weekend = find.text('This Weekend');
+    await tester.ensureVisible(weekend);
+    await tester.tap(weekend);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Move Beta up'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Apply order'));
+    await tester.pumpAndSettle();
+    await publish(tester);
+    final saved = HomepageConfig.parse(github.calls.single.values.single).toJson();
+    expect(saved['tripDisplayOrder'], {
+      'explore': [],
+      'weekend': ['b', 'a', 'inactive'],
+      'all': [],
+    });
+  });
+
   if (!Platform.isAndroid) {
     for (final dark in [false, true]) {
       testWidgets('homepage editor golden ${dark ? 'dark' : 'light'}', (
