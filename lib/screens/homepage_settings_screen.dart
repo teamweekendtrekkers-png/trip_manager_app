@@ -703,7 +703,17 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
       children: [
         for (final group in groups.entries)
           ExpansionTile(
+            leading: Icon(switch (group.key) {
+              'Departure dates' => Icons.event_outlined,
+              'Trip card' => Icons.style_outlined,
+              _ => Icons.navigation_outlined,
+            }),
             title: Text(group.key),
+            subtitle: Text(switch (group.key) {
+              'Departure dates' => 'Colour the next three date chips',
+              'Trip card' => 'Price and action button colours',
+              _ => 'Home, This Weekend, Calendar, All Departures and WhatsApp',
+            }),
             children: [
               for (final part in group.value.entries)
                 Padding(
@@ -1029,6 +1039,16 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                       _text('hero', 'description', 'Description', lines: 3),
                     ],
                     if (_group == 'All' || _group == 'Appearance') ...[
+                      if (_group == 'Appearance')
+                        Card(
+                          child: ExpansionTile(
+                            leading: const Icon(Icons.palette_outlined),
+                            title: const Text('Card and tab colours'),
+                            subtitle: const Text('Choose colours for individual website elements'),
+                            initiallyExpanded: true,
+                            children: [_partColourEditor()],
+                          ),
+                        ),
                       ExpansionTile(
                         title: const Text('Colours, photos & animations'),
                         initiallyExpanded: _group == 'Appearance',
@@ -1234,10 +1254,6 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                             ],
                           ),
                         ],
-                      ),
-                      ExpansionTile(
-                        title: const Text('Card and tab colours'),
-                        children: [_partColourEditor()],
                       ),
                       const SizedBox(height: 16),
                     ],

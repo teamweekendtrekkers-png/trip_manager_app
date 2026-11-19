@@ -470,28 +470,38 @@ class _TripsListScreenState extends State<TripsListScreen> {
                   }),
                 ),
               ),
-              for (final group in _moreToolGroups.entries) ...[
-                ListTile(
-                  dense: true,
-                  title: Text(
-                    group.key,
-                    style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
+              for (final group in _moreToolGroups.entries)
+                Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: ExpansionTile(
+                    leading: Icon(
+                      group.value.first.icon,
                       color: Theme.of(ctx).colorScheme.primary,
-                      fontWeight: FontWeight.w700,
                     ),
+                    title: Text(group.key),
+                    subtitle: Text(switch (group.key) {
+                      'Departures & pricing' => 'Dates, availability, UPI and coupons',
+                      'Website & libraries' => 'Pages, colours, photos and reusable content',
+                      'Reports & publishing' => 'Customer journey, deployment and history',
+                      _ => 'Repository connection and app preferences',
+                    }),
+                    initiallyExpanded: group.value.contains(_workspace),
+                    children: [
+                      for (final destination in group.value)
+                        ListTile(
+                          leading: Icon(destination.icon),
+                          title: Text(destination.label),
+                          subtitle: Text(destination.description),
+                          selected: destination == _workspace,
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            _openDestination(destination);
+                          },
+                        ),
+                    ],
                   ),
                 ),
-                for (final destination in group.value)
-                  ListTile(
-                    leading: Icon(destination.icon),
-                    title: Text(destination.label),
-                    subtitle: Text(destination.description),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _openDestination(destination);
-                    },
-                  ),
-              ],
             ],
           ),
         ),
