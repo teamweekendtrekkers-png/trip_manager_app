@@ -32,6 +32,19 @@ class HomepageConfig {
       'showWeekendFilter': true,
     },
     'presentation': {
+      'partColours': {
+        'dateFirst': 'default',
+        'dateSecond': 'default',
+        'dateThird': 'default',
+        'cardPrice': 'default',
+        'cardDetails': 'default',
+        'cardHelp': 'default',
+        'navHome': 'default',
+        'navWeekend': 'default',
+        'navCalendar': 'default',
+        'navAll': 'default',
+        'navWhatsapp': 'default',
+      },
       'preset': 'forest',
       'heroMobileImage': '',
       'heroFocalPoint': 'center',
@@ -167,6 +180,10 @@ class HomepageConfig {
       throw const FormatException('Website page fields must be text up to 4000 characters.');
     }
     final presentation = data['presentation'] as Map<String, dynamic>;
+    const allowedColours = ['default', 'teal', 'blue', 'purple', 'orange', 'gold', 'rose', 'green'];
+    if ((presentation['partColours'] as Map).values.any((value) => !allowedColours.contains(value))) {
+      throw const FormatException('Choose a colour from the available palette.');
+    }
     if (!['forest', 'ocean', 'earth'].contains(presentation['preset']) ||
         !['center', 'top', 'bottom', 'left', 'right'].contains(presentation['heroFocalPoint']) ||
         !['center', 'top', 'bottom', 'left', 'right'].contains(presentation['heroMobileFocalPoint']) ||

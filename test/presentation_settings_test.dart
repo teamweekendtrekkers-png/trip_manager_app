@@ -12,10 +12,10 @@ void main() {
     expect(config['presentation']['heroSlides'], isEmpty);
   });
   test('hero controls preserve safe photos and reject unsupported palettes and injected paths', () {
-    final valid = {'animationsEnabled':true, 'preset':'ocean', 'heroMobileImage':'images/mobile.jpg', 'heroFocalPoint':'top', 'heroMobileFocalPoint':'bottom', 'heroMotion':true, 'heroSlides':['images/second.jpg','https://example.com/third.webp']};
+    final valid = {'partColours': {...(HomepageConfig.initial().toJson()['presentation']['partColours'] as Map), 'navCalendar':'blue'}, 'animationsEnabled':true, 'preset':'ocean', 'heroMobileImage':'images/mobile.jpg', 'heroFocalPoint':'top', 'heroMobileFocalPoint':'bottom', 'heroMotion':true, 'heroSlides':['images/second.jpg','https://example.com/third.webp']};
     expect(HomepageConfig.parse(jsonEncode({'version':1, 'presentation':valid})).toJson()['presentation'], valid);
     for (final invalid in [
-      {...valid,'preset':'custom-red'}, {...valid,'heroMobileImage':'images/../secret'},
+      {...valid,'partColours':{'navCalendar':'invalid'}}, {...valid,'preset':'custom-red'}, {...valid,'heroMobileImage':'images/../secret'},
       {...valid,'heroMotion':'true'}, {...valid,'animationsEnabled':'true'}, {...valid,'heroSlides':['images/1.jpg','images/2.jpg','images/3.jpg']},
       {...valid,'heroFocalPoint':'50%;evil'}, {...valid,'heroSlides':['javascript:alert(1)']},
     ]) {
