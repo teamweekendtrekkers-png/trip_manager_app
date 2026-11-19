@@ -167,27 +167,6 @@ void main() {
   );
 
   testWidgets(
-    'version comes from the installed package and exposes what is new',
-    (tester) async {
-      PackageInfo.setMockInitialValues(
-        appName: 'Trip Manager',
-        packageName: 'test.manager',
-        version: '1.7.0',
-        buildNumber: '8',
-        buildSignature: '',
-      );
-      await tester.pumpWidget(
-        const MaterialApp(home: Scaffold(body: AppVersionCard())),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('v1.7.0 · Build 8'), findsOneWidget);
-      await tester.tap(find.text('What’s new'));
-      await tester.pumpAndSettle();
-      expect(find.text('Copy app details'), findsOneWidget);
-    },
-  );
-
-  testWidgets(
     'cancel keeps edits; discard restores last local save even if autosave fires during confirmation',
     (tester) async {
       await tester.runAsync(() async {

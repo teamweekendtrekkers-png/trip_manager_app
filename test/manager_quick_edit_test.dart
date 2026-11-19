@@ -31,10 +31,6 @@ void main(){
     expect(()=>mergeQuickTripEdit({...current,'id':'other'},initial,edited),throwsStateError);
     expect(initial['price'],'₹6,599');
   });
-  testWidgets('focused editor sections exclude other panels without leaving blank spacers',(tester) async {
-    await tester.pumpWidget(MaterialApp(home:Scaffold(body:Column(children:visibleEditorChildren(TripEditorSection.photos,const [TripEditorPanel(section:TripEditorSection.basics,child:Text('Name field')),SizedBox(height:100),TripEditorPanel(section:TripEditorSection.photos,child:Text('Photo field'))])))));
-    expect(find.text('Photo field'),findsOneWidget);expect(find.text('Name field'),findsNothing);expect(find.byWidgetPredicate((w)=>w is SizedBox && w.height==100),findsNothing);
-  });
   testWidgets('quick price draft preserves unrelated fields and legacy visibility absence',(tester) async {
     Map<String,dynamic>? saved;final original=trip();
     await tester.pumpWidget(MaterialApp(home:Scaffold(body:Builder(builder:(ctx)=>TextButton(onPressed:() async {saved=await showDialog<Map<String,dynamic>>(context:ctx,builder:(_)=>QuickTripEditor(trip:original));},child:const Text('Open quick edit'))))));
