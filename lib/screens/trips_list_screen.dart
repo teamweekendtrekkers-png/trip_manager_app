@@ -413,6 +413,27 @@ class _TripsListScreenState extends State<TripsListScreen> {
     );
   }
 
+  static const _moreToolGroups = <String, List<ManagerDestination>>{
+    'Departures & pricing': [
+      ManagerDestination.departureManagement,
+      ManagerDestination.batches,
+      ManagerDestination.payments,
+    ],
+    'Website & libraries': [
+      ManagerDestination.homepage,
+      ManagerDestination.library,
+      ManagerDestination.reusableLibrary,
+      ManagerDestination.sharedContent,
+    ],
+    'Reports & publishing': [
+      ManagerDestination.analytics,
+      ManagerDestination.deployment,
+      ManagerDestination.history,
+      ManagerDestination.health,
+    ],
+    'App settings': [ManagerDestination.settings],
+  };
+
   void _showMoreTools() {
     showModalBottomSheet<void>(
       context: context,
@@ -439,29 +460,38 @@ class _TripsListScreenState extends State<TripsListScreen> {
                       }
                     : null,
               ),
-              for (final destination in [
-                ManagerDestination.dashboard,
-                ManagerDestination.library,
-                ManagerDestination.reusableLibrary,
-                ManagerDestination.history,
-                ManagerDestination.payments,
-                ManagerDestination.bookingReview,
-                ManagerDestination.analytics,
-                ManagerDestination.departureManagement,
-                ManagerDestination.sharedContent,
-                ManagerDestination.deployment,
-                ManagerDestination.health,
-                ManagerDestination.settings,
-              ])
-                ListTile(
-                  leading: Icon(destination.icon),
-                  title: Text(destination.label),
-                  subtitle: Text(destination.description),
-                  onTap: () {
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: ManagerToolFinder(onSelected: (destination) {
                     Navigator.pop(ctx);
                     _openDestination(destination);
-                  },
+                  }),
                 ),
+              ),
+              for (final group in _moreToolGroups.entries) ...[
+                ListTile(
+                  dense: true,
+                  title: Text(
+                    group.key,
+                    style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                for (final destination in group.value)
+                  ListTile(
+                    leading: Icon(destination.icon),
+                    title: Text(destination.label),
+                    subtitle: Text(destination.description),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _openDestination(destination);
+                    },
+                  ),
+              ],
             ],
           ),
         ),
