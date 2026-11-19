@@ -81,6 +81,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
       'Description': 'Hero|hero.description',
       'Mobile cover and crop': 'Appearance|presentation.heroMobileImage',
       'Website animations and colours': 'Appearance',
+      'Date chips, trip cards and mobile tab colours': 'Appearance',
       'Trip photo slideshow and timing': 'Trip gallery',
       'About and Contact pages, banner headings and navigation': 'Pages',
       'Upcoming trips and date selection': 'Upcoming Batches',
@@ -667,6 +668,78 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
     });
   }
 
+  Widget _partColourEditor() {
+    final values = _draft!['presentation']['partColours'] as Map;
+    const choices = {
+      'default': ('Site default', Color(0xff657b70)),
+      'teal': ('Teal', Color(0xff0b6259)),
+      'blue': ('Blue', Color(0xff254f82)),
+      'purple': ('Purple', Color(0xff593984)),
+      'orange': ('Burnt orange', Color(0xff904017)),
+      'gold': ('Gold', Color(0xffdbab37)),
+      'rose': ('Rose', Color(0xff8c3555)),
+      'green': ('Forest green', Color(0xff245c33)),
+    };
+    const groups = {
+      'Departure dates': {
+        'dateFirst': 'First date',
+        'dateSecond': 'Second date',
+        'dateThird': 'Third date',
+      },
+      'Trip card': {
+        'cardPrice': 'Trip price',
+        'cardDetails': 'View trip button',
+        'cardHelp': 'Help me choose button',
+      },
+      'Mobile tabs': {
+        'navHome': 'Home',
+        'navWeekend': 'This Weekend',
+        'navCalendar': 'Calendar',
+        'navAll': 'All Departures',
+        'navWhatsapp': 'WhatsApp',
+      },
+    };
+    return Column(
+      children: [
+        for (final group in groups.entries)
+          ExpansionTile(
+            title: Text(group.key),
+            children: [
+              for (final part in group.value.entries)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey('part-colour-${part.key}-${values[part.key]}'),
+                    initialValue: values[part.key] as String,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: part.value,
+                      border: const OutlineInputBorder(),
+                    ),
+                    items: [
+                      for (final choice in choices.entries)
+                        DropdownMenuItem(
+                          value: choice.key,
+                          child: Row(
+                            children: [
+                              Icon(Icons.circle, size: 14, color: choice.value.$2),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text(choice.value.$1)),
+                            ],
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) setState(() => values[part.key] = value);
+                    },
+                  ),
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+
   Widget _backgroundPreview() {
     final path = _hero['backgroundImage'] as String;
     final url = path.startsWith('https://')
@@ -1161,6 +1234,10 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                             ],
                           ),
                         ],
+                      ),
+                      ExpansionTile(
+                        title: const Text('Card and tab colours'),
+                        children: [_partColourEditor()],
                       ),
                       const SizedBox(height: 16),
                     ],
