@@ -1,4 +1,7 @@
 import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:provider/provider.dart';
+import '../providers/trips_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -27,6 +30,73 @@ int? compareManagerVersions(String release, String installed) {
   return 0;
 }
 
+Future<void> confirmManagerClose(BuildContext context) async {
+  final workspace = context.read<TripsProvider?>();
+  final platform = Theme.of(context).platform;
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialog) => AlertDialog(
+      title: const Text('Close Trip Manager?'),
+      content: Text(
+        workspace?.hasUnsavedChanges == true
+            ? 'Your workspace has unpublished changes. Save a draft before closing if you want to keep editing later.'
+            : 'You can open Trip Manager again whenever you need it.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialog, false),
+          child: const Text('Keep open'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(dialog, true),
+          child: const Text('Close app'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+  await workspace?.flushDraft();
+  if (!context.mounted) return;
+  if (workspace?.draftError != null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'The workspace draft could not be saved. Trip Manager is still open.',
+        ),
+      ),
+    );
+    return;
+  }
+  if (platform == TargetPlatform.android) {
+    await SystemNavigator.pop();
+  } else {
+    await ServicesBinding.instance.exitApplication(ui.AppExitType.cancelable);
+  }
+}
+
+void showManagerUpdates(BuildContext context) {
+  showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('App updates'),
+      content: const SizedBox(
+        width: 460,
+        child: SingleChildScrollView(child: AppVersionCard()),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => confirmManagerClose(context),
+          child: const Text('Close app'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close window'),
+        ),
+      ],
+    ),
+  );
+}
+
 class AppVersionCard extends StatefulWidget {
   const AppVersionCard({super.key, this.compact = false, this.updateClient});
   final bool compact;
@@ -39,6 +109,8 @@ class _AppVersionCardState extends State<AppVersionCard> {
   PackageInfo? info;
   bool checking = false;
   String? status;
+  Uri? updateDownload;
+  String? updateLabel;
   @override
   void initState() {
     super.initState();
@@ -55,7 +127,12 @@ class _AppVersionCardState extends State<AppVersionCard> {
   Future<void> checkUpdates() async {
     if (info == null) return;
     final platform = Theme.of(context).platform;
-    setState(() => checking = true);
+    setState(() {
+      checking = true;
+      status = null;
+      updateDownload = null;
+      updateLabel = null;
+    });
     final client =
         widget.updateClient ??
         Dio(
@@ -65,6 +142,8 @@ class _AppVersionCardState extends State<AppVersionCard> {
           ),
         );
     String message;
+    Uri? download;
+    String? downloadLabel;
     try {
       const api =
           'https://api.github.com/repos/teamweekendtrekkers-png/trip_manager_app';
@@ -94,10 +173,11 @@ class _AppVersionCardState extends State<AppVersionCard> {
           : platform == TargetPlatform.windows
           ? 'trip-manager-windows-x64'
           : '';
-      final hasDownload = ((artifacts.data as Map)['artifacts'] as List).any(
-        (item) =>
-            item is Map && item['name'] == name && item['expired'] == false,
-      );
+      final matching = ((artifacts.data as Map)['artifacts'] as List)
+          .whereType<Map>()
+          .where((item) => item['name'] == name && item['expired'] == false);
+      final artifactId = matching.firstOrNull?['id']?.toString() ?? '';
+      final hasDownload = RegExp(r'^[0-9]+$').hasMatch(artifactId);
       final manifest = await client.get(
         'https://raw.githubusercontent.com/teamweekendtrekkers-png/trip_manager_app/$sha/pubspec.yaml',
         options: Options(responseType: ResponseType.plain),
@@ -117,10 +197,19 @@ class _AppVersionCardState extends State<AppVersionCard> {
           : !hasDownload
           ? 'Latest build is $tag, but its download is unavailable for this device.'
           : comparison > 0
-          ? 'Update available: $tag. Open downloads to get it. GitHub sign-in may be required.'
+          ? 'Update available: $tag. GitHub sign-in may be required to download it.'
           : comparison == 0
           ? 'You’re up to date with the latest successful manager build.'
           : 'This installed build is newer than the latest successful manager build ($tag).';
+      if (hasDownload && comparison != null && comparison > 0) {
+        download = Uri.https(
+          'github.com',
+          '/teamweekendtrekkers-png/trip_manager_app/actions/runs/$id/artifacts/$artifactId',
+        );
+        downloadLabel = platform == TargetPlatform.android
+            ? 'Download Android update'
+            : 'Download Windows update';
+      }
     } on DioException {
       message =
           'Could not check for updates. Check your connection or try again later.';
@@ -134,7 +223,19 @@ class _AppVersionCardState extends State<AppVersionCard> {
       setState(() {
         checking = false;
         status = message;
+        updateDownload = download;
+        updateLabel = downloadLabel;
       });
+  }
+
+  Future<void> openDownload(Uri url) async {
+    try {
+      if (await launchUrl(url, mode: LaunchMode.externalApplication)) return;
+    } catch (_) {
+      // The system browser can be unavailable on managed devices.
+    }
+    if (mounted)
+      setState(() => status = 'Could not open downloads. Try again.');
   }
 
   void details() => showDialog<void>(
@@ -207,7 +308,7 @@ class _AppVersionCardState extends State<AppVersionCard> {
         leading: const Icon(Icons.info_outline),
         title: Text(label),
         subtitle: const Text('Version & what’s new'),
-        onTap: details,
+        onTap: () => showManagerUpdates(context),
       );
     return Card(
       child: Padding(
@@ -222,7 +323,14 @@ class _AppVersionCardState extends State<AppVersionCard> {
               subtitle: const Text('Installed manager app'),
               onTap: details,
             ),
-            if (status != null) Text(status!),
+            if (status != null)
+              Semantics(liveRegion: true, child: Text(status!)),
+            if (updateDownload case final Uri uri)
+              FilledButton.icon(
+                onPressed: () => openDownload(uri),
+                icon: const Icon(Icons.download),
+                label: Text(updateLabel!),
+              ),
             Wrap(
               spacing: 8,
               children: [
@@ -239,16 +347,7 @@ class _AppVersionCardState extends State<AppVersionCard> {
                 ),
                 TextButton(onPressed: details, child: const Text('What’s new')),
                 TextButton(
-                  onPressed: () async {
-                    final opened = await launchUrl(
-                      Uri.parse(managerReleasesUrl),
-                      mode: LaunchMode.externalApplication,
-                    );
-                    if (!opened && mounted)
-                      setState(
-                        () => status = 'Could not open downloads. Try again.',
-                      );
-                  },
+                  onPressed: () => openDownload(Uri.parse(managerReleasesUrl)),
                   child: const Text('Open downloads'),
                 ),
               ],
@@ -259,4 +358,3 @@ class _AppVersionCardState extends State<AppVersionCard> {
     );
   }
 }
-

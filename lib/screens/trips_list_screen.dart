@@ -1,3 +1,4 @@
+import '../widgets/app_version_card.dart';
 import '../models/homepage_config.dart';
 import '../services/homepage_settings_service.dart';
 import '../services/github_service.dart';
@@ -469,6 +470,23 @@ class _TripsListScreenState extends State<TripsListScreen> {
                     _openDestination(destination);
                   }),
                 ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.system_update_outlined),
+                title: const Text('App updates'),
+                subtitle: const Text('Check for a new Android or Windows build'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  showManagerUpdates(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.exit_to_app),
+                title: const Text('Close app'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  confirmManagerClose(context);
+                },
               ),
               for (final group in _moreToolGroups.entries)
                 Card(

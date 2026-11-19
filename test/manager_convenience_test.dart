@@ -119,6 +119,7 @@ void main() {
                 'artifacts': [
                   {
                     'name': 'trip-manager-windows-x64',
+                    'id': 123,
                     'expired': scenario == 'expired',
                   },
                 ],
@@ -150,6 +151,7 @@ void main() {
         _ => 'Could not check for updates',
       };
       expect(find.textContaining(expected), findsOneWidget);
+      expect(find.text('Download Windows update'), scenario == 'newer' ? findsOneWidget : findsNothing);
       client.close();
     });
   }
