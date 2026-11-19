@@ -1414,13 +1414,27 @@ class _TripEditScreenState extends State<TripEditScreen>
     final current = List<String>.from(_tripData['thingsToCarry'] ?? []);
     final result = await showDialog<List<String>>(
       context: context,
-      builder: (_) => CarryLibraryDialog(current: current,
-        store: ReusableLibraryStore(kind: 'carry', scope: DraftStore.scope(context.read<SettingsProvider>().settings)),
-        entries: buildCarryLibrary([...context.read<TripsProvider>().trips, _tripData])),
+      builder: (_) => CarryLibraryDialog(
+        current: current,
+        store: ReusableLibraryStore(
+          kind: 'carry',
+          scope: DraftStore.scope(context.read<SettingsProvider>().settings),
+        ),
+        entries: buildCarryLibrary([
+          ...context.read<TripsProvider>().trips,
+          _tripData,
+        ]),
+      ),
     );
     if (!mounted || result == null) return;
     setState(() => _tripData['thingsToCarry'] = result);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Packing items added to this draft. Other trips are unchanged.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Packing items added to this draft. Other trips are unchanged.',
+        ),
+      ),
+    );
   }
 
   Widget _buildListSection({
@@ -2220,7 +2234,14 @@ class _TripEditScreenState extends State<TripEditScreen>
     ]);
     final result = await showDialog<List<Map<String, dynamic>>>(
       context: context,
-      builder: (_) => PickupLibraryDialog(entries: entries, current: current, store: ReusableLibraryStore(kind: 'pickup', scope: DraftStore.scope(context.read<SettingsProvider>().settings))),
+      builder: (_) => PickupLibraryDialog(
+        entries: entries,
+        current: current,
+        store: ReusableLibraryStore(
+          kind: 'pickup',
+          scope: DraftStore.scope(context.read<SettingsProvider>().settings),
+        ),
+      ),
     );
     if (!mounted || result == null) return;
     setState(() => _tripData['boardingLocations'] = result);
@@ -2624,6 +2645,7 @@ class _TripEditScreenState extends State<TripEditScreen>
                 ? theme.colorScheme.outline
                 : Colors.green;
 
+            final special = _departurePricing[range?.key] as Map?;
             return Card(
               key: ValueKey('date-range-$index'),
               margin: const EdgeInsets.only(bottom: 8),
@@ -2633,10 +2655,21 @@ class _TripEditScreenState extends State<TripEditScreen>
                   color: statusColor,
                 ),
                 title: Text(label),
-                subtitle: Text(status, style: TextStyle(color: statusColor)),
+                subtitle: Text(
+                  special == null
+                      ? status
+                      : '$status · ₹${special['price']} per traveller',
+                  style: TextStyle(color: statusColor),
+                ),
                 trailing: Wrap(
                   spacing: 0,
                   children: [
+                    if (range != null && !duplicate && !expired)
+                      IconButton(
+                        tooltip: 'Set departure price',
+                        onPressed: () => _editDeparturePrice(range.key, label),
+                        icon: const Icon(Icons.currency_rupee),
+                      ),
                     IconButton(
                       key: ValueKey('edit-date-$index'),
                       tooltip: 'Edit date range',
@@ -2647,7 +2680,12 @@ class _TripEditScreenState extends State<TripEditScreen>
                       key: ValueKey('remove-date-$index'),
                       tooltip: 'Remove date range',
                       onPressed: () {
-                        setState(() => _availableDates.removeAt(index));
+                        setState(() {
+                          _availableDates.removeAt(index);
+                          final prices = _departurePricing;
+                          if (!duplicate) prices.remove(range?.key);
+                          _tripData['departurePricing'] = prices;
+                        });
                       },
                       icon: const Icon(Icons.delete_outline),
                     ),
@@ -2658,6 +2696,84 @@ class _TripEditScreenState extends State<TripEditScreen>
           }),
       ],
     );
+  }
+
+  Map<String, dynamic> get _departurePricing =>
+      Map<String, dynamic>.from(_tripData['departurePricing'] as Map? ?? {});
+
+  Future<void> _editDeparturePrice(String key, String date) async {
+    final current = _departurePricing[key] as Map?;
+    var price = current?['price']?.toString() ?? '';
+    var note = current?['note']?.toString() ?? '';
+    final form = GlobalKey<FormState>();
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Departure price'),
+        content: Form(
+          key: form,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(date),
+                TextFormField(
+                  initialValue: price,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Price per traveller (₹)',
+                    helperText: 'Leave blank to use the standard trip price',
+                  ),
+                  onChanged: (value) => price = value,
+                  validator: (value) {
+                    final input = value?.trim() ?? '';
+                    final amount = int.tryParse(input);
+                    return input.isEmpty ||
+                            (amount != null &&
+                                amount > 0 &&
+                                amount <= 1000000000)
+                        ? null
+                        : 'Enter a positive amount in whole rupees';
+                  },
+                ),
+                TextFormField(
+                  initialValue: note,
+                  maxLength: 120,
+                  decoration: const InputDecoration(
+                    labelText: 'Note shown to travellers',
+                    hintText: 'Long weekend pricing',
+                  ),
+                  onChanged: (value) => note = value,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (form.currentState!.validate()) Navigator.pop(context, true);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (result != true || !mounted) return;
+    setState(() {
+      final prices = _departurePricing;
+      final amount = int.tryParse(price.trim());
+      if (amount == null) {
+        prices.remove(key);
+      } else {
+        prices[key] = {'price': amount, 'note': note.trim()};
+      }
+      _tripData['departurePricing'] = prices;
+    });
   }
 
   Future<void> _pickDateRange({int? index, bool duplicate = false}) async {
@@ -2724,6 +2840,12 @@ class _TripEditScreenState extends State<TripEditScreen>
             values.add(range.key);
             _tripData[field] = values;
           }
+        }
+        final prices = _departurePricing;
+        final special = prices.remove(oldKey);
+        if (special != null) {
+          prices[range.key] = special;
+          _tripData['departurePricing'] = prices;
         }
         _availableDates[index] = canonical;
       }

@@ -367,6 +367,24 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
                                 SelectableText(
                                   'Amount reported: ₹${report['amount']}\nTransaction ID: ${report['transactionId']}\n${report['type'] == 'half' ? '50% advance' : 'Full payment'}',
                                 ),
+                                if (booking['traveller_details']
+                                    case final List details)
+                                  for (final person in details.whereType<Map>())
+                                    ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      title: Text(person['name'].toString()),
+                                      subtitle: SelectableText(
+                                        [
+                                          'Age: ${person['age']}',
+                                          '${person['phone']}',
+                                          '${person['email']}',
+                                          if (person['pickup'] is String &&
+                                              (person['pickup'] as String)
+                                                  .isNotEmpty)
+                                            'Pickup: ${person['pickup']}',
+                                        ].join('\n'),
+                                      ),
+                                    ),
                                 if (booking['payment_review_note']
                                         ?.toString()
                                         .isNotEmpty ==
