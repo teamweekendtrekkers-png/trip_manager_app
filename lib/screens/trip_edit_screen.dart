@@ -2683,8 +2683,9 @@ class _TripEditScreenState extends State<TripEditScreen>
                         setState(() {
                           _availableDates.removeAt(index);
                           final prices = _departurePricing;
-                          if (!duplicate) prices.remove(range?.key);
-                          _tripData['departurePricing'] = prices;
+                          if (!duplicate && prices.remove(range?.key) != null) {
+                            _saveDeparturePrices(prices);
+                          }
                         });
                       },
                       icon: const Icon(Icons.delete_outline),
@@ -2700,6 +2701,14 @@ class _TripEditScreenState extends State<TripEditScreen>
 
   Map<String, dynamic> get _departurePricing =>
       Map<String, dynamic>.from(_tripData['departurePricing'] as Map? ?? {});
+
+  void _saveDeparturePrices(Map<String, dynamic> prices) {
+    if (prices.isEmpty) {
+      _tripData.remove('departurePricing');
+    } else {
+      _tripData['departurePricing'] = prices;
+    }
+  }
 
   Future<void> _editDeparturePrice(String key, String date) async {
     final current = _departurePricing[key] as Map?;
@@ -2772,7 +2781,7 @@ class _TripEditScreenState extends State<TripEditScreen>
       } else {
         prices[key] = {'price': amount, 'note': note.trim()};
       }
-      _tripData['departurePricing'] = prices;
+      _saveDeparturePrices(prices);
     });
   }
 

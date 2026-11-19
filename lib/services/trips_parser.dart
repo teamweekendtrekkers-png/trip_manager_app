@@ -13,6 +13,7 @@ class TripsParser {
     'maxTravellers',
     'isBestseller',
     'contentSections',
+    'departurePricing',
     'publicSlug',
       'batchColor',
     'previousSlugs',
@@ -230,6 +231,23 @@ class TripsParser {
         : <String>[];
   }
 
+  static List<String> _departurePricingErrors(Map<String, dynamic> trip) {
+    if (!trip.containsKey('departurePricing')) return [];
+    final pricing = trip['departurePricing'];
+    if (pricing is! Map ||
+        pricing.entries.any((entry) {
+          final value = entry.value;
+          if (entry.key is! String || value is! Map) return true;
+          final price = value['price'];
+          final note = value['note'];
+          return price is! int || price <= 0 || price > 1000000000 ||
+              (note != null && (note is! String || note.length > 120));
+        })) {
+      return ['Departure prices must be positive whole rupee amounts with notes of at most 120 characters.'];
+    }
+    return [];
+  }
+
   static List<String> _validateSourceTrip(
     String tripId,
     Map<String, dynamic> source,
@@ -241,6 +259,7 @@ class TripsParser {
       ).map((error) => 'Trip "$tripId": $error'),
     );
     errors.addAll(_travellerLimitErrors(source));
+    errors.addAll(_departurePricingErrors(source));
     if(source.containsKey('batchColor')&&!_batchColors.contains(source['batchColor']))errors.add('Invalid upcoming batch colour.');
     const stringFields = {
       'publicSlug',
@@ -403,6 +422,7 @@ class TripsParser {
       'soldOutDepartures',
       'maxTravellers',
       'contentSections',
+      'departurePricing',
       'publicSlug',
       'batchColor',
       'previousSlugs',
@@ -644,6 +664,9 @@ class TripsParser {
       writeStringField('bestTime', const ['bestTime']);
       writeStringField('duration', const ['duration']);
       writeStringListField('availableDates', const ['availableDates']);
+      if (trip.containsKey('departurePricing')) {
+        buffer.writeln('        departurePricing: ${jsonEncode(trip['departurePricing'])},');
+      }
       if (trip.containsKey('closedDepartures')) writeStringListField('closedDepartures', const ['closedDepartures']);
       for (final field in ['confirmedDepartures', 'soldOutDepartures']) {
         if (trip.containsKey(field)) writeStringListField(field, [field]);
@@ -820,6 +843,7 @@ class TripsParser {
     for (var index = 0; index < trips.length; index++) {
       final trip = trips[index];
       errors.addAll(_travellerLimitErrors(trip));
+      errors.addAll(_departurePricingErrors(trip));
       if(trip.containsKey('batchColor')&&!_batchColors.contains(trip['batchColor']))errors.add('Invalid upcoming batch colour.');
       final rawId = trip['id'];
       final id = rawId is String ? rawId : '';

@@ -62,6 +62,17 @@ function getTripData(id) { return tripsData[id]; }
 ''';
 
 void main() {
+  test('preserves a priced departure when reading and publishing', () {
+    final trips = TripsParser.parseTripsData(_fixture);
+    final pricing = {
+      '2026-01-18/2026-01-19': {'price': 4500, 'note': 'Long weekend pricing'},
+    };
+    trips.first['departurePricing'] = pricing;
+    final generated = TripsParser.generateTripsDataJs(trips);
+    expect(TripsParser.parseTripsData(generated).first['departurePricing'], pricing);
+  });
+
+
   group('TripsParser characterization', () {
     test('parses identifiers, aliases, nested editor data, and defaults', () {
       final parsed = TripsParser.parseTripsDocument(_fixture);
