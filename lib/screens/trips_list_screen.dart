@@ -1065,42 +1065,44 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                   if (provider.error != null &&
                                       !provider.hasConflict) {
                                     return Center(
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.error_outline,
-                                            size: 64,
-                                            color: Colors.red[300],
-                                          ),
-                                          const SizedBox(height: 16),
-                                          Text(
-                                            'Error loading trips',
-                                            style: Theme.of(
-                                              context,
-                                            ).textTheme.titleLarge,
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 32,
+                                      child: SingleChildScrollView(
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.error_outline,
+                                              size: 64,
+                                              color: Colors.red[300],
                                             ),
-                                            child: Text(
-                                              provider.error!,
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                color: Colors.grey[600],
+                                            const SizedBox(height: 16),
+                                            Text(
+                                              'Error loading trips',
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.titleLarge,
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Padding(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 32,
+                                              ),
+                                              child: Text(
+                                                provider.error!,
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  color: Colors.grey[600],
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                          const SizedBox(height: 16),
-                                          ElevatedButton.icon(
-                                            onPressed: _confirmAndRefresh,
-                                            icon: const Icon(Icons.refresh),
-                                            label: const Text('Retry'),
-                                          ),
-                                        ],
+                                            const SizedBox(height: 16),
+                                            ElevatedButton.icon(
+                                              onPressed: _confirmAndRefresh,
+                                              icon: const Icon(Icons.refresh),
+                                              label: const Text('Retry'),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     );
                                   }
