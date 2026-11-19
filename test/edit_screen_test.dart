@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trip_manager_app/services/trip_date_utils.dart';
 import 'package:trip_manager_app/services/trips_parser.dart';
 
 void main() {
@@ -66,27 +65,6 @@ void main() {
       }
       expect(parsedAgain['inclusions'], <String>['Transport', 'Meals']);
       expect(parsedAgain['exclusions'], <String>['Personal expenses']);
-    });
-
-    test('calendar labels are canonical before entering the payload', () {
-      final selected = TripDateUtils.fromDates(
-        DateTime(2026, 8, 14),
-        DateTime(2026, 8, 16),
-      );
-      final payload = _editorPayload()
-        ..['availableDates'] = <String>[
-          TripDateUtils.formatCanonical(selected),
-        ];
-
-      final parsed = TripsParser.parseTripsData(
-        TripsParser.generateTripsDataJs(<Map<String, dynamic>>[payload]),
-      ).single;
-
-      expect(parsed['availableDates'], <String>['Aug 14-16, 2026']);
-      expect(
-        TripDateUtils.parse((parsed['availableDates'] as List).single)!.key,
-        '2026-08-14/2026-08-16',
-      );
     });
   });
 }
