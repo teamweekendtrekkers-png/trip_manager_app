@@ -24,14 +24,21 @@ class DiscoverySettingsEditor extends StatelessWidget {
             'enabled': 'Show trip discovery controls',
             'showSearch': 'Destination / trip search',
             'showExperienceFilter': 'Experience categories',
+            'showTripTypeFilter': 'Show trip type filters',
             'showWeekendFilter': 'Upcoming weekend / date filter',
           }.entries)
             SwitchListTile(
               key: ValueKey('homepage-discovery-${entry.key}'),
               contentPadding: EdgeInsets.zero,
               title: Text(entry.value),
+              subtitle: entry.key == 'showTripTypeFilter'
+                  ? const Text('Show the Trip type row on the All Trips page.')
+                  : null,
               value: discovery[entry.key] as bool,
-              onChanged: entry.key == 'enabled' || discovery['enabled'] == true
+              onChanged:
+                  entry.key == 'enabled' ||
+                      entry.key == 'showTripTypeFilter' ||
+                      discovery['enabled'] == true
                   ? (value) => onChanged(entry.key, value)
                   : null,
             ),

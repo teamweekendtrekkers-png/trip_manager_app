@@ -29,6 +29,7 @@ class HomepageConfig {
       'enabled': true,
       'showSearch': true,
       'showExperienceFilter': true,
+      'showTripTypeFilter': true,
       'showWeekendFilter': true,
     },
     'presentation': {
