@@ -26,6 +26,7 @@ import '../services/photo_advice.dart';
 import '../services/trip_date_utils.dart';
 import 'deployment_status_screen.dart';
 import '../widgets/homepage_sections_editor.dart';
+import '../widgets/story_highlights_editor.dart';
 import '../widgets/discovery_settings_editor.dart';
 
 class HomepageSettingsScreen extends StatefulWidget {
@@ -88,6 +89,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
     final choices = {
       'Trip display order and sorting': 'Trip order',
       'Calendar holidays and special dates': 'Calendar',
+      'Instagram story highlights and covers': 'Story highlights',
       'Desktop cover': 'Hero|hero.backgroundImage',
       'Headline': 'Hero|hero.title',
       'Tagline': 'Hero|hero.tagline',
@@ -284,6 +286,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
     final result = copyDocument(jsonDecode(_saved!) as Map);
     final keys = switch (_group) {
       'Hero' => ['hero'],
+      'Story highlights' => ['storyHighlights'],
       'Appearance' => ['presentation'],
       'Trip gallery' => ['tripGallery'],
       'Pages' => ['pages'],
@@ -988,12 +991,15 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                         'Trip gallery',
                       ],
                       selected: switch (_group) {
+                        'Story highlights' => 'Hero',
                         'Calendar' => 'Upcoming Batches',
                         'Trip order' => 'Destinations',
                         _ => _group,
                       },
                       onChanged: (group) => setState(() => _group = group),
                     ),
+                    if (['Hero', 'Story highlights'].contains(_group))
+                      _websiteSubsections(['Hero', 'Story highlights']),
                     if (['Upcoming Batches', 'Calendar'].contains(_group))
                       _websiteSubsections(['Upcoming Batches', 'Calendar']),
                     if (['Destinations', 'Trip order'].contains(_group))
@@ -1038,6 +1044,11 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                         ),
                       ),
                     const SizedBox(height: 20),
+                    if (_group == 'Story highlights')
+                      StoryHighlightsEditor(
+                        value: _draft!['storyHighlights'] as Map<String, dynamic>,
+                        onChanged: (value) => setState(() => _draft!['storyHighlights'] = value),
+                      ),
                     if (_group == 'All' || _group == 'Hero') ...[
                       Text(
                         'Hero / Background',

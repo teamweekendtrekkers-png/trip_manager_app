@@ -12,6 +12,7 @@ class HomepageConfig {
 
   static const defaults = <String, dynamic>{
     'version': 1,
+    'storyHighlights': {'enabled': false, 'items': <Object>[]},
     'pages': websitePagesDefaults,
     'tripGallery': {'autoSlide': true, 'intervalSeconds': 5},
     'destinationSlider': {'autoSlide': true, 'intervalSeconds': 5},
@@ -146,6 +147,16 @@ class HomepageConfig {
     if ((data['discovery'] as Map).values.any((value) => value is! bool)) {
       throw const FormatException('Discovery settings must be booleans.');
     }
+    final stories = data['storyHighlights'] as Map<String, dynamic>;
+    final storyItems = stories['items'];
+    if (stories['enabled'] is! bool || storyItems is! List || storyItems.length > 12 ||
+        storyItems.any((item) => item is! Map ||
+          item['name'] is! String || item['image'] is! String || item['url'] is! String ||
+          !isValidStory(item['name'] as String, item['image'] as String, item['url'] as String))) {
+      throw const FormatException(
+        'Each story needs a name, a cover image and an Instagram Highlight link.',
+      );
+    }
     final holidays = data['calendarHolidays'];
     final holidayDates = <String>{};
     if (holidays is! List || holidays.any((item) {
@@ -271,6 +282,11 @@ class HomepageConfig {
     );
   }
 
+  static bool isValidStory(String name, String image, String url) =>
+      name.trim().isNotEmpty && name.length <= 32 && safeImage(image) &&
+      RegExp(r'^https://(?:www\.)?instagram\.com/stories/highlights/\d+/?(?:\?[^\s]*)?$',
+        caseSensitive: false).hasMatch(url);
+
   static bool safeImage(String value) {
     if (RegExp(r'''[\s"'()<>\\\x00-\x1f]''').hasMatch(value)) return false;
     final uri = Uri.tryParse(value);
@@ -289,6 +305,10 @@ class HomepageConfig {
       Map<String, dynamic>.from(jsonDecode(jsonEncode(_data)) as Map);
   String encode() {
     final data = toJson();
+    final stories = data['storyHighlights'];
+    if (stories['enabled'] == false && (stories['items'] as List).isEmpty) {
+      data.remove('storyHighlights');
+    }
     if (data['sections']['reviews']['source'] == 'manual') {
       (data['sections']['reviews'] as Map).remove('source');
     }
