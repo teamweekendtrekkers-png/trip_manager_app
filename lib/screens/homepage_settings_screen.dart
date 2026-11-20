@@ -79,7 +79,9 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
       for (final section in sections)
         ChoiceChip(
           label: Text(section == 'Calendar' ? 'Calendar holidays' : section),
-          selected: _group == section,
+          selected:
+              _group == section ||
+              (_group == 'Destinations' && section == 'Trip discovery'),
           onSelected: (_) => setState(() => _group = section),
         ),
     ],
@@ -96,12 +98,15 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
       'Description': 'Hero|hero.description',
       'Mobile cover and crop': 'Appearance|presentation.heroMobileImage',
       'Website animations and colours': 'Appearance',
-      'Date chips, trip cards and mobile tab colours': 'Appearance',
+      'Departure date colours': 'Date colours',
+      'Trip card colours': 'Card colours',
+      'Mobile navigation tab colours': 'Mobile tab colours',
       'Trip photo slideshow and timing': 'Trip gallery',
       'About and Contact pages, banner headings and navigation': 'Pages',
       'Upcoming trips and date selection': 'Upcoming Batches',
-      'Trip discovery and Featured visibility': 'Destinations',
-      'Explore Destinations automatic slideshow and timing': 'Destinations',
+      'Trip discovery, filters and Featured visibility': 'Trip discovery',
+      'Explore Destinations automatic slideshow and timing':
+          'Destination slideshow',
       'Statistics, How it works, Why choose us': 'Information',
       'Google Reviews and rating': 'Reviews',
       'Footer, contact, social links, UPI visibility': 'Footer',
@@ -293,11 +298,23 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
       'Upcoming Batches' => ['upcomingBatches'],
       'Calendar' => ['calendarHolidays'],
       'Trip order' => ['tripDisplayOrder'],
-      'Destinations' => ['discovery', 'destinationSlider'],
+      'Destinations' || 'Trip discovery' => ['discovery'],
+      'Destination slideshow' => ['destinationSlider'],
       'Footer' => ['footer'],
       _ => <String>[],
     };
     for (final key in keys) result[key] = copyDocument(_draft!)[key];
+    if (_group == 'Appearance') {
+      final saved = jsonDecode(_saved!) as Map;
+      result['presentation']['partColours'] =
+          saved['presentation']['partColours'];
+    } else if (_partColourGroups.containsKey(_group)) {
+      final published = result['presentation']['partColours'] as Map;
+      final draft = _draft!['presentation']['partColours'] as Map;
+      for (final key in _partColourGroups[_group]!.keys) {
+        published[key] = draft[key];
+      }
+    }
     if (_group == 'Information' || _group == 'Reviews') {
       for (final key
           in _group == 'Reviews'
@@ -703,6 +720,26 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
     });
   }
 
+  static const _partColourGroups = {
+    'Date colours': {
+      'dateFirst': 'First date',
+      'dateSecond': 'Second date',
+      'dateThird': 'Third date',
+    },
+    'Card colours': {
+      'cardPrice': 'Trip price',
+      'cardDetails': 'View trip button',
+      'cardHelp': 'Help me choose button',
+    },
+    'Mobile tab colours': {
+      'navHome': 'Home',
+      'navWeekend': 'This Week',
+      'navCalendar': 'Calendar',
+      'navAll': 'All Departures',
+      'navWhatsapp': 'WhatsApp',
+    },
+  };
+
   Widget _partColourEditor() {
     final values = _draft!['presentation']['partColours'] as Map;
     const choices = {
@@ -715,35 +752,19 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
       'rose': ('Rose', Color(0xff8c3555)),
       'green': ('Forest green', Color(0xff245c33)),
     };
-    const groups = {
-      'Departure dates': {
-        'dateFirst': 'First date',
-        'dateSecond': 'Second date',
-        'dateThird': 'Third date',
-      },
-      'Trip card': {
-        'cardPrice': 'Trip price',
-        'cardDetails': 'View trip button',
-        'cardHelp': 'Help me choose button',
-      },
-      'Mobile tabs': {
-        'navHome': 'Home',
-        'navWeekend': 'This Week',
-        'navCalendar': 'Calendar',
-        'navAll': 'All Departures',
-        'navWhatsapp': 'WhatsApp',
-      },
-    };
     return Column(
       children: [
-        for (final group in groups.entries)
+        for (final group in _partColourGroups.entries.where(
+          (entry) => entry.key == _group,
+        ))
           ExpansionTile(
             leading: Icon(switch (group.key) {
-              'Departure dates' => Icons.event_outlined,
-              'Trip card' => Icons.style_outlined,
+              'Date colours' => Icons.event_outlined,
+              'Card colours' => Icons.style_outlined,
               _ => Icons.navigation_outlined,
             }),
             title: Text(group.key),
+            initiallyExpanded: true,
             subtitle: Text(switch (group.key) {
               'Departure dates' => 'Colour the next three date chips',
               'Trip card' => 'Price and action button colours',
@@ -993,7 +1014,12 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                       selected: switch (_group) {
                         'Story highlights' => 'Hero',
                         'Calendar' => 'Upcoming Batches',
-                        'Trip order' => 'Destinations',
+                        'Trip order' ||
+                        'Trip discovery' ||
+                        'Destination slideshow' => 'Destinations',
+                        'Date colours' ||
+                        'Card colours' ||
+                        'Mobile tab colours' => 'Appearance',
                         _ => _group,
                       },
                       onChanged: (group) => setState(() => _group = group),
@@ -1002,8 +1028,23 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                       _websiteSubsections(['Hero', 'Story highlights']),
                     if (['Upcoming Batches', 'Calendar'].contains(_group))
                       _websiteSubsections(['Upcoming Batches', 'Calendar']),
-                    if (['Destinations', 'Trip order'].contains(_group))
-                      _websiteSubsections(['Destinations', 'Trip order']),
+                    if ([
+                      'Destinations',
+                      'Trip discovery',
+                      'Trip order',
+                      'Destination slideshow',
+                    ].contains(_group))
+                      _websiteSubsections([
+                        'Trip discovery',
+                        'Trip order',
+                        'Destination slideshow',
+                      ]),
+                    if (_group == 'Appearance' ||
+                        _partColourGroups.containsKey(_group))
+                      _websiteSubsections([
+                        'Appearance',
+                        ..._partColourGroups.keys,
+                      ]),
                     OutlinedButton.icon(
                       onPressed: () => Navigator.push(
                         context,
@@ -1046,8 +1087,10 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                     const SizedBox(height: 20),
                     if (_group == 'Story highlights')
                       StoryHighlightsEditor(
-                        value: _draft!['storyHighlights'] as Map<String, dynamic>,
-                        onChanged: (value) => setState(() => _draft!['storyHighlights'] = value),
+                        value:
+                            _draft!['storyHighlights'] as Map<String, dynamic>,
+                        onChanged: (value) =>
+                            setState(() => _draft!['storyHighlights'] = value),
                       ),
                     if (_group == 'All' || _group == 'Hero') ...[
                       Text(
@@ -1096,19 +1139,9 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                       _text('hero', 'tagline', 'Tagline', lines: 3),
                       _text('hero', 'description', 'Description', lines: 3),
                     ],
+                    if (_partColourGroups.containsKey(_group))
+                      _partColourEditor(),
                     if (_group == 'All' || _group == 'Appearance') ...[
-                      if (_group == 'Appearance')
-                        Card(
-                          child: ExpansionTile(
-                            leading: const Icon(Icons.palette_outlined),
-                            title: const Text('Card and tab colours'),
-                            subtitle: const Text(
-                              'Choose colours for individual website elements',
-                            ),
-                            initiallyExpanded: true,
-                            children: [_partColourEditor()],
-                          ),
-                        ),
                       ExpansionTile(
                         title: const Text('Colours, photos & animations'),
                         initiallyExpanded: _group == 'Appearance',
@@ -1358,7 +1391,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                         initiallyExpanded: _group == 'Trip order',
                         children: [_tripOrderSection()],
                       ),
-                    if (_group == 'Destinations')
+                    if (_group == 'Destinations' || _group == 'Trip discovery')
                       const ListTile(
                         title: Text('Explore Destinations'),
                         subtitle: Text(
@@ -1366,7 +1399,9 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                         ),
                       ),
                     const SizedBox(height: 16),
-                    if (_group == 'All' || _group == 'Destinations')
+                    if (_group == 'All' ||
+                        _group == 'Destinations' ||
+                        _group == 'Trip discovery')
                       DiscoverySettingsEditor(
                         discovery: _draft!['discovery'] as Map<String, dynamic>,
                         onChanged: (field, value) => setState(() {
@@ -1405,7 +1440,8 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                         initiallyExpanded: _group == 'Pages',
                         onChanged: () => setState(() {}),
                       ),
-                    if (_group == 'All' || _group == 'Destinations') ...[
+                    if (_group == 'All' ||
+                        _group == 'Destination slideshow') ...[
                       Text(
                         'Explore Destinations slideshow',
                         style: Theme.of(context).textTheme.titleLarge,

@@ -149,28 +149,32 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
         .toList();
     return [
       Text(
-        'Your daily workspace',
+        'What do you need to do?',
         style: Theme.of(
           context,
         ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
       ),
       const SizedBox(height: 6),
       Text(
-        'Start with bookings, update a trip, or resolve an item that needs attention.',
+        'Open a workspace to manage trips, bookings or the website.',
         style: Theme.of(context).textTheme.bodyMedium,
       ),
       const SizedBox(height: 12),
       Align(
         alignment: Alignment.centerLeft,
-        child: Wrap(spacing: 8, runSpacing: 8, children: [
-          ManagerToolFinder(onSelected: go),
-          OutlinedButton.icon(
-            key: const Key('dashboard-reusable-libraries'),
-            onPressed: () => go(ManagerDestination.reusableLibrary),
-            icon: const Icon(Icons.inventory_2_outlined),
-            label: const Text('Reusable libraries'),
-          ),
-        ]),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ManagerToolFinder(onSelected: go),
+            OutlinedButton.icon(
+              key: const Key('dashboard-reusable-libraries'),
+              onPressed: () => go(ManagerDestination.reusableLibrary),
+              icon: const Icon(Icons.inventory_2_outlined),
+              label: const Text('Reusable libraries'),
+            ),
+          ],
+        ),
       ),
       const SizedBox(height: 12),
       ManagerSetupChecklist(
@@ -225,6 +229,23 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
             'Departures',
             'See upcoming trip dates',
             () => go(ManagerDestination.batches),
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      ManagerCardGrid(
+        children: [
+          _task(
+            Icons.web_outlined,
+            'Edit website',
+            'Stories, trip order, colours and pages',
+            () => go(ManagerDestination.homepage),
+          ),
+          _task(
+            Icons.insights_outlined,
+            'Customer journey',
+            'See where travellers stop during booking',
+            () => go(ManagerDestination.analytics),
           ),
         ],
       ),
