@@ -274,6 +274,7 @@ void main() {
         'enabled': true,
         'showSearch': true,
         'showExperienceFilter': true,
+        'showTripTypeFilter': true,
         'showWeekendFilter': true,
       });
       for (final edit in <void Function(Map<String, dynamic>)>[
@@ -588,6 +589,11 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(draft['showWeekendFilter'], isFalse);
+    final tripTypes = find.byKey(const ValueKey('homepage-discovery-showTripTypeFilter'));
+    expect(tester.widget<SwitchListTile>(tripTypes).value, isTrue);
+    await tester.tap(tripTypes);
+    await tester.pumpAndSettle();
+    expect(draft['showTripTypeFilter'], isFalse);
     await tester.tap(find.byKey(const ValueKey('homepage-discovery-enabled')));
     await tester.pumpAndSettle();
     expect(
@@ -636,6 +642,10 @@ void main() {
     );
     await showKey(tester, weekend);
     await tester.tap(weekend);
+    await tester.pumpAndSettle();
+    final typeFilter = find.byKey(const ValueKey('homepage-discovery-showTripTypeFilter'));
+    await showKey(tester, typeFilter);
+    await tester.tap(typeFilter);
     await tester.pumpAndSettle();
     final publish = find.byKey(const Key('homepage-publish'));
     await showKey(tester, publish);

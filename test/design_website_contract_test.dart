@@ -56,7 +56,10 @@ void main() {
       );
       expect(
         data['discovery'],
-        original['discovery'] ?? HomepageConfig.defaults['discovery'],
+        {
+          ...HomepageConfig.defaults['discovery'] as Map<String, dynamic>,
+          ...?original['discovery'] as Map<String, dynamic>?,
+        },
       );
       expect(data['hero'], original['hero']);
     },
