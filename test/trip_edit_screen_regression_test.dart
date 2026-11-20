@@ -63,7 +63,7 @@ void main() {
     await tester.pumpWidget(buildSubject(provider, destination));
     await tester.tap(find.byKey(const Key('editor-section-picker')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Dates & price').last);
+    await tester.tap(find.text('Pickup points').last);
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.byKey(const Key('reuse-pickup-points')), 300, scrollable: find.byType(Scrollable).first);
     await tester.tap(find.byKey(const Key('reuse-pickup-points')));

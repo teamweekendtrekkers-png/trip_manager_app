@@ -414,27 +414,6 @@ class _TripsListScreenState extends State<TripsListScreen> {
     );
   }
 
-  static const _moreToolGroups = <String, List<ManagerDestination>>{
-    'Departures & pricing': [
-      ManagerDestination.departureManagement,
-      ManagerDestination.batches,
-      ManagerDestination.payments,
-    ],
-    'Website & libraries': [
-      ManagerDestination.homepage,
-      ManagerDestination.library,
-      ManagerDestination.reusableLibrary,
-      ManagerDestination.sharedContent,
-    ],
-    'Reports & publishing': [
-      ManagerDestination.analytics,
-      ManagerDestination.deployment,
-      ManagerDestination.history,
-      ManagerDestination.health,
-    ],
-    'App settings': [ManagerDestination.settings],
-  };
-
   void _showMoreTools() {
     showModalBottomSheet<void>(
       context: context,
@@ -447,7 +426,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
               const Padding(
                 padding: EdgeInsets.all(16),
                 child: Text(
-                  'More tools',
+                  'Browse workspaces',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -465,16 +444,20 @@ class _TripsListScreenState extends State<TripsListScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: ManagerToolFinder(onSelected: (destination) {
-                    Navigator.pop(ctx);
-                    _openDestination(destination);
-                  }),
+                  child: ManagerToolFinder(
+                    onSelected: (destination) {
+                      Navigator.pop(ctx);
+                      _openDestination(destination);
+                    },
+                  ),
                 ),
               ),
               ListTile(
                 leading: const Icon(Icons.system_update_outlined),
                 title: const Text('App updates'),
-                subtitle: const Text('Check for a new Android or Windows build'),
+                subtitle: const Text(
+                  'Check for a new Android or Windows build',
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   showManagerUpdates(context);
@@ -488,21 +471,19 @@ class _TripsListScreenState extends State<TripsListScreen> {
                   confirmManagerClose(context);
                 },
               ),
-              for (final group in _moreToolGroups.entries)
+              for (final group in managerNavigationGroups.entries)
                 Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
                   child: ExpansionTile(
                     leading: Icon(
                       group.value.first.icon,
                       color: Theme.of(ctx).colorScheme.primary,
                     ),
                     title: Text(group.key),
-                    subtitle: Text(switch (group.key) {
-                      'Departures & pricing' => 'Dates, availability, UPI and coupons',
-                      'Website & libraries' => 'Pages, colours, photos and reusable content',
-                      'Reports & publishing' => 'Customer journey, deployment and history',
-                      _ => 'Repository connection and app preferences',
-                    }),
+                    subtitle: Text(managerNavigationDescriptions[group.key]!),
                     initiallyExpanded: group.value.contains(_workspace),
                     children: [
                       for (final destination in group.value)
@@ -596,12 +577,16 @@ class _TripsListScreenState extends State<TripsListScreen> {
     final isDesktop =
         MediaQuery.sizeOf(context).width >= managerDesktopBreakpoint;
     final provider = context.watch<TripsProvider>();
-    final searchResults = provider.searchTrips(_searchQuery)
+    final searchResults = provider
+        .searchTrips(_searchQuery)
         .where((trip) => !_showFeaturedOnly || trip['featured'] == true)
         .toList();
     bool matchesFilter(Map<String, dynamic> trip, String filter) =>
-        matchesTripWorkspaceFilter(trip, filter,
-            hasDraft: provider.changes.containsKey(trip['id']));
+        matchesTripWorkspaceFilter(
+          trip,
+          filter,
+          hasDraft: provider.changes.containsKey(trip['id']),
+        );
     return Scaffold(
       drawer: isDesktop
           ? null
@@ -1087,11 +1072,20 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                           right: 6,
                                         ),
                                         child: ChoiceChip(
-                                          label: Row(mainAxisSize: MainAxisSize.min, children: [
-                                            Text(filter == 'Draft' ? 'Unpublished' : filter),
-                                            const SizedBox(width: 5),
-                                            Text('(${searchResults.where((trip) => matchesFilter(trip, filter)).length})'),
-                                          ]),
+                                          label: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                filter == 'Draft'
+                                                    ? 'Unpublished'
+                                                    : filter,
+                                              ),
+                                              const SizedBox(width: 5),
+                                              Text(
+                                                '(${searchResults.where((trip) => matchesFilter(trip, filter)).length})',
+                                              ),
+                                            ],
+                                          ),
                                           selected: _tripFilter == filter,
                                           onSelected: (_) => setState(
                                             () => _tripFilter = filter,
@@ -1142,9 +1136,10 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                             ),
                                             const SizedBox(height: 8),
                                             Padding(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 32,
-                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 32,
+                                                  ),
                                               child: Text(
                                                 provider.error!,
                                                 textAlign: TextAlign.center,
@@ -1166,7 +1161,12 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                   }
 
                                   final trips = sortTripWorkspace(
-                                    searchResults.where((trip) => matchesFilter(trip, _tripFilter)).toList(),
+                                    searchResults
+                                        .where(
+                                          (trip) =>
+                                              matchesFilter(trip, _tripFilter),
+                                        )
+                                        .toList(),
                                     _tripSort,
                                   );
 
@@ -1247,22 +1247,36 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                         ),
                                         child: Wrap(
                                           alignment: WrapAlignment.spaceBetween,
-                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          crossAxisAlignment:
+                                              WrapCrossAlignment.center,
                                           spacing: 12,
                                           children: [
-                                            Text('${trips.length} of ${provider.tripCount} trips'
+                                            Text(
+                                              '${trips.length} of ${provider.tripCount} trips'
                                               '${_showFeaturedOnly ? ' · Featured only' : ''}',
-                                              key: const Key('trip-results-count')),
+                                              key: const Key(
+                                                'trip-results-count',
+                                              ),
+                                            ),
                                             DropdownButton<TripWorkspaceSort>(
                                               key: const Key('trip-sort'),
                                               value: _tripSort,
                                               isDense: false,
                                               hint: const Text('Sort trips'),
                                               onChanged: (value) {
-                                                if (value != null) setState(() => _tripSort = value);
+                                                if (value != null)
+                                                  setState(
+                                                    () => _tripSort = value,
+                                                  );
                                               },
-                                              items: [for (final sort in TripWorkspaceSort.values)
-                                                DropdownMenuItem(value: sort, child: Text(sort.label))],
+                                              items: [
+                                                for (final sort
+                                                    in TripWorkspaceSort.values)
+                                                  DropdownMenuItem(
+                                                    value: sort,
+                                                    child: Text(sort.label),
+                                                  ),
+                                              ],
                                             ),
                                           ],
                                         ),

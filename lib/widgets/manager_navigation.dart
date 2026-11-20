@@ -98,27 +98,37 @@ extension ManagerDestinationDetails on ManagerDestination {
 
 /// One shared order keeps phone and desktop navigation consistent.
 const managerNavigationGroups = <String, List<ManagerDestination>>{
-  'Daily work': [
+  'Trips & departures': [
     ManagerDestination.dashboard,
     ManagerDestination.trips,
-    ManagerDestination.bookingReview,
     ManagerDestination.departureManagement,
     ManagerDestination.batches,
   ],
-  'Website & media': [
-    ManagerDestination.homepage,
+  'Bookings & payments': [
+    ManagerDestination.bookingReview,
+    ManagerDestination.payments,
+    ManagerDestination.analytics,
+  ],
+  'Website editing': [ManagerDestination.homepage],
+  'Media & reusable content': [
     ManagerDestination.library,
     ManagerDestination.reusableLibrary,
     ManagerDestination.sharedContent,
-    ManagerDestination.payments,
   ],
-  'Insights & management': [
-    ManagerDestination.analytics,
-    ManagerDestination.health,
+  'Publishing & app settings': [
     ManagerDestination.deployment,
     ManagerDestination.history,
+    ManagerDestination.health,
     ManagerDestination.settings,
   ],
+};
+
+const managerNavigationDescriptions = <String, String>{
+  'Trips & departures': 'Trip details, prices and departure dates',
+  'Bookings & payments': 'Payment review, UPI, coupons and customer journey',
+  'Website editing': 'Homepage, trip order, calendar, colours and reviews',
+  'Media & reusable content': 'Photos, pickup points, packing and policies',
+  'Publishing & app settings': 'Deployment, version history and preferences',
 };
 
 final managerNavigationOrder = List<ManagerDestination>.unmodifiable(
@@ -373,7 +383,8 @@ List<ManagerDestination> findManagerTools(String query) {
     ManagerDestination.dashboard: 'home daily tasks overview',
     ManagerDestination.trips: 'edit create add price dates itinerary trip',
     ManagerDestination.library: 'images pictures cover upload tags edit photos',
-    ManagerDestination.reusableLibrary: 'pickup boarding packing carry things templates hide restore edit library',
+    ManagerDestination.reusableLibrary:
+        'pickup boarding packing carry things templates hide restore edit library',
     ManagerDestination.homepage:
         'design appearance animation colours colors logo hero reviews website edit',
     ManagerDestination.batches: 'calendar upcoming dates preview',

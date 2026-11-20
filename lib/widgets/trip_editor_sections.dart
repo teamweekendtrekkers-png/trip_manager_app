@@ -1,17 +1,29 @@
 import 'package:flutter/material.dart';
 
-enum TripEditorSection { all, basics, dates, photos, itinerary, website }
+enum TripEditorSection {
+  all,
+  basics,
+  dates,
+  pickup,
+  photos,
+  itinerary,
+  guidance,
+  website,
+}
 
 extension TripEditorSectionLabel on TripEditorSection {
   String get hint => switch (this) {
     TripEditorSection.all => 'Browse every field, or choose a section above.',
     TripEditorSection.basics =>
       'Trip name, destination, description and key details.',
-    TripEditorSection.dates =>
-      'Departure dates, prices and boarding locations.',
+    TripEditorSection.dates => 'Departure dates, availability and prices.',
+    TripEditorSection.pickup =>
+      'Boarding locations, meeting times and map links.',
     TripEditorSection.photos => 'Cover image and the trip photo gallery.',
     TripEditorSection.itinerary =>
-      'Daily plan, inclusions and traveller guidance.',
+      'Day-by-day plans, activities and trip highlights.',
+    TripEditorSection.guidance =>
+      'Inclusions, exclusions and the packing list.',
     TripEditorSection.website =>
       'Custom sections, visibility and booking options.',
   };
@@ -20,8 +32,10 @@ extension TripEditorSectionLabel on TripEditorSection {
     TripEditorSection.all => 'All sections',
     TripEditorSection.basics => 'Basics',
     TripEditorSection.dates => 'Dates & price',
-    TripEditorSection.photos => 'Photos',
-    TripEditorSection.itinerary => 'Itinerary & guidance',
+    TripEditorSection.pickup => 'Pickup points',
+    TripEditorSection.photos => 'Photos & video',
+    TripEditorSection.itinerary => 'Itinerary & highlights',
+    TripEditorSection.guidance => 'Packing & inclusions',
     TripEditorSection.website => 'Website sections',
   };
 }
@@ -30,9 +44,13 @@ TripEditorSection editorSectionFor(String title) => switch (title) {
   'Basic Information' ||
   'About This Trip' ||
   'Trip Details' => TripEditorSection.basics,
-  'Date & Pricing' ||
-  'Departure Dates' ||
-  'Boarding Locations' => TripEditorSection.dates,
+  'Date & Pricing' || 'Departure Dates' => TripEditorSection.dates,
+  'Boarding Locations' ||
+  'Pickup points' ||
+  'Pickup summary' => TripEditorSection.pickup,
+  'Inclusions' ||
+  'Exclusions' ||
+  'Things to Carry' => TripEditorSection.guidance,
   'Trip video' => TripEditorSection.photos,
   'Visibility' ||
   'Website URL & Booking Cutoff' ||

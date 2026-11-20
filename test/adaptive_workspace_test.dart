@@ -329,7 +329,7 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('editor-guided-next')));
     await tester.pumpAndSettle();
-    expect(find.text('Step 2 of 5'), findsOneWidget);
+    expect(find.text('Step 2 of ${TripEditorSection.values.length - 1}'), findsOneWidget);
     await tester.tap(find.byKey(const Key('editor-guided-back')));
     await tester.pumpAndSettle();
     expect(find.text('Weekend draft'), findsOneWidget);
@@ -354,13 +354,13 @@ void main() {
         )
         .first;
     for (final label in [
-      'Booking review',
       'Manage departures',
+      'Booking review',
+      'Payments & coupons',
       'Website content',
       'Shared trip content',
-      'Payments & coupons',
-      'Data health',
       'Publishing status',
+      'Data health',
     ]) {
       await tester.scrollUntilVisible(
         find.text(label),

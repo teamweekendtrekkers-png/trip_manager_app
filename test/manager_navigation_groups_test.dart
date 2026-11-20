@@ -18,6 +18,6 @@ void main() {
     }
     expect(managerNavigationOrder.first, ManagerDestination.dashboard);
     expect(managerNavigationOrder[1], ManagerDestination.trips);
-    expect(managerNavigationOrder[2], ManagerDestination.bookingReview);
+    expect(managerNavigationOrder[2], ManagerDestination.departureManagement);
   });
 }
