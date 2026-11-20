@@ -1066,6 +1066,30 @@ void main() {
     expect(tester.widget<TextField>(find.byKey(const ValueKey('homepage-hero-title'))).controller!.text, 'Unfinished headline');
     expect(tester.takeException(), isNull);
   });
+  testWidgets('publishes date colours without publishing draft card colours', (tester) async {
+    final github = await openEditor(tester);
+    await tapKey(tester, 'homepage-group-Appearance');
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Card colours'));
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'part-colour-cardPrice-default');
+    await tester.tap(find.text('Purple').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Date colours'));
+    await tester.pumpAndSettle();
+    await tapKey(tester, 'part-colour-dateFirst-default');
+    await tester.tap(find.text('Blue').last);
+    await tester.pumpAndSettle();
+    await publish(tester);
+    final saved = HomepageConfig.parse(github.calls.single.values.single).toJson();
+    final colours = saved['presentation']['partColours'];
+    expect(colours['dateFirst'], 'blue');
+    expect(colours['cardPrice'], 'default');
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Card colours'));
+    await tester.pumpAndSettle();
+    await showKey(tester, 'part-colour-cardPrice-purple');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('publishes a separate recommended order for one trip list', (tester) async {
     final github = await openEditor(tester);
     await tapKey(tester, 'homepage-group-Destinations');

@@ -195,7 +195,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Your daily workspace'), findsOneWidget);
+      expect(find.text('What do you need to do?'), findsOneWidget);
       await tester.runAsync(() async {
         final boundary = tester.renderObject<RenderRepaintBoundary>(
           find.byKey(previewKey),
@@ -232,7 +232,7 @@ void main() {
         );
       }
       await tester.pumpAndSettle();
-      expect(find.text('Your daily workspace'), findsOneWidget);
+      expect(find.text('What do you need to do?'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }
