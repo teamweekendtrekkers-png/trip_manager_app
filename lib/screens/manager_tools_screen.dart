@@ -23,6 +23,7 @@ class ManagerToolsScreen extends StatefulWidget {
     super.key,
     required this.tool,
     this.onNavigate,
+    this.onGuideNavigate,
     this.onPendingBookings,
     this.choosePhoto = false,
     this.embedded = false,
@@ -30,6 +31,7 @@ class ManagerToolsScreen extends StatefulWidget {
   });
   final ManagerDestination tool;
   final ValueChanged<ManagerDestination>? onNavigate;
+  final ManagerGuideSelection? onGuideNavigate;
   final VoidCallback? onPendingBookings;
   final bool choosePhoto;
   final bool embedded;
@@ -167,6 +169,11 @@ class _ManagerToolsScreenState extends State<ManagerToolsScreen> {
           runSpacing: 8,
           children: [
             ManagerToolFinder(onSelected: go),
+            ManagerGuideButton(
+              onSelected:
+                  widget.onGuideNavigate ??
+                  (destination, {section}) => go(destination),
+            ),
             OutlinedButton.icon(
               key: const Key('dashboard-reusable-libraries'),
               onPressed: () => go(ManagerDestination.reusableLibrary),

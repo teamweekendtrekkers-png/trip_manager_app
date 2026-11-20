@@ -152,15 +152,20 @@ class _NavigationGroupHeading extends StatelessWidget {
   );
 }
 
+typedef ManagerGuideSelection =
+    void Function(ManagerDestination destination, {String? section});
+
 class ManagerSideNavigation extends StatelessWidget {
   const ManagerSideNavigation({
     super.key,
     required this.onSelected,
+    this.onGuideSelected,
     this.selected = ManagerDestination.trips,
   });
 
   final ManagerDestination selected;
   final ValueChanged<ManagerDestination> onSelected;
+  final ManagerGuideSelection? onGuideSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -214,7 +219,18 @@ class ManagerSideNavigation extends StatelessWidget {
                   horizontal: 16,
                   vertical: 8,
                 ),
-                child: ManagerToolFinder(onSelected: onSelected),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    ManagerToolFinder(onSelected: onSelected),
+                    ManagerGuideButton(
+                      onSelected:
+                          onGuideSelected ??
+                          (destination, {section}) => onSelected(destination),
+                    ),
+                  ],
+                ),
               ),
               Expanded(
                 child: ListView(
@@ -530,4 +546,219 @@ class _ToolFinderDialogState extends State<_ToolFinderDialog> {
       ),
     );
   }
+}
+
+class ManagerGuideButton extends StatelessWidget {
+  const ManagerGuideButton({super.key, required this.onSelected});
+
+  final ManagerGuideSelection onSelected;
+
+  static const _tasks =
+      <String, List<(String, String, ManagerDestination, String?)>>{
+        'Trips & departures': [
+          (
+            'Create a trip',
+            'Trips → Add trip',
+            ManagerDestination.trips,
+            'create',
+          ),
+          (
+            'Edit dates or prices',
+            'Trips → Choose a trip → Dates & price',
+            ManagerDestination.trips,
+            'dates',
+          ),
+          (
+            'Edit photos or video',
+            'Trips → Edit trip → Photos & video',
+            ManagerDestination.trips,
+            'photos',
+          ),
+          (
+            'Edit pickup points',
+            'Trips → Edit trip → Pickup points',
+            ManagerDestination.trips,
+            'pickup',
+          ),
+          (
+            'Edit packing or inclusions',
+            'Trips → Edit trip → Packing & inclusions',
+            ManagerDestination.trips,
+            'guidance',
+          ),
+          (
+            'Close or reopen a departure',
+            'Manage departures → Choose a trip and date',
+            ManagerDestination.departureManagement,
+            null,
+          ),
+        ],
+        'Website editing': [
+          (
+            'Edit Instagram highlights',
+            'Website content → Hero → Story highlights',
+            ManagerDestination.homepage,
+            'Story highlights',
+          ),
+          (
+            'Reorder website or calendar trips',
+            'Website content → Destinations → Trip order',
+            ManagerDestination.homepage,
+            'Trip order',
+          ),
+          (
+            'Show or hide trip-type filters',
+            'Website content → Destinations → Trip discovery',
+            ManagerDestination.homepage,
+            'Trip discovery',
+          ),
+          (
+            'Edit calendar holidays',
+            'Website content → Upcoming Batches → Calendar holidays',
+            ManagerDestination.homepage,
+            'Calendar',
+          ),
+          (
+            'Change departure date colours',
+            'Website content → Appearance → Date colours',
+            ManagerDestination.homepage,
+            'Date colours',
+          ),
+          (
+            'Edit reviews',
+            'Website content → Reviews',
+            ManagerDestination.homepage,
+            'Reviews',
+          ),
+          (
+            'Edit footer',
+            'Website content → Footer',
+            ManagerDestination.homepage,
+            'Footer',
+          ),
+          (
+            'Edit pages',
+            'Website content → Pages',
+            ManagerDestination.homepage,
+            'Pages',
+          ),
+          (
+            'Change trip card colours',
+            'Website content → Appearance → Card colours',
+            ManagerDestination.homepage,
+            'Card colours',
+          ),
+          (
+            'Change mobile tab colours',
+            'Website content → Appearance → Mobile tab colours',
+            ManagerDestination.homepage,
+            'Mobile tab colours',
+          ),
+        ],
+        'Bookings & reusable content': [
+          (
+            'Review payments',
+            'Bookings → Choose a submission',
+            ManagerDestination.bookingReview,
+            null,
+          ),
+          (
+            'Set up UPI or coupons',
+            'Payments & coupons',
+            ManagerDestination.payments,
+            null,
+          ),
+          (
+            'See booking drop-offs',
+            'Customer journey → Sign in to analytics',
+            ManagerDestination.analytics,
+            null,
+          ),
+          (
+            'Reuse pickup points or packing lists',
+            'Reusable libraries → Choose a library',
+            ManagerDestination.reusableLibrary,
+            null,
+          ),
+          (
+            'Edit shared FAQs and policies',
+            'Shared trip content',
+            ManagerDestination.sharedContent,
+            null,
+          ),
+        ],
+        'Publishing & settings': [
+          (
+            'Check whether a change is live',
+            'Publishing status → Recent builds',
+            ManagerDestination.deployment,
+            null,
+          ),
+          (
+            'Restore an earlier version',
+            'Version history → Restore as draft',
+            ManagerDestination.history,
+            null,
+          ),
+          (
+            'Edit repository or contact settings',
+            'Settings',
+            ManagerDestination.settings,
+            null,
+          ),
+        ],
+      };
+
+  Future<void> _openGuide(BuildContext context) async {
+    final destination =
+        await showDialog<({ManagerDestination workspace, String? section})>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Manager guide'),
+            content: SizedBox(
+              width: 560,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final group in _tasks.entries)
+                      ExpansionTile(
+                        title: Text(group.key),
+                        children: [
+                          for (final (title, path, target, section)
+                              in group.value)
+                            ListTile(
+                              title: Text(title),
+                              subtitle: Text(path),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => Navigator.pop(dialogContext, (
+                                workspace: target,
+                                section: section,
+                              )),
+                            ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+    if (destination != null && context.mounted) {
+      onSelected(destination.workspace, section: destination.section);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+    onPressed: () => _openGuide(context),
+    icon: const Icon(Icons.help_outline),
+    label: const Text('Guide'),
+  );
 }

@@ -37,7 +37,9 @@ class HomepageSettingsScreen extends StatefulWidget {
     this.referenceDate,
     this.imageUploader,
     this.imagePreviewBuilder,
+    this.initialSection = 'All',
   });
+  final String initialSection;
   final HomepageSettingsService? service;
   final List<Map<String, dynamic>>? trips;
   final DateTime? referenceDate;
@@ -69,7 +71,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
     }
   }
 
-  String _group = 'All';
+  late String _group = widget.initialSection;
   final _anchors = <String, GlobalKey>{};
   final _fieldFocus = <String, FocusNode>{};
   Widget _websiteSubsections(List<String> sections) => Wrap(

@@ -246,7 +246,10 @@ class _TripsListScreenState extends State<TripsListScreen> {
     super.dispose();
   }
 
-  Future<void> _openDestination(ManagerDestination destination) async {
+  Future<void> _openDestination(
+    ManagerDestination destination, {
+    String? section,
+  }) async {
     if (!mounted) return;
     if (destination == ManagerDestination.trips ||
         destination == ManagerDestination.dashboard ||
@@ -258,6 +261,9 @@ class _TripsListScreenState extends State<TripsListScreen> {
       });
       _searchFocusNode.unfocus();
       FocusManager.instance.primaryFocus?.unfocus();
+      if (destination == ManagerDestination.trips && section != null) {
+        await _openGuideTripSection(section);
+      }
       return;
     }
     final provider = context.read<TripsProvider>();
@@ -276,7 +282,8 @@ class _TripsListScreenState extends State<TripsListScreen> {
             ManagerToolsScreen(tool: destination, onNavigate: _openDestination),
       ),
       ManagerDestination.homepage => MaterialPageRoute<void>(
-        builder: (_) => const HomepageSettingsScreen(),
+        builder: (_) =>
+            HomepageSettingsScreen(initialSection: section ?? 'All'),
       ),
       ManagerDestination.reusableLibrary => MaterialPageRoute<void>(
         builder: (_) => const ReusableLibrariesScreen(),
@@ -444,11 +451,23 @@ class _TripsListScreenState extends State<TripsListScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: ManagerToolFinder(
-                    onSelected: (destination) {
-                      Navigator.pop(ctx);
-                      _openDestination(destination);
-                    },
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      ManagerToolFinder(
+                        onSelected: (destination) {
+                          Navigator.pop(ctx);
+                          _openDestination(destination);
+                        },
+                      ),
+                      ManagerGuideButton(
+                        onSelected: (destination, {section}) {
+                          Navigator.pop(ctx);
+                          _openDestination(destination, section: section);
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -829,6 +848,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
             children: [
               if (isDesktop) ...[
                 ManagerSideNavigation(
+                  onGuideSelected: _openDestination,
                   selected: _workspace,
                   onSelected: _openDestination,
                 ),
@@ -852,6 +872,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                 embedded: true,
                                 githubService: widget.toolsService,
                                 onNavigate: _openDestination,
+                                onGuideNavigate: _openDestination,
                                 onPendingBookings: () {
                                   setState(() {
                                     _bookingFilter =
@@ -1426,7 +1447,38 @@ class _TripsListScreenState extends State<TripsListScreen> {
     );
   }
 
-  void _editTrip(String tripId) {
+  Future<void> _openGuideTripSection(String section) async {
+    if (section == 'create') {
+      _addNewTrip();
+      return;
+    }
+    final target = TripEditorSection.values.byName(section);
+    final trips = context.read<TripsProvider>().trips;
+    if (trips.isEmpty) {
+      _showTripUnavailable();
+      return;
+    }
+    final id = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text('Choose a trip'),
+        children: [
+          for (final trip in trips)
+            SimpleDialogOption(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, trip['id'].toString()),
+              child: Text(trip['title']?.toString() ?? trip['id'].toString()),
+            ),
+        ],
+      ),
+    );
+    if (id != null && mounted) _editTrip(id, initialSection: target);
+  }
+
+  void _editTrip(
+    String tripId, {
+    TripEditorSection initialSection = TripEditorSection.basics,
+  }) {
     final provider = context.read<TripsProvider>();
     final index = provider.getTripIndexById(tripId);
     final trip = provider.getTripById(tripId);
@@ -1440,7 +1492,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
         builder: (_) => TripEditScreen(
           trip: trip,
           index: index,
-          initialSection: TripEditorSection.basics,
+          initialSection: initialSection,
         ),
       ),
     );
