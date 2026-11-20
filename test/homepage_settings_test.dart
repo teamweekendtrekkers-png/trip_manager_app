@@ -84,6 +84,23 @@ class MemoryGitHub extends GitHubService {
 }
 
 void main() {
+  test('Instagram highlights round trip when hidden and preserve their order', () {
+    final initial = HomepageConfig.initial();
+    expect(jsonDecode(initial.encode()).containsKey('storyHighlights'), false);
+    final draft = initial.toJson();
+    draft['storyHighlights'] = {
+      'enabled': false,
+      'items': [
+        {'name': 'Treks', 'image': 'images/logo.jpg', 'url': 'https://www.instagram.com/stories/highlights/123/'},
+        {'name': 'Beaches', 'image': 'images/logo.jpg', 'url': 'https://www.instagram.com/stories/highlights/456/'},
+      ],
+    };
+    final saved = HomepageConfig.parse(jsonEncode(draft));
+    expect(HomepageConfig.parse(saved.encode()).toJson()['storyHighlights'], draft['storyHighlights']);
+    draft['storyHighlights']['items'][0]['url'] = 'https://other.example/stories/highlights/123/';
+    expect(() => HomepageConfig.parse(jsonEncode(draft)), throwsFormatException);
+  });
+
   test(
     'defaults reproduce automatic three-group behavior without mutating data',
     () {
