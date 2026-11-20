@@ -71,10 +71,23 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
   String _group = 'All';
   final _anchors = <String, GlobalKey>{};
   final _fieldFocus = <String, FocusNode>{};
+  Widget _websiteSubsections(List<String> sections) => Wrap(
+    spacing: 8,
+    runSpacing: 4,
+    children: [
+      for (final section in sections)
+        ChoiceChip(
+          label: Text(section == 'Calendar' ? 'Calendar holidays' : section),
+          selected: _group == section,
+          onSelected: (_) => setState(() => _group = section),
+        ),
+    ],
+  );
+
   Future<void> _searchFields() async {
     final choices = {
-      'Trip display order and sorting': 'Destinations',
-      'Calendar holidays and special dates': 'Upcoming Batches',
+      'Trip display order and sorting': 'Trip order',
+      'Calendar holidays and special dates': 'Calendar',
       'Desktop cover': 'Hero|hero.backgroundImage',
       'Headline': 'Hero|hero.title',
       'Tagline': 'Hero|hero.tagline',
@@ -274,8 +287,10 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
       'Appearance' => ['presentation'],
       'Trip gallery' => ['tripGallery'],
       'Pages' => ['pages'],
-      'Upcoming Batches' => ['upcomingBatches', 'calendarHolidays'],
-      'Destinations' => ['discovery', 'destinationSlider', 'tripDisplayOrder'],
+      'Upcoming Batches' => ['upcomingBatches'],
+      'Calendar' => ['calendarHolidays'],
+      'Trip order' => ['tripDisplayOrder'],
+      'Destinations' => ['discovery', 'destinationSlider'],
       'Footer' => ['footer'],
       _ => <String>[],
     };
@@ -469,7 +484,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
 
   static const _orderViews = {
     'explore': 'Explore Trips',
-    'weekend': 'This Weekend',
+    'weekend': 'This Week',
     'all': 'All Departures',
   };
 
@@ -497,7 +512,9 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                 _ => Icons.route_outlined,
               }),
               trailing: const Icon(Icons.chevron_right),
-              onTap: _trips.isEmpty ? null : () => _editTripOrder(entry.key, entry.value),
+              onTap: _trips.isEmpty
+                  ? null
+                  : () => _editTripOrder(entry.key, entry.value),
             ),
           ),
         if (_trips.isEmpty)
@@ -513,7 +530,9 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
         if (trip['id'] case final String id)
           id: (trip['title'] ?? trip['name'] ?? id).toString(),
     };
-    final existing = (orders[key] as List).whereType<String>().where(titles.containsKey);
+    final existing = (orders[key] as List).whereType<String>().where(
+      titles.containsKey,
+    );
     final ids = <String>{...existing, ...titles.keys}.toList();
     final result = await showDialog<List<String>>(
       context: context,
@@ -547,12 +566,16 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                       children: [
                         IconButton(
                           tooltip: 'Move $title up',
-                          onPressed: index > 0 ? () => move(index, index - 1) : null,
+                          onPressed: index > 0
+                              ? () => move(index, index - 1)
+                              : null,
                           icon: const Icon(Icons.keyboard_arrow_up),
                         ),
                         IconButton(
                           tooltip: 'Move $title down',
-                          onPressed: index + 1 < ids.length ? () => move(index, index + 1) : null,
+                          onPressed: index + 1 < ids.length
+                              ? () => move(index, index + 1)
+                              : null,
                           icon: const Icon(Icons.keyboard_arrow_down),
                         ),
                       ],
@@ -587,7 +610,9 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Mark holidays and special occasions on the departure calendar.'),
+        const Text(
+          'Mark holidays and special occasions on the departure calendar.',
+        ),
         const SizedBox(height: 8),
         for (final holiday in holidays)
           ListTile(
@@ -619,17 +644,24 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
 
   Future<void> _editHoliday({Map? existing}) async {
     final now = DateTime.now();
-    final initial = DateTime.tryParse(existing?['date']?.toString() ?? '') ?? now;
+    final initial =
+        DateTime.tryParse(existing?['date']?.toString() ?? '') ?? now;
     final date = await showDatePicker(
       context: context,
       initialDate: initial,
       firstDate: DateTime(initial.year < 2020 ? initial.year : 2020),
-      lastDate: DateTime((initial.year > now.year ? initial.year : now.year) + 10, 12, 31),
+      lastDate: DateTime(
+        (initial.year > now.year ? initial.year : now.year) + 10,
+        12,
+        31,
+      ),
       helpText: 'Choose a holiday date',
     );
     if (!mounted || date == null) return;
     final key = date.toIso8601String().substring(0, 10);
-    final controller = TextEditingController(text: existing?['name']?.toString() ?? '');
+    final controller = TextEditingController(
+      text: existing?['name']?.toString() ?? '',
+    );
     final name = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -693,7 +725,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
       },
       'Mobile tabs': {
         'navHome': 'Home',
-        'navWeekend': 'This Weekend',
+        'navWeekend': 'This Week',
         'navCalendar': 'Calendar',
         'navAll': 'All Departures',
         'navWhatsapp': 'WhatsApp',
@@ -712,14 +744,16 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
             subtitle: Text(switch (group.key) {
               'Departure dates' => 'Colour the next three date chips',
               'Trip card' => 'Price and action button colours',
-              _ => 'Home, This Weekend, Calendar, All Departures and WhatsApp',
+              _ => 'Home, This Week, Calendar, All Departures and WhatsApp',
             }),
             children: [
               for (final part in group.value.entries)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
                   child: DropdownButtonFormField<String>(
-                    key: ValueKey('part-colour-${part.key}-${values[part.key]}'),
+                    key: ValueKey(
+                      'part-colour-${part.key}-${values[part.key]}',
+                    ),
                     initialValue: values[part.key] as String,
                     isExpanded: true,
                     decoration: InputDecoration(
@@ -732,7 +766,11 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                           value: choice.key,
                           child: Row(
                             children: [
-                              Icon(Icons.circle, size: 14, color: choice.value.$2),
+                              Icon(
+                                Icons.circle,
+                                size: 14,
+                                color: choice.value.$2,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(child: Text(choice.value.$1)),
                             ],
@@ -740,7 +778,8 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                         ),
                     ],
                     onChanged: (value) {
-                      if (value != null) setState(() => values[part.key] = value);
+                      if (value != null)
+                        setState(() => values[part.key] = value);
                     },
                   ),
                 ),
@@ -948,9 +987,17 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                         'Pages',
                         'Trip gallery',
                       ],
-                      selected: _group,
+                      selected: switch (_group) {
+                        'Calendar' => 'Upcoming Batches',
+                        'Trip order' => 'Destinations',
+                        _ => _group,
+                      },
                       onChanged: (group) => setState(() => _group = group),
                     ),
+                    if (['Upcoming Batches', 'Calendar'].contains(_group))
+                      _websiteSubsections(['Upcoming Batches', 'Calendar']),
+                    if (['Destinations', 'Trip order'].contains(_group))
+                      _websiteSubsections(['Destinations', 'Trip order']),
                     OutlinedButton.icon(
                       onPressed: () => Navigator.push(
                         context,
@@ -1044,7 +1091,9 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                           child: ExpansionTile(
                             leading: const Icon(Icons.palette_outlined),
                             title: const Text('Card and tab colours'),
-                            subtitle: const Text('Choose colours for individual website elements'),
+                            subtitle: const Text(
+                              'Choose colours for individual website elements',
+                            ),
                             initiallyExpanded: true,
                             children: [_partColourEditor()],
                           ),
@@ -1286,15 +1335,16 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                     ],
                     if (_group == 'All' || _group == 'Upcoming Batches')
                       _preview(),
-                    if (_group == 'All' || _group == 'Upcoming Batches')
+                    if (_group == 'All' || _group == 'Calendar')
                       ExpansionTile(
                         title: const Text('Calendar holidays'),
+                        initiallyExpanded: _group == 'Calendar',
                         children: [_calendarHolidaySection()],
                       ),
-                    if (_group == 'All' || _group == 'Destinations')
+                    if (_group == 'All' || _group == 'Trip order')
                       ExpansionTile(
                         title: const Text('Trip display order'),
-                        initiallyExpanded: _group == 'Destinations',
+                        initiallyExpanded: _group == 'Trip order',
                         children: [_tripOrderSection()],
                       ),
                     if (_group == 'Destinations')

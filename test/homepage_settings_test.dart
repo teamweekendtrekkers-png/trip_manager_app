@@ -1052,7 +1052,9 @@ void main() {
   testWidgets('publishes a separate recommended order for one trip list', (tester) async {
     final github = await openEditor(tester);
     await tapKey(tester, 'homepage-group-Destinations');
-    final weekend = find.text('This Weekend');
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Trip order'));
+    await tester.pumpAndSettle();
+    final weekend = find.text('This Week');
     await tester.ensureVisible(weekend);
     await tester.tap(weekend);
     await tester.pumpAndSettle();

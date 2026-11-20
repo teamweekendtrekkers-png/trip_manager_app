@@ -20,7 +20,7 @@ void main(){
     }
     expect(tester.widget<IconButton>(find.byKey(const Key('editor-next-section'))).onPressed, isNull);
     await tester.tap(find.byKey(const Key('editor-previous-section'))); await tester.pumpAndSettle();
-    expect(selected, TripEditorSection.itinerary);
+    expect(selected, TripEditorSection.guidance);
     expect(tester.takeException(), isNull);
   });
   test('quick edits retain concurrent unrelated fields and reject same-field changes',(){

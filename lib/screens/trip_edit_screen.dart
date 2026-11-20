@@ -259,7 +259,9 @@ class _TripEditScreenState extends State<TripEditScreen>
       text: _tripData['pickupPoint'] ?? '',
     );
     _imageController = TextEditingController(text: _tripData['image'] ?? '');
-    _videoController = TextEditingController(text: _tripData['videoUrl']?.toString() ?? '');
+    _videoController = TextEditingController(
+      text: _tripData['videoUrl']?.toString() ?? '',
+    );
     // Website-specific fields
     _badgeController = TextEditingController(
       text: _tripData['badge']?.toString() ?? 'Trek',
@@ -735,15 +737,6 @@ class _TripEditScreenState extends State<TripEditScreen>
                                       );
                                   },
                                 ),
-                                const SizedBox(height: 16),
-                                TextFormField(
-                                  controller: _pickupPointController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Pickup Point',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.directions_bus),
-                                  ),
-                                ),
                               ],
                             ),
                             const SizedBox(height: 16),
@@ -869,11 +862,13 @@ class _TripEditScreenState extends State<TripEditScreen>
                                   keyboardType: TextInputType.url,
                                   decoration: const InputDecoration(
                                     labelText: 'YouTube video link',
-                                    helperText: 'Paste a video or Short to show it on this trip page.',
+                                    helperText:
+                                        'Paste a video or Short to show it on this trip page.',
                                     helperMaxLines: 2,
                                     border: OutlineInputBorder(),
                                   ),
-                                  validator: (value) => value == null ||
+                                  validator: (value) =>
+                                      value == null ||
                                           value.trim().isEmpty ||
                                           TripsParser.isTripVideoUrl(value)
                                       ? null
@@ -995,6 +990,18 @@ class _TripEditScreenState extends State<TripEditScreen>
                             const SizedBox(height: 16),
 
                             // Boarding Locations Card
+                            _buildSectionCard(
+                              title: 'Pickup summary',
+                              children: [
+                                TextFormField(
+                                  controller: _pickupPointController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Pickup Point',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                              ],
+                            ),
                             _buildBoardingLocationsSection(),
                             const SizedBox(height: 16),
 
@@ -1279,7 +1286,9 @@ class _TripEditScreenState extends State<TripEditScreen>
       'URL and booking cutoff': 'Website URL & Booking Cutoff',
       'Maximum travellers per booking': 'Trip Details',
       'Duration, distance, elevation': 'Website Display Fields',
-      'Itinerary, packing, inclusions': 'Itinerary & guidance',
+      'Daily itinerary and activities': 'Itinerary & highlights',
+      'Packing list and things to carry': 'Things to Carry',
+      'Inclusions and exclusions': 'Inclusions',
       'FAQs, cancellation, highlights': 'Website sections',
     };
     String search = '';
@@ -1329,7 +1338,7 @@ class _TripEditScreenState extends State<TripEditScreen>
     setState(
       () => _editingSection = field == 'Website sections'
           ? TripEditorSection.website
-          : field == 'Itinerary & guidance'
+          : field == 'Itinerary & highlights'
           ? TripEditorSection.itinerary
           : editorSectionFor(field),
     );
@@ -1394,7 +1403,7 @@ class _TripEditScreenState extends State<TripEditScreen>
     required List<String> defaults,
   }) {
     return TripEditorPanel(
-      section: TripEditorSection.itinerary,
+      section: editorSectionFor(title),
       child: Column(
         key: ValueKey('trip-detail-list-$field'),
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1474,7 +1483,7 @@ class _TripEditScreenState extends State<TripEditScreen>
     required Function(int, String) onEdit,
   }) {
     return TripEditorPanel(
-      section: TripEditorSection.itinerary,
+      section: editorSectionFor(title),
       child: Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -1992,7 +2001,7 @@ class _TripEditScreenState extends State<TripEditScreen>
     final hasCustomLocations = boardingLocations.isNotEmpty;
 
     return TripEditorPanel(
-      section: TripEditorSection.dates,
+      section: TripEditorSection.pickup,
       child: Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -3000,7 +3009,9 @@ class _TripEditScreenState extends State<TripEditScreen>
     final videoUrl = _videoController.text.trim();
     if (videoUrl.isNotEmpty && !TripsParser.isTripVideoUrl(videoUrl)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid YouTube link in Photos → Trip video.')),
+        const SnackBar(
+          content: Text('Enter a valid YouTube link in Photos → Trip video.'),
+        ),
       );
       return;
     }
