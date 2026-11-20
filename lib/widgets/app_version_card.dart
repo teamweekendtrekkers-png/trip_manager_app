@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+import '../models/manager_release_notes.dart';
 import 'package:provider/provider.dart';
 import '../providers/trips_provider.dart';
 import 'package:flutter/material.dart';
@@ -257,8 +258,11 @@ class _AppVersionCardState extends State<AppVersionCard> {
               'What’s new',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            const Text(
-              '• PDF page previews with zoom and custom trip sections\n• Labelled trip actions and previous/next editor sections\n• Dashboard shortcuts for booking review, UPI and coupons\n• Clearer draft saving and publishing guidance\n• Extra website sections and coupon deletion with Undo',
+            Text(
+              managerReleaseNotes[[info?.version, info?.buildNumber].join('+')]
+                      ?.map((note) => '• $note')
+                      .join('\n') ??
+                  'Release notes are unavailable for this build.',
             ),
             const SizedBox(height: 12),
             const Text(
