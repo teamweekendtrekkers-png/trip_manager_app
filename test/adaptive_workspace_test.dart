@@ -103,6 +103,24 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Home guide opens dates and price after choosing a trip', (tester) async {
+    await _setSize(tester, const Size(390, 844));
+    final providers = await _providers();
+    await tester.pumpWidget(_app(providers, home: true));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Guide'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Trips & departures'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit dates or prices'));
+    await tester.pumpAndSettle();
+    expect(find.text('Choose a trip'), findsOneWidget);
+    final title = providers.trips.trips.first['title'] as String;
+    await tester.tap(find.descendant(of: find.byType(SimpleDialog), matching: find.text(title)));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TripEditorSectionPicker>(find.byType(TripEditorSectionPicker)).value, TripEditorSection.dates);
+  });
+
   testWidgets('Home photo issue opens Photos directly on a small phone', (
     tester,
   ) async {

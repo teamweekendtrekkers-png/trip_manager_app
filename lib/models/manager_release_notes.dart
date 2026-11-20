@@ -1,4 +1,9 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.35.0+43': [
+    'Open Guide from Home, More or the desktop sidebar.',
+    'Find step-by-step paths for trip editing, website settings, bookings and publishing.',
+    'Tap a guide task to open its screen or website editing section.',
+  ],
   '1.34.0+42': [
     'About shows the release notes for the installed version and build.',
     'Home has shortcuts for website editing and Customer journey.',
