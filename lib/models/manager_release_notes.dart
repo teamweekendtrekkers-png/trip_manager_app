@@ -1,4 +1,8 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.37.0+45': [
+    'Jump straight to website settings such as Story highlights, Trip order and Calendar on a phone.',
+    'See what each trip section contains before opening it.',
+  ],
   '1.36.0+44': [
     'Upload a story cover or choose a photo from the library.',
     'Preview the circular cover before saving the story.',

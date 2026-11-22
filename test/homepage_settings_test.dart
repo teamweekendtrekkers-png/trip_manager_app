@@ -545,7 +545,12 @@ void main() {
       await tester.tap(picker);
       await tester.pumpAndSettle();
       final group = key.substring('homepage-group-'.length);
-      await tester.tap(find.text(group == 'All' ? 'All sections' : group).last);
+      final option = find.text(group == 'All' ? 'All sections' : group);
+      if (option.evaluate().isEmpty) {
+        await tester.scrollUntilVisible(option, group == 'All' ? -120 : 120,
+          scrollable: find.byType(Scrollable).last);
+      }
+      await tester.tap(option.last);
       await tester.pumpAndSettle();
       return;
     }
@@ -1090,13 +1095,23 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('phone section picker opens Story highlights in one step', (tester) async {
+    await openEditor(tester);
+    await tapKey(tester, 'homepage-group-Story highlights');
+    expect(find.text('Show story highlights'), findsOneWidget);
+    expect(find.text('Add story'), findsOneWidget);
+  });
+
   testWidgets('publishes a separate recommended order for one trip list', (tester) async {
     final github = await openEditor(tester);
     await tapKey(tester, 'homepage-group-Destinations');
     await tester.tap(find.widgetWithText(ChoiceChip, 'Trip order'));
     await tester.pumpAndSettle();
     final weekend = find.text('This Week');
+    await tester.drag(find.byKey(const Key('homepage-editor-scroll')), const Offset(0, -230));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(weekend);
+    await tester.pumpAndSettle();
     await tester.tap(weekend);
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Move Beta up'));

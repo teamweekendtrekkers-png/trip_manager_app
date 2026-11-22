@@ -142,11 +142,32 @@ class TripEditorSectionPicker extends StatelessWidget {
                       vertical: 10,
                     ),
                   ),
+                  selectedItemBuilder: (context) => [
+                    for (final section in TripEditorSection.values)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(section.label),
+                      ),
+                  ],
+                  itemHeight: null,
                   items: [
                     for (final section in TripEditorSection.values)
                       DropdownMenuItem(
                         value: section,
-                        child: Text(section.label),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(section.label),
+                              Text(
+                                section.hint,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                   ],
                   onChanged: (section) {

@@ -72,6 +72,19 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
   }
 
   late String _group = widget.initialSection;
+
+  static const _websiteGroups = <String, List<String>>{
+    'Hero': ['Story highlights'],
+    'Upcoming Batches': ['Calendar'],
+    'Destinations': ['Trip discovery', 'Trip order', 'Destination slideshow'],
+    'Appearance': ['Date colours', 'Card colours', 'Mobile tab colours'],
+  };
+
+  void _selectWebsiteSection(String section) {
+    setState(() => _group = section);
+    if (_homeScroll.hasClients) _homeScroll.jumpTo(0);
+  }
+
   final _anchors = <String, GlobalKey>{};
   final _fieldFocus = <String, FocusNode>{};
   Widget _websiteSubsections(List<String> sections) => Wrap(
@@ -84,7 +97,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
           selected:
               _group == section ||
               (_group == 'Destinations' && section == 'Trip discovery'),
-          onSelected: (_) => setState(() => _group = section),
+          onSelected: (_) => _selectWebsiteSection(section),
         ),
     ],
   );
@@ -1043,7 +1056,9 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                         'Pages',
                         'Trip gallery',
                       ],
-                      selected: switch (_group) {
+                      subsections: _websiteGroups,
+                      selected: _group,
+                      desktopSelected: switch (_group) {
                         'Story highlights' => 'Hero',
                         'Calendar' => 'Upcoming Batches',
                         'Trip order' ||
@@ -1054,7 +1069,7 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                         'Mobile tab colours' => 'Appearance',
                         _ => _group,
                       },
-                      onChanged: (group) => setState(() => _group = group),
+                      onChanged: _selectWebsiteSection,
                     ),
                     if (['Hero', 'Story highlights'].contains(_group))
                       _websiteSubsections(['Hero', 'Story highlights']),
