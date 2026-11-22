@@ -861,9 +861,9 @@ class _TripEditScreenState extends State<TripEditScreen>
                                   controller: _videoController,
                                   keyboardType: TextInputType.url,
                                   decoration: const InputDecoration(
-                                    labelText: 'YouTube video link',
+                                    labelText: 'YouTube or Instagram Reel link',
                                     helperText:
-                                        'Paste a video or Short to show it on this trip page.',
+                                        'Use a YouTube video, Short, or public Instagram Reel.',
                                     helperMaxLines: 2,
                                     border: OutlineInputBorder(),
                                   ),
@@ -872,7 +872,7 @@ class _TripEditScreenState extends State<TripEditScreen>
                                           value.trim().isEmpty ||
                                           TripsParser.isTripVideoUrl(value)
                                       ? null
-                                      : 'Enter a valid HTTPS YouTube video link.',
+                                      : 'Enter a valid HTTPS YouTube or Instagram Reel link.',
                                 ),
                               ],
                             ),
@@ -1280,7 +1280,7 @@ class _TripEditScreenState extends State<TripEditScreen>
       'Dates': 'Departure Dates',
       'Price and discount': 'Date & Pricing',
       'Pickup locations': 'Boarding Locations',
-      'Trip video or YouTube': 'Trip video',
+      'Trip video, YouTube or Instagram Reel': 'Trip video',
       'Photos': 'Display Image — card 16:9 (1200×675 px)',
       'Visibility': 'Visibility',
       'URL and booking cutoff': 'Website URL & Booking Cutoff',
@@ -3010,7 +3010,7 @@ class _TripEditScreenState extends State<TripEditScreen>
     if (videoUrl.isNotEmpty && !TripsParser.isTripVideoUrl(videoUrl)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Enter a valid YouTube link in Photos → Trip video.'),
+          content: Text('Enter a valid YouTube or Instagram Reel link in Photos → Trip video.'),
         ),
       );
       return;
