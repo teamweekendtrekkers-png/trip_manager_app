@@ -229,6 +229,9 @@ class TripsParser {
     if (url == null || url.scheme != 'https' || url.userInfo.isNotEmpty ||
         (url.hasPort && url.port != 443)) return false;
     final parts = url.pathSegments.where((part) => part.isNotEmpty).toList();
+    if (const ['instagram.com', 'www.instagram.com'].contains(url.host)) {
+      return RegExp(r'^/reel/[A-Za-z0-9_-]{1,64}/?$').hasMatch(url.path);
+    }
     String? id;
     if (url.host == 'youtu.be' && parts.length == 1) {
       id = parts.first;
