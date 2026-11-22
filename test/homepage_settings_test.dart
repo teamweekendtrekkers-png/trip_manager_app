@@ -1090,6 +1090,13 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('phone section picker opens Story highlights in one step', (tester) async {
+    await openEditor(tester);
+    await tapKey(tester, 'homepage-group-Story highlights');
+    expect(find.text('Show story highlights'), findsOneWidget);
+    expect(find.text('Add story'), findsOneWidget);
+  });
+
   testWidgets('publishes a separate recommended order for one trip list', (tester) async {
     final github = await openEditor(tester);
     await tapKey(tester, 'homepage-group-Destinations');

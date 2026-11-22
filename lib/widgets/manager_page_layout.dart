@@ -75,11 +75,15 @@ class ManagerSectionPicker extends StatelessWidget {
     required this.sections,
     required this.selected,
     required this.onChanged,
+    this.subsections = const {},
+    this.desktopSelected,
   });
 
   final List<String> sections;
   final String selected;
   final ValueChanged<String> onChanged;
+  final Map<String, List<String>> subsections;
+  final String? desktopSelected;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -87,17 +91,27 @@ class ManagerSectionPicker extends StatelessWidget {
       if (constraints.maxWidth < 560 ||
           MediaQuery.textScalerOf(context).scale(16) > 22) {
         return Padding(
+          key: const Key('homepage-section-picker'),
           padding: const EdgeInsets.only(bottom: 12),
           child: DropdownButtonFormField<String>(
-            key: const Key('homepage-section-picker'),
+            key: ValueKey(selected),
             initialValue: selected,
             isExpanded: true,
             decoration: const InputDecoration(labelText: 'Website section'),
             items: [
-              for (final section in {...sections, selected})
+              for (final section in {
+                for (final parent in sections) ...[
+                  parent,
+                  ...?subsections[parent],
+                ],
+                selected,
+              })
                 DropdownMenuItem(
                   value: section,
-                  child: Text(section == 'All' ? 'All sections' : section),
+                  child: Text(
+                    section == 'All' ? 'All sections' : section,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
             ],
             onChanged: (value) {
@@ -113,7 +127,7 @@ class ManagerSectionPicker extends StatelessWidget {
             ChoiceChip(
               key: ValueKey('homepage-group-$section'),
               label: Text(section),
-              selected: selected == section,
+              selected: (desktopSelected ?? selected) == section,
               onSelected: (_) => onChanged(section),
             ),
         ],
