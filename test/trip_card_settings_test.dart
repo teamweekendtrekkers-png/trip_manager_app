@@ -275,6 +275,7 @@ void main() {
         'showSearch': true,
         'showExperienceFilter': true,
         'showTripTypeFilter': true,
+        'hideComingSoonTrips': false,
         'showWeekendFilter': true,
       });
       for (final edit in <void Function(Map<String, dynamic>)>[
