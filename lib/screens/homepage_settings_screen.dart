@@ -412,6 +412,36 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
     }
   }
 
+  Future<String?> _uploadStoryPhoto() async {
+    if (!_targetMatches)
+      throw StateError(
+        'Reopen the homepage editor after changing repository settings.',
+      );
+    if (widget.imageUploader != null) return widget.imageUploader!();
+    final photo = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (photo == null || !mounted) return null;
+    if (!_targetMatches)
+      throw StateError(
+        'Repository settings changed. Reopen the homepage editor.',
+      );
+    if (![
+      'jpg',
+      'jpeg',
+      'png',
+      'webp',
+    ].contains(photo.path.split('.').last.toLowerCase())) {
+      throw StateError('Choose a JPG, PNG or WebP image.');
+    }
+    final result = await ImageUploadService(settings: _target).uploadImage(
+      imageFile: File(photo.path),
+      tripId: 'story_highlights',
+      isMainImage: true,
+    );
+    if (!result.success)
+      throw StateError(result.error ?? 'Image upload failed.');
+    return result.imagePath;
+  }
+
   Future<void> _upload({
     String group = 'hero',
     String field = 'backgroundImage',
@@ -1089,6 +1119,28 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                     const SizedBox(height: 20),
                     if (_group == 'Story highlights')
                       StoryHighlightsEditor(
+                        uploadPhoto: _uploadStoryPhoto,
+                        choosePhoto: (dialogContext) => Navigator.push<String>(
+                          dialogContext,
+                          MaterialPageRoute(
+                            builder: (_) => const ManagerToolsScreen(
+                              tool: ManagerDestination.library,
+                              choosePhoto: true,
+                            ),
+                          ),
+                        ),
+                        previewPhoto: (path) {
+                          final url = path.startsWith('https://')
+                              ? path
+                              : 'https://raw.githubusercontent.com/${_target.repositoryOwner}/${_target.repositoryName}/${_target.branch}/$path';
+                          return widget.imagePreviewBuilder?.call(url) ??
+                              Image.network(
+                                url,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) =>
+                                    const Icon(Icons.broken_image_outlined),
+                              );
+                        },
                         value:
                             _draft!['storyHighlights'] as Map<String, dynamic>,
                         onChanged: (value) =>

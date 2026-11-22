@@ -1,4 +1,8 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.36.0+44': [
+    'Upload a story cover or choose a photo from the library.',
+    'Preview the circular cover before saving the story.',
+  ],
   '1.35.0+43': [
     'Open Guide from Home, More or the desktop sidebar.',
     'Find step-by-step paths for trip editing, website settings, bookings and publishing.',
