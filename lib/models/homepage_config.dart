@@ -31,6 +31,7 @@ class HomepageConfig {
       'showSearch': true,
       'showExperienceFilter': true,
       'showTripTypeFilter': true,
+      'hideComingSoonTrips': false,
       'showWeekendFilter': true,
     },
     'presentation': {

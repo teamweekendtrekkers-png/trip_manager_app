@@ -1,4 +1,8 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.38.0+46': [
+    'Hide Coming soon trip cards from your website in Trip discovery.',
+    'Choose story covers and publish them together with your homepage edits.'
+  ],
   '1.37.0+45': [
     'Jump straight to website settings such as Story highlights, Trip order and Calendar on a phone.',
     'See what each trip section contains before opening it.',

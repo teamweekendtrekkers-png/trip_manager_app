@@ -11,6 +11,7 @@ import 'manager_tools_screen.dart';
 import '../widgets/manager_navigation.dart';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import '../widgets/footer_settings_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -390,7 +391,12 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
     });
     final previous = copyDocument(jsonDecode(_saved!) as Map);
     final retained = copyDocument(_draft!);
-    final result = await _service.save(config);
+    final staged = <String, String>{};
+    for (final path in HomepageSettingsService.storyImages(config)) {
+      final image = _stagedStoryCover(path);
+      if (image != null) staged[path] = image;
+    }
+    final result = await _service.save(config, stagedImages: staged);
     if (!mounted) return;
     setState(() {
       _busy = false;
@@ -420,10 +426,17 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
         Map<String, dynamic>.from(jsonDecode(_saved!) as Map),
       );
       await saveLocalDraft();
+      for (final path in staged.keys) {
+        await DraftStore.remove(localScope, 'story-cover:$path');
+      }
       await DraftStore.recordPublication(localScope, _savedCommit);
       if (!mounted) return;
     }
   }
+
+  String? _stagedStoryCover(String path) =>
+      DraftStore.read(localScope, 'story-cover:$path')?['data']?['image']
+          as String?;
 
   Future<String?> _uploadStoryPhoto() async {
     if (!_targetMatches)
@@ -437,22 +450,24 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
       throw StateError(
         'Repository settings changed. Reopen the homepage editor.',
       );
-    if (![
-      'jpg',
-      'jpeg',
-      'png',
-      'webp',
-    ].contains(photo.path.split('.').last.toLowerCase())) {
+    final extension = photo.path.split('.').last.toLowerCase();
+    if (!['jpg', 'jpeg', 'png', 'webp'].contains(extension)) {
       throw StateError('Choose a JPG, PNG or WebP image.');
     }
-    final result = await ImageUploadService(settings: _target).uploadImage(
-      imageFile: File(photo.path),
-      tripId: 'story_highlights',
-      isMainImage: true,
-    );
-    if (!result.success)
-      throw StateError(result.error ?? 'Image upload failed.');
-    return result.imagePath;
+    if (!DraftStore.available) {
+      throw StateError(
+        'Local draft storage is unavailable. Reopen the app and try again.',
+      );
+    }
+    if (await photo.length() > 8 * 1024 * 1024) {
+      throw StateError('Choose a story cover smaller than 8 MB.');
+    }
+    final image = base64Encode(await photo.readAsBytes());
+    final id = Random.secure().nextInt(1 << 32).toRadixString(16);
+    final path =
+        'images/trips/story_cover_${DateTime.now().microsecondsSinceEpoch}_$id.$extension';
+    await DraftStore.write(localScope, 'story-cover:$path', {'image': image});
+    return path;
   }
 
   Future<void> _upload({
@@ -1145,6 +1160,13 @@ class _HomepageSettingsScreenState extends State<HomepageSettingsScreen>
                           ),
                         ),
                         previewPhoto: (path) {
+                          final staged = _stagedStoryCover(path);
+                          if (staged != null) {
+                            return Image.memory(
+                              base64Decode(staged),
+                              fit: BoxFit.cover,
+                            );
+                          }
                           final url = path.startsWith('https://')
                               ? path
                               : 'https://raw.githubusercontent.com/${_target.repositoryOwner}/${_target.repositoryName}/${_target.branch}/$path';

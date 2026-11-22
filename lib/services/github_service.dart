@@ -276,9 +276,26 @@ class GitHubService {
     required Map<String, String> files,
     required Map<String, String?> expectedBlobShas,
     required String commitMessage,
+  }) => commitFilesAndImagesAtomically(
+    files: files,
+    imageContents: const {},
+    expectedBlobShas: expectedBlobShas,
+    commitMessage: commitMessage,
+  );
+
+  Future<GitHubCommitResult> commitFilesAndImagesAtomically({
+    required Map<String, String> files,
+    required Map<String, String> imageContents,
+    required Map<String, String?> expectedBlobShas,
+    required String commitMessage,
   }) async {
+    final contents = {
+      for (final entry in files.entries)
+        entry.key: base64.encode(utf8.encode(entry.value)),
+      ...imageContents,
+    };
     final validationError = _validateAtomicCommitInput(
-      files,
+      contents,
       expectedBlobShas,
       commitMessage,
     );
@@ -331,7 +348,7 @@ class GitHubService {
       }
 
       final conflicts = <String>[];
-      for (final path in files.keys) {
+      for (final path in contents.keys) {
         final currentEntry = currentEntries[path];
         final currentSha = currentEntry?['sha']?.toString();
         final expectedSha = expectedBlobShas[path];
@@ -354,13 +371,10 @@ class GitHubService {
       }
 
       final createdBlobShas = <String, String>{};
-      for (final entry in files.entries) {
+      for (final entry in contents.entries) {
         final blobResponse = await _dio.post(
           '$_repoPath/git/blobs',
-          data: {
-            'content': base64.encode(utf8.encode(entry.value)),
-            'encoding': 'base64',
-          },
+          data: {'content': entry.value, 'encoding': 'base64'},
         );
         createdBlobShas[entry.key] = _requiredString(
           blobResponse.data?['sha'],

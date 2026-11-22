@@ -64,7 +64,15 @@ class HomepageSettingsService {
     return HomepageConfig.parse(jsonEncode(merged));
   }
 
-  Future<GitHubCommitResult> save(HomepageConfig draft) async {
+  static Set<String> storyImages(HomepageConfig config) => {
+    for (final item in config.toJson()['storyHighlights']['items'] as List)
+      item['image'] as String,
+  };
+
+  Future<GitHubCommitResult> save(
+    HomepageConfig draft, {
+    Map<String, String> stagedImages = const {},
+  }) async {
     if (_base == null) {
       return GitHubCommitResult(
         success: false,
@@ -83,11 +91,29 @@ class HomepageSettingsService {
             message: 'Homepage already matches your changes.',
           );
         }
-        final result = await github.commitFilesAtomically(
-          files: {path: merged.encode()},
-          expectedBlobShas: {path: latest.$2},
-          commitMessage: 'Customize homepage via Trip Manager',
+        final references = storyImages(
+          merged,
+        ).difference(storyImages(latest.$1));
+        final images = Map.fromEntries(
+          stagedImages.entries.where((entry) => references.contains(entry.key)),
         );
+        final files = {path: merged.encode()};
+        const message = 'Customize homepage via Trip Manager';
+        final result = images.isEmpty
+            ? await github.commitFilesAtomically(
+                files: files,
+                expectedBlobShas: {path: latest.$2},
+                commitMessage: message,
+              )
+            : await github.commitFilesAndImagesAtomically(
+                files: files,
+                imageContents: images,
+                expectedBlobShas: {
+                  path: latest.$2,
+                  for (final key in images.keys) key: null,
+                },
+                commitMessage: message,
+              );
         if (result.success) {
           _base = merged;
           _sha = result.fileBlobShas[path];

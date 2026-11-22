@@ -26,18 +26,26 @@ class DiscoverySettingsEditor extends StatelessWidget {
             'showExperienceFilter': 'Experience categories',
             'showTripTypeFilter': 'Show trip type filters',
             'showWeekendFilter': 'Upcoming weekend / date filter',
+            'hideComingSoonTrips': 'Hide Coming soon trips',
           }.entries)
             SwitchListTile(
               key: ValueKey('homepage-discovery-${entry.key}'),
               contentPadding: EdgeInsets.zero,
               title: Text(entry.value),
-              subtitle: entry.key == 'showTripTypeFilter'
-                  ? const Text('Show the Trip type row on the All Trips page.')
-                  : null,
-              value: discovery[entry.key] as bool,
+              subtitle: switch (entry.key) {
+                'showTripTypeFilter' => const Text(
+                  'Show the Trip type row on the All Trips page.',
+                ),
+                'hideComingSoonTrips' => const Text(
+                  'Hide Coming soon and New dates coming soon cards from Explore Destinations, search and All Trips.',
+                ),
+                _ => null,
+              },
+              value: discovery[entry.key] == true,
               onChanged:
                   entry.key == 'enabled' ||
                       entry.key == 'showTripTypeFilter' ||
+                      entry.key == 'hideComingSoonTrips' ||
                       discovery['enabled'] == true
                   ? (value) => onChanged(entry.key, value)
                   : null,

@@ -94,6 +94,9 @@ class StoryHighlightsEditor extends StatelessWidget {
                         ),
                       ],
                     ),
+                    const Text(
+                      'New photos go live when you publish this section.',
+                    ),
                     if (busy) const LinearProgressIndicator(),
                     if (error != null) Text(error!),
                     TextFormField(

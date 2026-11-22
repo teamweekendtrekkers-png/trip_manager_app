@@ -55,6 +55,7 @@ class MemoryGitHub extends GitHubService {
     : super(settings: AppSettings(githubToken: 'test'));
   final List<GitHubFileResult> snapshots;
   final calls = <Map<String, String>>[];
+  final imageCalls = <Map<String, String>>[];
   final expected = <Map<String, String?>>[];
   final results = <GitHubCommitResult>[];
   @override
@@ -63,6 +64,17 @@ class MemoryGitHub extends GitHubService {
       throw StateError('Unexpected homepage read: $filePath');
     }
     return snapshots.removeAt(0);
+  }
+
+  @override
+  Future<GitHubCommitResult> commitFilesAndImagesAtomically({
+    required Map<String, String> files,
+    required Map<String, String> imageContents,
+    required Map<String, String?> expectedBlobShas,
+    required String commitMessage,
+  }) {
+    imageCalls.add(imageContents);
+    return commitFilesAtomically(files: files, expectedBlobShas: expectedBlobShas, commitMessage: commitMessage);
   }
 
   @override
@@ -84,6 +96,23 @@ class MemoryGitHub extends GitHubService {
 }
 
 void main() {
+  test('publishes only referenced staged covers with homepage settings', () async {
+    const cover = 'images/trips/new-cover.png';
+    const unused = 'images/trips/replaced-cover.png';
+    final github = MemoryGitHub([file(config()), file(config())]);
+    final service = HomepageSettingsService(github);
+    await service.load();
+    final draft = config((data) {
+      data['storyHighlights']['items'] = [
+        {'name': 'Weekend', 'image': cover, 'url': 'https://www.instagram.com/stories/highlights/123/'},
+      ];
+    });
+    final result = await service.save(draft, stagedImages: {cover: 'Y29uZmln', unused: 'dW51c2Vk'});
+    expect(result.success, isTrue);
+    expect(github.imageCalls.single, {cover: 'Y29uZmln'});
+    expect(github.expected.single, {HomepageSettingsService.path: 'base', cover: null});
+    expect(HomepageSettingsService.storyImages(HomepageConfig.parse(github.calls.single[HomepageSettingsService.path]!)), {cover});
+  });
   test('Instagram highlights round trip when hidden and preserve their order', () {
     final initial = HomepageConfig.initial();
     expect(jsonDecode(initial.encode()).containsKey('storyHighlights'), false);
