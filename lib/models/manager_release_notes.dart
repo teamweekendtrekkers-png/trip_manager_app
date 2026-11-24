@@ -1,4 +1,8 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.40.0+48': [
+    'Compare matching weekdays and view an hourly IST activity heatmap when available.',
+    'See unmet trip demand, inspect per-trip conversion and open pending payment reviews.',
+  ],
   '1.39.0+47': [
     'Find the biggest booking funnel drop-off and switch between Overview, Traffic and Checkout & payments in Customer journey.',
     'Compare sessions and payment detail submissions by date in India time.',

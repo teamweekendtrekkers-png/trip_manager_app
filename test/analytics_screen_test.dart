@@ -27,6 +27,11 @@ class FakeAnalytics extends BookingReviewService {
       'trips':[{'trip_id':'kannur-theyyam','views':50,'checkouts':30,'submissions':10}],
       'sources':[{'source':'instagram','sessions':60,'submissions':8}],
       'devices':[{'device':'mobile','sessions':75,'submissions':10}],
+      'hourly': [{'weekday': 3, 'hour': 14, 'sessions': 20, 'submissions': 3}],
+      'activity': {'sessions': 100, 'submissions': 12},
+      'comparison': {'start': '2026-10-07', 'end': '2026-10-14', 'sessions': 90, 'submissions': 8},
+      'demand': {'no_results': 6, 'no_departure': 4},
+      'searched_dates': [{'day': '2026-11-20', 'sessions': 3}],
       'daily':[{'day':'2026-10-21','sessions':20,'submissions':3}],
       'errors':[], 'engagement':{'upi_copied':20,'qr_downloaded':5}, 'requests':2,
       'review':{'submitted':20,'pending':3,'verified':15,'rejected':2,'average_review_hours':2.1},
@@ -46,7 +51,7 @@ void main() {
       final service=FakeAnalytics(); final key=GlobalKey();
       await tester.pumpWidget(MaterialApp(theme:ThemeData(fontFamily:'AnalyticsPreview'),home:RepaintBoundary(key:key,child:AnalyticsScreen(service:service))));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Where visitors leave')); await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text('Where visitors leave'), 180, scrollable: find.byType(Scrollable).first); await tester.pumpAndSettle();
       expect(find.text('Where visitors leave'),findsOneWidget);
       expect(find.textContaining('20 have not reached the next step'),findsWidgets);
       expect(tester.takeException(),isNull);
@@ -63,10 +68,15 @@ void main() {
     });
   }
   testWidgets('date-wise report uses the selected filters and can reset them', (tester) async {
+    tester.view.physicalSize = const Size(390, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     final service = FakeAnalytics();
     await tester.pumpWidget(MaterialApp(home: AnalyticsScreen(service: service)));
     await tester.pumpAndSettle();
     expect(find.text('Largest drop-off'), findsOneWidget);
+    expect(find.text('Same-weekday comparison'), findsOneWidget);
     await tester.tap(find.text('All devices'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('mobile').last);
@@ -75,6 +85,10 @@ void main() {
     await tester.ensureVisible(find.text('By date'));
     await tester.tap(find.text('By date'));
     await tester.pumpAndSettle();
+    expect(find.text('Activity by hour (IST)'), findsOneWidget);
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Submissions'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Submissions')).selected, isTrue);
     expect(find.text('Daily activity'), findsOneWidget);
     expect(find.text('20 sessions · 3 submissions'), findsOneWidget);
     expect(find.text('Where visitors leave'), findsNothing);

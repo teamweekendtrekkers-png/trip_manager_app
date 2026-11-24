@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/github_service.dart';
+import '../services/booking_review_filter.dart';
+import 'booking_review_screen.dart';
 import '../services/booking_review_service.dart';
 
 class AnalyticsScreen extends StatefulWidget {
@@ -20,6 +22,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   String? error;
   Map<String, dynamic>? report;
   int days = 30;
+  bool hourlySubmissions = false;
   _ReportView view = _ReportView.overview;
   DateTimeRange get period =>
       custom ??
@@ -156,6 +159,111 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     ]);
   }
 
+  Widget activityByHour() {
+    final hourly = rows('hourly');
+    if (hourly.isEmpty)
+      return section('Activity by hour (IST)', [
+        const Text('No tracked activity in this period.'),
+      ]);
+    final metric = hourlySubmissions ? 'submissions' : 'sessions';
+    final counts = {
+      for (final row in hourly)
+        (number(row['weekday']), number(row['hour'])): number(row[metric]),
+    };
+    final peak = counts.values.fold(
+      1,
+      (int maximum, count) => count > maximum ? count : maximum,
+    );
+    final colors = Theme.of(context).colorScheme;
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    Widget cell(int day, int hour) {
+      final count = counts[(day, hour)] ?? 0;
+      final intensity = count / peak;
+      return Semantics(
+        label:
+            '${weekdays[day - 1]} ${hour.toString().padLeft(2, '0')}:00, $count $metric',
+        excludeSemantics: true,
+        child: Container(
+          margin: const EdgeInsets.all(2),
+          height: 30,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Color.lerp(
+              colors.surfaceContainer,
+              colors.primary,
+              intensity,
+            ),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 12,
+              color: intensity > .65 ? colors.onPrimary : colors.onSurface,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return section('Activity by hour (IST)', [
+      const Text(
+        'Scroll sideways to see all 24 hours. A session can appear in multiple hours.',
+      ),
+      Wrap(
+        spacing: 8,
+        children: [
+          for (final (value, label) in const [
+            (false, 'Sessions'),
+            (true, 'Submissions'),
+          ])
+            ChoiceChip(
+              label: Text(label),
+              selected: value == hourlySubmissions,
+              onSelected: (_) => setState(() => hourlySubmissions = value),
+            ),
+        ],
+      ),
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Table(
+          defaultColumnWidth: const FixedColumnWidth(39),
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+          children: [
+            TableRow(
+              children: [
+                const SizedBox.shrink(),
+                for (var hour = 0; hour < 24; hour++)
+                  Center(child: Text(hour.toString().padLeft(2, '0'))),
+              ],
+            ),
+            for (var day = 1; day <= 7; day++)
+              TableRow(
+                children: [
+                  Text(weekdays[day - 1]),
+                  for (var hour = 0; hour < 24; hour++) cell(day, hour),
+                ],
+              ),
+          ],
+        ),
+      ),
+    ]);
+  }
+
+  Widget comparePeriods(Map current, Map previous) {
+    String change(String key) {
+      final before = number(previous[key]), after = number(current[key]);
+      final change = after - before;
+      return '$after vs $before (${change > 0 ? '+' : ''}$change)';
+    }
+
+    return section('Same-weekday comparison', [
+      Text('Comparison dates: ${previous['start']} – ${previous['end']} · IST'),
+      Text('Active sessions: ${change('sessions')}'),
+      Text('Payment detail submissions: ${change('submissions')}'),
+    ]);
+  }
+
   Widget dailyActivity(MaterialLocalizations dates) {
     final activity = rows('daily')
       ..sort((a, b) => b['day'].toString().compareTo(a['day'].toString()));
@@ -210,6 +318,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   @override
   Widget build(BuildContext context) {
     final funnel = rows('funnel');
+    final comparison = report?['comparison'], activity = report?['activity'];
+    final demand = report?['demand'], review = report?['review'];
     final first = funnel.isEmpty ? 0 : number(funnel.first['count']);
     final last = funnel.isEmpty ? 0 : number(funnel.last['count']);
     final range = period;
@@ -455,7 +565,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           'This is an empty report, not a booking error. New data appears when a visitor views a trip with browser analytics allowed. Try a wider period or clear the filters.',
                         ),
                       ]),
-                    if (first > 0) biggestDrop(funnel),
+                    if (comparison is Map && activity is Map)
+                      comparePeriods(activity, comparison),
+                    if (first >= 20) biggestDrop(funnel),
+                    if (first > 0 && first < 20)
+                      const Text(
+                        'Fewer than 20 journeys. Interpret drop-offs with care.',
+                      ),
                     if (first > 0)
                       section('Where visitors leave', [
                         const Text(
@@ -505,12 +621,28 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     section('Trips attracting interest', [
                       for (final row in rows('trips'))
                         ListTile(
+                          onTap: busy || trip == row['trip_id']
+                              ? null
+                              : () {
+                                  setState(
+                                    () => trip = row['trip_id'].toString(),
+                                  );
+                                  load();
+                                },
                           contentPadding: EdgeInsets.zero,
                           title: Text(
                             row['trip_id'].toString().replaceAll('-', ' '),
                           ),
                           subtitle: Text(
-                            '${row['views']} journeys · ${row['checkouts']} checkouts · ${row['submissions']} submissions',
+                            [
+                              "${row['views']} views",
+                              if (row['dates'] != null)
+                                "${row['dates']} selected dates",
+                              "${row['checkouts']} checkouts",
+                              if (row['payment'] != null)
+                                "${row['payment']} reached payment",
+                              "${row['submissions']} submissions",
+                            ].join(' · '),
                           ),
                           trailing: Text(
                             percent(
@@ -524,6 +656,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ]),
                   ],
                   if (view == _ReportView.traffic) ...[
+                    if (demand is Map)
+                      section('Unmet trip demand', [
+                        if (demand['no_results'] != null)
+                          Text(
+                            "${demand['no_results']} sessions found no matching trips.",
+                          ),
+                        Text(
+                          "${demand['no_departure']} sessions viewed trips with no bookable dates.",
+                        ),
+                        for (final row in rows('searched_dates'))
+                          Text(
+                            "${row['day']} · ${row['sessions']} sessions looked for this departure",
+                          ),
+                      ]),
                     section('Traffic sources', [
                       const Text(
                         'First source within the tracked session. Unknown campaigns are grouped; campaign names and full URLs are not stored.',
@@ -551,7 +697,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         ),
                     ]),
                   ],
-                  if (view == _ReportView.daily) dailyActivity(dateLabels),
+                  if (view == _ReportView.daily) ...[
+                    if (report!.containsKey('hourly')) activityByHour(),
+                    dailyActivity(dateLabels),
+                  ],
                   if (view == _ReportView.checkout) ...[
                     section('Checkout issues', [
                       for (final row in rows('errors'))
@@ -559,6 +708,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           contentPadding: EdgeInsets.zero,
                           title: Text(switch (row['code']) {
                             'qr_failed' => 'QR image did not load',
+                            'pickup_missing' => 'Pickup point needed',
+                            'invalid_traveller_details' =>
+                              'Traveller details incomplete or invalid',
+                            'date_unavailable' =>
+                              'Departure no longer available',
                             'booking_submit_failed' =>
                               'Booking submission failed',
                             _ => 'Checkout could not continue',
@@ -582,6 +736,24 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       ),
                     ]),
                     section('Team payment review', [
+                      if (review is Map && review['overdue'] != null)
+                        Text(
+                          "${review['overdue']} payment reports waiting over 24 hours · ${review['confirmed']} confirmed among these reports",
+                        ),
+                      if (review is Map)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const BookingReviewScreen(
+                                  initialFilter: BookingReviewFilter.pending,
+                                ),
+                              ),
+                            ),
+                            child: const Text('Open pending payment reviews'),
+                          ),
+                        ),
                       if (report!['review'] == null)
                         const Text(
                           'Select All devices to view team review totals. Customer bookings do not store analytics device or session identifiers.',
