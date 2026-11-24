@@ -51,7 +51,7 @@ void main() {
       final service=FakeAnalytics(); final key=GlobalKey();
       await tester.pumpWidget(MaterialApp(theme:ThemeData(fontFamily:'AnalyticsPreview'),home:RepaintBoundary(key:key,child:AnalyticsScreen(service:service))));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Where visitors leave')); await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text('Where visitors leave'), 180, scrollable: find.byType(Scrollable).first); await tester.pumpAndSettle();
       expect(find.text('Where visitors leave'),findsOneWidget);
       expect(find.textContaining('20 have not reached the next step'),findsWidgets);
       expect(tester.takeException(),isNull);
