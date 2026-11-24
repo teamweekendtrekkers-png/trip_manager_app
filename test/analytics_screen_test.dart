@@ -62,6 +62,29 @@ void main() {
       expect(tester.takeException(),isNull);
     });
   }
+  testWidgets('date-wise report uses the selected filters and can reset them', (tester) async {
+    final service = FakeAnalytics();
+    await tester.pumpWidget(MaterialApp(home: AnalyticsScreen(service: service)));
+    await tester.pumpAndSettle();
+    expect(find.text('Largest drop-off'), findsOneWidget);
+    await tester.tap(find.text('All devices'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('mobile').last);
+    await tester.pumpAndSettle();
+    expect(service.selectedDevice, 'mobile');
+    await tester.ensureVisible(find.text('By date'));
+    await tester.tap(find.text('By date'));
+    await tester.pumpAndSettle();
+    expect(find.text('Daily activity'), findsOneWidget);
+    expect(find.text('20 sessions · 3 submissions'), findsOneWidget);
+    expect(find.text('Where visitors leave'), findsNothing);
+    await tester.ensureVisible(find.text('Reset filters'));
+    await tester.tap(find.text('Reset filters'));
+    await tester.pumpAndSettle();
+    expect(service.selectedDevice, isEmpty);
+    expect(find.text('Daily activity'), findsOneWidget);
+  });
+
   testWidgets('failure clears stale report and offers retry', (tester) async {
     final service=FakeAnalytics()..fail=true;
     await tester.pumpWidget(MaterialApp(home:AnalyticsScreen(service:service)));await tester.pumpAndSettle();
