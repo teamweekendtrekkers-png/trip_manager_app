@@ -2,6 +2,26 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:trip_manager_app/services/trip_workspace_filter.dart';
 
 void main() {
+  test('price order uses the selling fare and puts unknown fares last', () {
+    final trips = <Map<String, dynamic>>[
+      {'id': 'unknown'},
+      {'id': 'discount', 'price': 6000, 'discountedPrice': 4000},
+      {'id': 'standard', 'price': 4500},
+    ];
+    Iterable<Object?> order(TripWorkspaceSort mode) =>
+        sortTripWorkspace(trips, mode).map((trip) => trip['id']);
+    expect(order(TripWorkspaceSort.priceLow), [
+      'discount',
+      'standard',
+      'unknown',
+    ]);
+    expect(order(TripWorkspaceSort.priceHigh), [
+      'standard',
+      'discount',
+      'unknown',
+    ]);
+    expect(trips.first['id'], 'unknown');
+  });
   test(
     'attention and price filters respect active trips and selling fares',
     () {

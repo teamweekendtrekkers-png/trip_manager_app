@@ -6,7 +6,9 @@ import 'trip_date_utils.dart';
 enum TripWorkspaceSort {
   website('Website order'),
   name('Trip name'),
-  departure('Next departure');
+  departure('Next departure'),
+  priceLow('Price: low to high'),
+  priceHigh('Price: high to low');
 
   const TripWorkspaceSort(this.label);
   final String label;
@@ -32,6 +34,11 @@ List<Map<String, dynamic>> sortTripWorkspace(
                 .reduce((a, b) => a.isBefore(b) ? a : b);
     }
   }
+  final prices = <Map<String, dynamic>, num?>{
+    if (sort == TripWorkspaceSort.priceLow ||
+        sort == TripWorkspaceSort.priceHigh)
+      for (final trip in trips) trip: TripPricing.selling(trip),
+  };
   final indexed = trips.asMap().entries.toList();
   indexed.sort((a, b) {
     int comparison;
@@ -39,6 +46,15 @@ List<Map<String, dynamic>> sortTripWorkspace(
       String name(Map trip) =>
           (trip['title'] ?? trip['name'] ?? '').toString().trim().toLowerCase();
       comparison = name(a.value).compareTo(name(b.value));
+    } else if (prices.isNotEmpty) {
+      final first = prices[a.value], second = prices[b.value];
+      comparison = first == null || first <= 0
+          ? (second == null || second <= 0 ? 0 : 1)
+          : second == null || second <= 0
+          ? -1
+          : sort == TripWorkspaceSort.priceLow
+          ? first.compareTo(second)
+          : second.compareTo(first);
     } else {
       final first = dates[a.value], second = dates[b.value];
       comparison = first == null

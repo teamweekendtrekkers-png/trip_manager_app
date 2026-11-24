@@ -576,7 +576,8 @@ class _TripsListScreenState extends State<TripsListScreen> {
   }
 
   bool get _hasFilters =>
-      _searchQuery.isNotEmpty || _showFeaturedOnly || _tripFilter != 'All';
+      _searchQuery.isNotEmpty || _showFeaturedOnly || _tripFilter != 'All' ||
+      _tripSort != TripWorkspaceSort.website;
 
   void _clearFilters() {
     _searchController.clear();
@@ -584,6 +585,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
       _searchQuery = '';
       _showFeaturedOnly = false;
       _tripFilter = 'All';
+      _tripSort = TripWorkspaceSort.website;
     });
   }
 
@@ -1307,7 +1309,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                           onRefresh: _confirmAndRefresh,
                                           child: ReorderableListView.builder(
                                             key: ValueKey<String>(
-                                              '$_searchQuery|$_tripFilter|$_showFeaturedOnly',
+                                              '$_searchQuery|$_tripFilter|$_showFeaturedOnly|$_tripSort',
                                             ),
                                             padding: const EdgeInsets.only(
                                               bottom: 80,

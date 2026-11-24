@@ -1,4 +1,7 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.41.0+49': [
+    'Sort the trip workspace by price and restore website order with Clear filters.',
+  ],
   '1.40.0+48': [
     'Compare matching weekdays and view an hourly IST activity heatmap when available.',
     'See unmet trip demand, inspect per-trip conversion and open pending payment reviews.',
