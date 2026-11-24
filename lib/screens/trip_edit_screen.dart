@@ -112,6 +112,22 @@ class _TripEditScreenState extends State<TripEditScreen>
     }
   }
 
+  bool _validPublicSlug(String slug) =>
+      RegExp(r'^[a-z0-9][a-z0-9_-]*$').hasMatch(slug) &&
+      !const ['constructor', 'prototype', '__proto__'].contains(slug);
+
+  Future<void> _copyTripLink(String url) async {
+    var message = 'Trip link copied';
+    try {
+      await Clipboard.setData(ClipboardData(text: url));
+    } catch (_) {
+      message = 'Could not copy the trip link.';
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
   Future<void> _openLiveTrip() async {
     final published = _publishedTrip;
     if (published == null) return;
@@ -537,23 +553,32 @@ class _TripEditScreenState extends State<TripEditScreen>
                                         'Lowercase words separated by hyphens; internal ID stays unchanged',
                                     border: OutlineInputBorder(),
                                   ),
-                                  validator: (value) =>
-                                      RegExp(
-                                            r'^[a-z0-9][a-z0-9_-]*$',
-                                          ).hasMatch(value ?? '') &&
-                                          ![
-                                            'constructor',
-                                            'prototype',
-                                            '__proto__',
-                                          ].contains(value)
-                                      ? null
-                                      : 'Enter a safe lowercase slug',
+                                  validator: (value) => _validPublicSlug(value ?? '') ? null : 'Enter a safe lowercase slug',
                                 ),
                                 const SizedBox(height: 8),
-                                SelectableText(
-                                  'https://www.teamweekendtrekkers.com/trips/' +
-                                      _slugController.text +
-                                      '/',
+                                ValueListenableBuilder<TextEditingValue>(
+                                  valueListenable: _slugController,
+                                  builder: (context, value, _) {
+                                    final slug = value.text;
+                                    if (!_validPublicSlug(slug)) {
+                                      return const Text('Enter a valid slug to copy the trip link.');
+                                    }
+                                    final url = Uri(
+                                      scheme: 'https',
+                                      host: 'www.teamweekendtrekkers.com',
+                                      pathSegments: ['trips', slug, ''],
+                                    ).toString();
+                                    return Row(
+                                      children: [
+                                        Expanded(child: SelectableText(url)),
+                                        IconButton(
+                                          tooltip: 'Copy trip link',
+                                          onPressed: () => _copyTripLink(url),
+                                          icon: const Icon(Icons.copy_outlined),
+                                        ),
+                                      ],
+                                    );
+                                  },
                                 ),
                                 const SizedBox(height: 16),
                                 TextFormField(

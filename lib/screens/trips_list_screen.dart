@@ -598,6 +598,10 @@ class _TripsListScreenState extends State<TripsListScreen> {
     final isDesktop =
         MediaQuery.sizeOf(context).width >= managerDesktopBreakpoint;
     final provider = context.watch<TripsProvider>();
+    final publishedSlugs = {
+      for (final trip in provider.baseTrips)
+        trip['id']: (trip['publicSlug'] ?? trip['id'] ?? '').toString(),
+    };
     final searchResults = provider
         .searchTrips(_searchQuery)
         .where((trip) => !_showFeaturedOnly || trip['featured'] == true)
@@ -1352,6 +1356,7 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                                 ),
                                                 child: _TripCard(
                                                   trip: trip,
+                                                  publishedSlug: publishedSlugs[tripId],
                                                   upcomingLabel:
                                                       TripVisibility.upcoming(
                                                         trip,
@@ -2161,6 +2166,7 @@ class _TripCard extends StatelessWidget {
   final VoidCallback onDuplicate;
   final bool draftChanged;
   final String upcomingLabel;
+  final String? publishedSlug;
 
   const _TripCard({
     required this.trip,
@@ -2170,6 +2176,7 @@ class _TripCard extends StatelessWidget {
     required this.onQuickEdit,
     required this.onDuplicate,
     this.draftChanged = false,
+    this.publishedSlug,
     this.upcomingLabel = 'Upcoming Batches: check Website content',
   });
 
@@ -2412,10 +2419,21 @@ class _TripCard extends StatelessWidget {
                       onDelete();
                     } else if (value == 'featured') {
                       onToggleFeatured();
+                    } else if (value == 'copy-link') {
+                      _copyPublishedLink(context);
                     }
                   },
                   tooltip: 'Trip actions',
                   itemBuilder: (context) => [
+                    if (publishedSlug?.isNotEmpty == true)
+                      const PopupMenuItem(
+                        value: 'copy-link',
+                        child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(Icons.link),
+                          title: Text('Copy website link'),
+                        ),
+                      ),
                     const PopupMenuItem(
                       value: 'duplicate',
                       child: ListTile(
@@ -2465,6 +2483,25 @@ class _TripCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _copyPublishedLink(BuildContext context) async {
+    final slug = publishedSlug;
+    if (slug == null || slug.isEmpty) return;
+    final url = Uri(
+      scheme: 'https',
+      host: 'www.teamweekendtrekkers.com',
+      pathSegments: ['trips', slug, ''],
+    );
+    var message = 'Website link copied';
+    try {
+      await Clipboard.setData(ClipboardData(text: url.toString()));
+    } catch (_) {
+      message = 'Could not copy the website link.';
+    }
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 
   String _getImageUrl(BuildContext context, String image) {
