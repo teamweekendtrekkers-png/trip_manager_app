@@ -7,8 +7,8 @@ enum TripWorkspaceSort {
   website('Website order'),
   name('Trip name'),
   departure('Next departure'),
-  priceLow('Price: low to high'),
-  priceHigh('Price: high to low');
+  priceLow('Lowest price'),
+  priceHigh('Highest price');
 
   const TripWorkspaceSort(this.label);
   final String label;
