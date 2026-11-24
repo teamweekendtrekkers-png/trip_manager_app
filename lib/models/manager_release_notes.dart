@@ -1,4 +1,9 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.39.0+47': [
+    'Find the biggest booking funnel drop-off and switch between Overview, Traffic and Checkout & payments in Customer journey.',
+    'Compare sessions and payment detail submissions by date in India time.',
+    'See the report’s selected dates and reset filters in one tap.',
+  ],
   '1.38.0+46': [
     'Hide Coming soon trip cards from your website in Trip discovery.',
     'Choose story covers and publish them together with your homepage edits.'
