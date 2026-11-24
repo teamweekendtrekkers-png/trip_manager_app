@@ -1,4 +1,9 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.42.0+50': [
+    'Jump to today or yesterday in Customer journey and read hourly totals in a weekday list.',
+    'See the busiest hour for sessions or submissions.',
+    'Copy a published trip link from the trip card menu.',
+  ],
   '1.41.0+49': [
     'Sort the trip workspace by price and restore website order with Clear filters.',
   ],

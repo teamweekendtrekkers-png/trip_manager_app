@@ -11,10 +11,10 @@ import 'booking_review_service_test.dart' show BookingConfig;
 class FakeAnalytics extends BookingReviewService {
   FakeAnalytics() : super(BookingConfig());
   bool fail = false;
-  String selectedTrip = '', selectedDevice = '';
+  String selectedTrip = '', selectedDevice = '', selectedStart = '', selectedEnd = '';
   @override bool get signedIn => true;
   @override Future<Map<String, dynamic>> analytics({required String start, required String end, String trip = '', String device = ''}) async {
-    selectedTrip = trip; selectedDevice = device;
+    selectedTrip = trip; selectedDevice = device; selectedStart = start; selectedEnd = end;
     if (fail) throw StateError('Analytics unavailable');
     return {
       'sessions': 100, 'launched_at': '2026-10-21T00:00:00Z', 'direct_checkout': 8,
@@ -92,11 +92,17 @@ void main() {
     expect(find.text('Daily activity'), findsOneWidget);
     expect(find.text('20 sessions · 3 submissions'), findsOneWidget);
     expect(find.text('Where visitors leave'), findsNothing);
+    tester.state<ScrollableState>(find.byType(Scrollable).first).position.jumpTo(0);
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Reset filters'));
     await tester.tap(find.text('Reset filters'));
     await tester.pumpAndSettle();
     expect(service.selectedDevice, isEmpty);
-    expect(find.text('Daily activity'), findsOneWidget);
+    await tester.ensureVisible(find.text('Yesterday (IST)'));
+    await tester.tap(find.text('Yesterday (IST)'));
+    await tester.pumpAndSettle();
+    expect(service.selectedStart, service.selectedEnd);
+    expect(find.text('Activity by hour (IST)'), findsOneWidget);
   });
 
   testWidgets('failure clears stale report and offers retry', (tester) async {

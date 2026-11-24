@@ -23,6 +23,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Map<String, dynamic>? report;
   int days = 30;
   bool hourlySubmissions = false;
+  int? hourlyWeekday;
   _ReportView view = _ReportView.overview;
   DateTimeRange get period =>
       custom ??
@@ -170,6 +171,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       for (final row in hourly)
         (number(row['weekday']), number(row['hour'])): number(row[metric]),
     };
+    MapEntry<(int, int), int>? busiest;
+    for (final entry in counts.entries) {
+      if (entry.value > (busiest?.value ?? 0)) busiest = entry;
+    }
     final peak = counts.values.fold(
       1,
       (int maximum, count) => count > maximum ? count : maximum,
@@ -206,10 +211,27 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       );
     }
 
+    final singleDay = period.start == period.end;
+    final day = singleDay ? period.start.weekday : hourlyWeekday;
     return section('Activity by hour (IST)', [
-      const Text(
-        'Scroll sideways to see all 24 hours. A session can appear in multiple hours.',
-      ),
+      if (busiest != null)
+        Text(
+          'Busiest hour: ${weekdays[busiest.key.$1 - 1]} ${hourLabel(busiest.key.$2)} · ${busiest.value} $metric',
+        ),
+      if (!singleDay)
+        DropdownButton<int>(
+          value: day ?? 0,
+          items: [
+            const DropdownMenuItem(value: 0, child: Text('All weekdays')),
+            for (var i = 0; i < weekdays.length; i++)
+              DropdownMenuItem(value: i + 1, child: Text(weekdays[i])),
+          ],
+          onChanged: (value) => setState(() => hourlyWeekday = value),
+        ),
+      if (day == null || day == 0)
+        const Text(
+          'Scroll sideways to see all 24 hours. A session can appear in multiple hours.',
+        ),
       Wrap(
         spacing: 8,
         children: [
@@ -224,30 +246,51 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             ),
         ],
       ),
-      SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Table(
-          defaultColumnWidth: const FixedColumnWidth(39),
-          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-          children: [
-            TableRow(
-              children: [
-                const SizedBox.shrink(),
-                for (var hour = 0; hour < 24; hour++)
-                  Center(child: Text(hour.toString().padLeft(2, '0'))),
-              ],
-            ),
-            for (var day = 1; day <= 7; day++)
+      if (day != null && day != 0)
+        for (var hour = 0; hour < 24; hour++)
+          ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: Text(hourLabel(hour)),
+            trailing: Text('${counts[(day, hour)] ?? 0} $metric'),
+          )
+      else
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Table(
+            defaultColumnWidth: const FixedColumnWidth(39),
+            defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+            children: [
               TableRow(
                 children: [
-                  Text(weekdays[day - 1]),
-                  for (var hour = 0; hour < 24; hour++) cell(day, hour),
+                  const SizedBox.shrink(),
+                  for (var hour = 0; hour < 24; hour++)
+                    Center(child: Text(hour.toString().padLeft(2, '0'))),
                 ],
               ),
-          ],
+              for (var day = 1; day <= 7; day++)
+                TableRow(
+                  children: [
+                    Text(weekdays[day - 1]),
+                    for (var hour = 0; hour < 24; hour++) cell(day, hour),
+                  ],
+                ),
+            ],
+          ),
         ),
-      ),
     ]);
+  }
+
+  String hourLabel(int hour) => '${hour.toString().padLeft(2, '0')}:00';
+
+  Future<void> showSingleDay(int offset) async {
+    final end = today;
+    final day = DateTime(end.year, end.month, end.day - offset);
+    setState(() {
+      custom = DateTimeRange(start: day, end: day);
+      hourlyWeekday = null;
+    });
+    await load();
   }
 
   Widget comparePeriods(Map current, Map previous) {
@@ -698,6 +741,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ]),
                   ],
                   if (view == _ReportView.daily) ...[
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        OutlinedButton(
+                          onPressed: busy ? null : () => showSingleDay(0),
+                          child: const Text('Today (IST)'),
+                        ),
+                        OutlinedButton(
+                          onPressed: busy ? null : () => showSingleDay(1),
+                          child: const Text('Yesterday (IST)'),
+                        ),
+                      ],
+                    ),
                     if (report!.containsKey('hourly')) activityByHour(),
                     dailyActivity(dateLabels),
                   ],
