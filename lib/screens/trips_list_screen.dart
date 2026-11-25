@@ -2380,18 +2380,10 @@ class _TripCard extends StatelessWidget {
                             ),
                             label: const Text('Dates & price'),
                           ),
-                          Tooltip(
-                            message: upcomingLabel,
-                            child: Padding(
-                              padding: const EdgeInsets.all(8),
-                              child: Icon(
-                                Icons.visibility_outlined,
-                                size: 18,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                              ),
-                            ),
+                          TextButton.icon(
+                            onPressed: onDepartures,
+                            icon: const Icon(Icons.event_available_outlined, size: 18),
+                            label: const Text('Departures'),
                           ),
                         ],
                       ),

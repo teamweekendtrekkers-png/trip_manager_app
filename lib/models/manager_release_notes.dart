@@ -1,4 +1,7 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.43.1+52': [
+    'Open the departure workspace straight from a trip card.',
+  ],
   '1.43.0+51': [
     'Review the oldest pending payments first across all pages and open them from Customer Journey without signing in again.',
     'Keep your report visible during refresh and see when it was last updated.',
