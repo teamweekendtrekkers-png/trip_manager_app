@@ -2387,11 +2387,14 @@ class _TripCard extends StatelessWidget {
                               child: InkWell(
                                 onTap: onDepartures,
                                 borderRadius: BorderRadius.circular(8),
-                                child: const Padding(
-                                  padding: EdgeInsets.all(8),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8),
                                   child: Icon(
-                                    Icons.event_available_outlined,
+                                    Icons.visibility_outlined,
                                     size: 18,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               ),
