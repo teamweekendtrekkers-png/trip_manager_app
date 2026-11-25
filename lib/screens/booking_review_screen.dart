@@ -10,10 +10,16 @@ class BookingReviewScreen extends StatefulWidget {
     super.key,
     this.service,
     this.embedded = false,
+    this.borrowSession = false,
+    this.tripId = '',
+    this.departure = '',
     this.filterRequest = 0,
     this.initialFilter = BookingReviewFilter.all,
   });
   final bool embedded;
+  final bool borrowSession;
+  final String tripId;
+  final String departure;
   final int filterRequest;
   final BookingReviewFilter initialFilter;
   final BookingReviewService? service;
@@ -31,9 +37,13 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
   bool busy = false;
   bool _showPassword = false;
   int offset = 0;
+  int? queueTotal;
   BookingReviewFilter filter = BookingReviewFilter.all;
   List<Map<String, dynamic>> get visibleBookings => bookings
-      .where((booking) => matchesBookingReview(booking, filter))
+      .where(
+        (booking) =>
+            queueTotal != null || matchesBookingReview(booking, filter),
+      )
       .toList();
   @override
   void initState() {
@@ -44,14 +54,24 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
         BookingReviewService(
           GitHubService(settings: context.read<SettingsProvider>().settings),
         );
+    if (widget.borrowSession && service.signedIn) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _load();
+      });
+    }
   }
 
   @override
   void didUpdateWidget(covariant BookingReviewScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialFilter != widget.initialFilter ||
-        oldWidget.filterRequest != widget.filterRequest)
+        oldWidget.filterRequest != widget.filterRequest) {
       filter = widget.initialFilter;
+      if (service.signedIn)
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _load(pageOffset: 0);
+        });
+    }
   }
 
   @override
@@ -59,7 +79,7 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
     email.dispose();
     password.dispose();
     search.dispose();
-    service.dispose();
+    if (!widget.borrowSession) service.dispose();
     super.dispose();
   }
 
@@ -70,10 +90,17 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
     });
     try {
       final next = pageOffset ?? offset;
-      final rows = await service.load(search: search.text, offset: next);
+      final result = await service.queue(
+        filter: filter.name,
+        search: search.text,
+        offset: next,
+        tripId: widget.tripId,
+        departure: widget.departure,
+      );
       if (mounted)
         setState(() {
-          bookings = rows;
+          bookings = result.rows;
+          queueTotal = result.total;
           offset = next;
         });
     } catch (e) {
@@ -184,7 +211,7 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
           appBar: AppBar(
             title: const Text('Bookings & payment review'),
             actions: [
-              if (service.signedIn)
+              if (service.signedIn && !widget.borrowSession)
                 TextButton(
                   onPressed: busy ? null : _signOut,
                   child: const Text('Sign out'),
@@ -218,6 +245,8 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
             ),
             const SizedBox(height: 16),
           ],
+          if (widget.departure.isNotEmpty)
+            Text('Departure: ${widget.departure}'),
           if (busy) const LinearProgressIndicator(),
           if (error != null)
             Text(
@@ -297,8 +326,12 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
               label: const Text('Refresh bookings'),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Search covers all bookings. Status filters apply to this page (up to 50 bookings).',
+            Text(
+              queueTotal == null
+                  ? 'Search covers all bookings. Status filters apply to this page.'
+                  : filter == BookingReviewFilter.pending
+                  ? 'Oldest pending payments first'
+                  : 'Newest bookings first',
             ),
             Wrap(
               spacing: 8,
@@ -310,12 +343,18 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
                     selected: filter == option,
                     onSelected: busy
                         ? null
-                        : (_) => setState(() => filter = option),
+                        : (_) {
+                            if (filter == option) return;
+                            setState(() => filter = option);
+                            if (queueTotal != null) _load(pageOffset: 0);
+                          },
                   ),
               ],
             ),
             Text(
-              '${visibleBookings.length} of ${bookings.length} bookings on this page',
+              queueTotal == null
+                  ? '${visibleBookings.length} of ${bookings.length} bookings on this page'
+                  : '${queueTotal!} matching bookings',
               key: const Key('booking-results-count'),
             ),
             if (search.text.isNotEmpty || filter != BookingReviewFilter.all)
@@ -435,7 +474,11 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
                 ),
                 Text('Page ${offset ~/ 50 + 1}'),
                 TextButton(
-                  onPressed: busy || bookings.length < 50
+                  onPressed:
+                      busy ||
+                          (queueTotal == null
+                              ? bookings.length < 50
+                              : offset + bookings.length >= queueTotal!)
                       ? null
                       : () => _load(pageOffset: offset + 50),
                   child: const Text('Next'),

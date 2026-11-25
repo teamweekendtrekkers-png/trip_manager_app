@@ -75,8 +75,11 @@ void main() {
     final service = FakeAnalytics();
     await tester.pumpWidget(MaterialApp(home: AnalyticsScreen(service: service)));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Largest drop-off'), 160);
     expect(find.text('Largest drop-off'), findsOneWidget);
     expect(find.text('Same-weekday comparison'), findsOneWidget);
+    tester.state<ScrollableState>(find.byType(Scrollable).first).position.jumpTo(0);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('All devices'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('mobile').last);

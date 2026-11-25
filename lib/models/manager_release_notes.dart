@@ -1,4 +1,9 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.43.0+51': [
+    'Review the oldest pending payments first across all pages and open them from Customer Journey without signing in again.',
+    'Keep your report visible during refresh and see when it was last updated.',
+    'Open a departure workspace to compare draft and published details and find bookings.',
+  ],
   '1.42.0+50': [
     'Jump to today or yesterday in Customer journey and read hourly totals in a weekday list.',
     'See the busiest hour for sessions or submissions.',
