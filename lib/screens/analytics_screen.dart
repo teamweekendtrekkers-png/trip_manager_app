@@ -4,6 +4,7 @@ import '../providers/settings_provider.dart';
 import '../services/github_service.dart';
 import '../services/booking_review_filter.dart';
 import 'booking_review_screen.dart';
+import 'departure_management_screen.dart';
 import '../services/booking_review_service.dart';
 
 class AnalyticsScreen extends StatefulWidget {
@@ -13,7 +14,7 @@ class AnalyticsScreen extends StatefulWidget {
   State<AnalyticsScreen> createState() => _AnalyticsScreenState();
 }
 
-enum _ReportView { overview, traffic, daily, checkout }
+enum _ReportView { overview, traffic, demand, daily, checkout, team }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
   late final BookingReviewService service;
@@ -62,12 +63,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     super.dispose();
   }
 
-  Future<void> load() async {
+  DateTime? lastRefreshed;
+
+  Future<void> load({bool keepReport = false}) async {
     if (!mounted || busy) return;
     setState(() {
       busy = true;
       error = null;
-      report = null;
+      if (!keepReport) report = null;
     });
     try {
       final range = period;
@@ -77,9 +80,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         trip: trip,
         device: device,
       );
-      if (mounted) setState(() => report = value);
+      if (mounted)
+        setState(() {
+          report = value;
+          lastRefreshed = DateTime.now();
+        });
     } catch (e) {
-      if (mounted) setState(() => error = e.toString());
+      if (mounted)
+        setState(() {
+          error = e.toString();
+          if (!service.signedIn) report = null;
+        });
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -302,6 +313,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     return section('Same-weekday comparison', [
       Text('Comparison dates: ${previous['start']} – ${previous['end']} · IST'),
+      const Text(
+        'Active sessions include any tracked activity. Website visits count the initial visit event.',
+      ),
       Text('Active sessions: ${change('sessions')}'),
       Text('Payment detail submissions: ${change('submissions')}'),
     ]);
@@ -378,7 +392,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           if (service.signedIn)
             IconButton(
               tooltip: 'Refresh analytics',
-              onPressed: busy ? null : load,
+              onPressed: busy ? null : () => load(keepReport: true),
               icon: const Icon(Icons.refresh),
             ),
           if (service.signedIn)
@@ -401,22 +415,31 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             children: [
               if (busy) const LinearProgressIndicator(),
               if (error != null)
-                section('Could not load analytics', [
-                  Text(
-                    error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+                section(
+                  report == null
+                      ? 'Could not load analytics'
+                      : 'Could not refresh analytics',
+                  [
+                    Text(
+                      error!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
-                  ),
-                  TextButton(
-                    onPressed: busy
-                        ? null
-                        : service.signedIn
-                        ? load
-                        : signIn,
-                    child: const Text('Try again'),
-                  ),
-                ]),
+                    TextButton(
+                      onPressed: busy
+                          ? null
+                          : service.signedIn
+                          ? () => load(keepReport: true)
+                          : signIn,
+                      child: const Text('Try again'),
+                    ),
+                  ],
+                ),
+              if (report != null && lastRefreshed != null)
+                Text(
+                  'Updated ${TimeOfDay.fromDateTime(lastRefreshed!).format(context)} (local time)',
+                ),
               if (!service.signedIn) ...[
                 const Text(
                   'Sign in with your booking administrator account to see aggregate analytics. Your password is not saved.',
@@ -575,7 +598,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         (_ReportView.overview, 'Overview'),
                         (_ReportView.traffic, 'Traffic'),
                         (_ReportView.daily, 'By date'),
-                        (_ReportView.checkout, 'Checkout & payments'),
+                        (_ReportView.demand, 'Demand'),
+                        (_ReportView.checkout, 'Checkout'),
+                        (_ReportView.team, 'Team follow-up'),
                       ])
                         ChoiceChip(
                           label: Text(label),
@@ -591,7 +616,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       runSpacing: 8,
                       children: [
                         metric(
-                          'Tracked sessions',
+                          'Website visits',
                           '${number(report!['sessions'])}',
                         ),
                         metric('Trip journeys', '$first'),
@@ -661,6 +686,31 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           'Recent sessions may still be in progress. Leaving this funnel does not prove why someone stopped.',
                         ),
                       ]),
+                    if (rows('departure_opportunities').isNotEmpty)
+                      section('Departure checkout opportunities', [
+                        const Text(
+                          'Date selections and checkout starts for the same departure and device. Ongoing journeys may still convert.',
+                        ),
+                        for (final row in rows('departure_opportunities'))
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              "${row['trip_id'].toString().replaceAll('-', ' ')} · ${row['day']}",
+                            ),
+                            subtitle: Text(
+                              "${row['device']} · ${row['selected']} selected · ${row['checkout']} opened checkout"
+                              "${number(row['selected']) >= 20 ? ' · ${row['dropped']} did not open checkout' : ' · Small sample'}",
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => DepartureManagementScreen(
+                                  tripId: row['trip_id'].toString(),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ]),
                     section('Trips attracting interest', [
                       for (final row in rows('trips'))
                         ListTile(
@@ -699,20 +749,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ]),
                   ],
                   if (view == _ReportView.traffic) ...[
-                    if (demand is Map)
-                      section('Unmet trip demand', [
-                        if (demand['no_results'] != null)
-                          Text(
-                            "${demand['no_results']} sessions found no matching trips.",
-                          ),
-                        Text(
-                          "${demand['no_departure']} sessions viewed trips with no bookable dates.",
-                        ),
-                        for (final row in rows('searched_dates'))
-                          Text(
-                            "${row['day']} · ${row['sessions']} sessions looked for this departure",
-                          ),
-                      ]),
                     section('Traffic sources', [
                       const Text(
                         'First source within the tracked session. Unknown campaigns are grouped; campaign names and full URLs are not stored.',
@@ -739,6 +775,26 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           ),
                         ),
                     ]),
+                  ],
+                  if (view == _ReportView.demand) ...[
+                    if (demand is Map)
+                      section('Unmet trip demand', [
+                        if (demand['no_results'] != null)
+                          Text(
+                            "${demand['no_results']} sessions found no matching trips.",
+                          ),
+                        Text(
+                          "${demand['no_departure']} sessions viewed trips with no bookable dates.",
+                        ),
+                        for (final row in rows('searched_dates'))
+                          Text(
+                            "${row['day']} · ${row['sessions']} sessions looked for this departure",
+                          ),
+                      ]),
+                    if (demand is! Map)
+                      const Text(
+                        'No demand data is available for this report.',
+                      ),
                   ],
                   if (view == _ReportView.daily) ...[
                     Wrap(
@@ -791,6 +847,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         'These actions do not prove payment. Only an accepted payment report enters the submission step.',
                       ),
                     ]),
+                  ],
+                  if (view == _ReportView.team) ...[
                     section('Team payment review', [
                       if (review is Map && review['overdue'] != null)
                         Text(
@@ -802,7 +860,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           child: OutlinedButton(
                             onPressed: () => Navigator.of(context).push(
                               MaterialPageRoute<void>(
-                                builder: (_) => const BookingReviewScreen(
+                                builder: (_) => BookingReviewScreen(
+                                  service: service,
+                                  borrowSession: true,
                                   initialFilter: BookingReviewFilter.pending,
                                 ),
                               ),
@@ -822,6 +882,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         Text(
                           '${(report!['review'] as Map)['submitted']} submitted · ${(report!['review'] as Map)['pending']} pending · ${(report!['review'] as Map)['verified']} verified · ${(report!['review'] as Map)['rejected']} rejected',
                         ),
+                        if ((report!['review']
+                                as Map)['average_confirmation_hours'] !=
+                            null)
+                          Text(
+                            'Average time to seat confirmation: ${(report!['review'] as Map)['average_confirmation_hours']} hours',
+                          ),
                         Text(
                           'Average time to latest review: ${(report!['review'] as Map)['average_review_hours'] ?? '—'} hours. Payment verification does not confirm seat availability.',
                         ),

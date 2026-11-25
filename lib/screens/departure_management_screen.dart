@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../services/trip_pricing.dart';
+import '../services/booking_review_filter.dart';
+import 'booking_review_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/trips_provider.dart';
 import '../services/trip_date_utils.dart';
@@ -8,7 +12,8 @@ import '../widgets/departure_calendar.dart';
 import 'manager_tools_screen.dart' show bulkDates;
 
 class DepartureManagementScreen extends StatefulWidget {
-  const DepartureManagementScreen({super.key});
+  const DepartureManagementScreen({super.key, this.tripId});
+  final String? tripId;
   @override
   State<DepartureManagementScreen> createState() =>
       _DepartureManagementScreenState();
@@ -52,9 +57,119 @@ class _DepartureManagementScreenState extends State<DepartureManagementScreen> {
     await provider.flushDraft();
   }
 
+  Future<void> _openDeparture(
+    Map<String, dynamic> trip,
+    Map<String, dynamic>? published,
+    String label,
+  ) async {
+    final range = TripDateUtils.parse(label);
+    if (range == null) return;
+    final special = (trip['departurePricing'] as Map?)?[range.key] as Map?;
+    final draftFare =
+        TripPricing.amount(special?['price']) ?? TripPricing.selling(trip);
+    final publishedSpecial =
+        (published?['departurePricing'] as Map?)?[range.key] as Map?;
+    final publishedFare =
+        TripPricing.amount(publishedSpecial?['price']) ??
+        (published == null ? null : TripPricing.selling(published));
+    final stops = (trip['boardingLocations'] as List? ?? [])
+        .whereType<Map>()
+        .map((stop) => stop['name']?.toString() ?? '')
+        .where((name) => name.isNotEmpty)
+        .toList();
+    final publishedDates = (published?['availableDates'] as List? ?? []).map(
+      (value) => value.toString(),
+    );
+    final liveDate = publishedDates
+        .where((value) => TripDateUtils.parse(value)?.key == range.key)
+        .firstOrNull;
+    final slug = (published?['publicSlug'] ?? published?['id'])?.toString();
+    final link = slug == null || liveDate == null
+        ? null
+        : Uri(
+            scheme: 'https',
+            host: 'www.teamweekendtrekkers.com',
+            pathSegments: ['trips', slug, ''],
+            queryParameters: {'date': liveDate},
+            fragment: 'bookingCard',
+          );
+    final status = departureStatus(trip, range.key).replaceAll('-', ' ');
+    final previousStatus = published != null && liveDate != null
+        ? departureStatus(published, range.key).replaceAll('-', ' ')
+        : null;
+    String fare(num? price) =>
+        price == null ? 'Fare unavailable' : TripPricing.money(price);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(label),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Draft: ${fare(draftFare)} per person · $status'),
+              if (previousStatus != null)
+                Text(
+                  'Published: ${fare(publishedFare)} per person · $previousStatus',
+                )
+              else
+                const Text('This departure is still a draft.'),
+              if (special?['note'] != null) Text(special!['note'].toString()),
+              const SizedBox(height: 8),
+              Text(
+                stops.isEmpty
+                    ? 'No trip-specific pickup points'
+                    : 'Pickup points: ${stops.join(', ')}',
+              ),
+              if (link != null) ...[
+                const SizedBox(height: 8),
+                SelectableText(link.toString()),
+                TextButton.icon(
+                  icon: const Icon(Icons.copy_outlined),
+                  label: const Text('Copy departure link'),
+                  onPressed: () async {
+                    await Clipboard.setData(
+                      ClipboardData(text: link.toString()),
+                    );
+                    if (dialogContext.mounted)
+                      ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        const SnackBar(content: Text('Departure link copied')),
+                      );
+                  },
+                ),
+              ],
+              if (liveDate != null)
+                TextButton.icon(
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  label: const Text('Review bookings for this date'),
+                  onPressed: () => Navigator.of(dialogContext).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => BookingReviewScreen(
+                        tripId: trip['id'].toString(),
+                        departure: range.key.split('/').first,
+                        initialFilter: BookingReviewFilter.all,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<TripsProvider>();
+    final published = {for (final trip in provider.baseTrips) trip['id']: trip};
     return Scaffold(
       appBar: AppBar(title: const Text('Manage departures')),
       body: Center(
@@ -121,9 +236,11 @@ class _DepartureManagementScreenState extends State<DepartureManagementScreen> {
                   ),
                 ),
               for (final trip in provider.trips.where(
-                (trip) => '${trip['title']} ${trip['location']}'
-                    .toLowerCase()
-                    .contains(_query),
+                (trip) =>
+                    (widget.tripId == null || widget.tripId == trip['id']) &&
+                    '${trip['title']} ${trip['location']}'
+                        .toLowerCase()
+                        .contains(_query),
               ))
                 Card(
                   child: Column(
@@ -139,6 +256,18 @@ class _DepartureManagementScreenState extends State<DepartureManagementScreen> {
                               : '${TripDateUtils.getUpcomingDateRanges(trip).length} bookable departures',
                         ),
                       ),
+                      for (final label
+                          in (trip['availableDates'] as List? ?? [])
+                              .whereType<String>())
+                        ListTile(
+                          title: Text(label),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => _openDeparture(
+                            trip,
+                            published[trip['id']],
+                            label,
+                          ),
+                        ),
                       if ((trip['availableDates'] as List? ?? []).isEmpty)
                         const Padding(
                           padding: EdgeInsets.all(16),

@@ -576,7 +576,9 @@ class _TripsListScreenState extends State<TripsListScreen> {
   }
 
   bool get _hasFilters =>
-      _searchQuery.isNotEmpty || _showFeaturedOnly || _tripFilter != 'All' ||
+      _searchQuery.isNotEmpty ||
+      _showFeaturedOnly ||
+      _tripFilter != 'All' ||
       _tripSort != TripWorkspaceSort.website;
 
   void _clearFilters() {
@@ -1356,7 +1358,8 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                                 ),
                                                 child: _TripCard(
                                                   trip: trip,
-                                                  publishedSlug: publishedSlugs[tripId],
+                                                  publishedSlug:
+                                                      publishedSlugs[tripId],
                                                   upcomingLabel:
                                                       TripVisibility.upcoming(
                                                         trip,
@@ -1370,6 +1373,17 @@ class _TripsListScreenState extends State<TripsListScreen> {
                                                       _toggleFeatured(tripId),
                                                   onQuickEdit: () =>
                                                       _quickEditTrip(tripId),
+                                                  onDepartures: () =>
+                                                      Navigator.of(
+                                                        context,
+                                                      ).push(
+                                                        MaterialPageRoute<void>(
+                                                          builder: (_) =>
+                                                              DepartureManagementScreen(
+                                                                tripId: tripId,
+                                                              ),
+                                                        ),
+                                                      ),
                                                   draftChanged: provider.changes
                                                       .containsKey(tripId),
                                                   onDuplicate: () {
@@ -2163,6 +2177,7 @@ class _TripCard extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onToggleFeatured;
   final VoidCallback onQuickEdit;
+  final VoidCallback onDepartures;
   final VoidCallback onDuplicate;
   final bool draftChanged;
   final String upcomingLabel;
@@ -2174,6 +2189,7 @@ class _TripCard extends StatelessWidget {
     required this.onDelete,
     required this.onToggleFeatured,
     required this.onQuickEdit,
+    required this.onDepartures,
     required this.onDuplicate,
     this.draftChanged = false,
     this.publishedSlug,
@@ -2413,6 +2429,8 @@ class _TripCard extends StatelessWidget {
                   onSelected: (value) {
                     if (value == 'duplicate') {
                       onDuplicate();
+                    } else if (value == 'departures') {
+                      onDepartures();
                     } else if (value == 'quick') {
                       onQuickEdit();
                     } else if (value == 'delete') {
@@ -2440,6 +2458,13 @@ class _TripCard extends StatelessWidget {
                         contentPadding: EdgeInsets.zero,
                         leading: Icon(Icons.copy),
                         title: Text('Duplicate as draft'),
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'departures',
+                      child: ListTile(
+                        leading: Icon(Icons.event_available_outlined),
+                        title: Text('Departure workspace'),
                       ),
                     ),
                     const PopupMenuItem(
@@ -2500,7 +2525,9 @@ class _TripCard extends StatelessWidget {
       message = 'Could not copy the website link.';
     }
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
