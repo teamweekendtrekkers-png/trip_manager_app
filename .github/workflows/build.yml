@@ -2,7 +2,7 @@ name: Build Android & Windows Desktop
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
     branches: [main, master]
   workflow_dispatch:
@@ -59,6 +59,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
   build-android:
+    if: github.ref == 'refs/heads/main'
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -102,6 +103,7 @@ jobs:
           if-no-files-found: error
           retention-days: 90
   build-windows:
+    if: github.ref == 'refs/heads/main'
     needs: test
     # Flutter 3.38 and its notification plugin target the stable VS 2022
     # toolchain. Pin the runner so a windows-latest compiler migration cannot
