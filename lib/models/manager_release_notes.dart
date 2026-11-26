@@ -1,4 +1,8 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.44.0+54': [
+    'Open the captain’s Pickup List from a departure and see confirmed travellers grouped by stop.',
+    'Copy a pickup message for the trip group or open a private WhatsApp chat from the list.',
+  ],
   '1.43.1+52': [
     'Open the departure workspace straight from a trip card.',
   ],
