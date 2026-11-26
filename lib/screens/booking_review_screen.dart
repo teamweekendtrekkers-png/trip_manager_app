@@ -1,6 +1,7 @@
 import '../services/booking_review_filter.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/settings_provider.dart';
 import '../services/github_service.dart';
 import '../services/booking_review_service.dart';
@@ -11,6 +12,7 @@ class BookingReviewScreen extends StatefulWidget {
     this.service,
     this.embedded = false,
     this.borrowSession = false,
+    this.pickupManifest = false,
     this.tripId = '',
     this.departure = '',
     this.filterRequest = 0,
@@ -18,6 +20,7 @@ class BookingReviewScreen extends StatefulWidget {
   });
   final bool embedded;
   final bool borrowSession;
+  final bool pickupManifest;
   final String tripId;
   final String departure;
   final int filterRequest;
@@ -89,6 +92,14 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
       error = null;
     });
     try {
+      if (widget.pickupManifest) {
+        final rows = await service.pickupManifest(
+          widget.tripId,
+          widget.departure,
+        );
+        if (mounted) setState(() => bookings = rows);
+        return;
+      }
       final next = pageOffset ?? offset;
       final result = await service.queue(
         filter: filter.name,
@@ -209,7 +220,11 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
       ? _content()
       : Scaffold(
           appBar: AppBar(
-            title: const Text('Bookings & payment review'),
+            title: Text(
+              widget.pickupManifest
+                  ? 'Pickup List'
+                  : 'Bookings & payment review',
+            ),
             actions: [
               if (service.signedIn && !widget.borrowSession)
                 TextButton(
@@ -220,6 +235,72 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
           ),
           body: _content(),
         );
+
+  List<Widget> _pickupList() {
+    final groups = <String, List<Map<String, dynamic>>>{};
+    for (final booking in bookings) {
+      final stop = booking['stop'] as String? ?? 'Pickup not selected';
+      (groups[stop] ??= []).add(booking);
+    }
+    return [
+      OutlinedButton.icon(
+        onPressed: busy ? null : () => _load(),
+        icon: const Icon(Icons.refresh),
+        label: const Text('Refresh pickup list'),
+      ),
+      if (!busy && error == null && bookings.isEmpty)
+        const Text('No confirmed bookings for this departure.'),
+      for (final group in groups.entries)
+        Card(
+          child: Column(
+            children: [
+              ListTile(
+                title: Text(group.key),
+                subtitle: Text(
+                  '${group.value.fold<int>(0, (total, row) => total + (row['people'] as num).toInt())} travellers',
+                ),
+              ),
+              for (final row in group.value)
+                ListTile(
+                  title: Text('${row['name']} · ${row['people']} travelling'),
+                  subtitle: SelectableText(row['phone']?.toString() ?? ''),
+                  trailing: IconButton(
+                    tooltip: 'Open private WhatsApp chat',
+                    icon: const Icon(Icons.chat_outlined),
+                    onPressed: () async {
+                      var digits = '${row['phone'] ?? ''}'.replaceAll(
+                        RegExp(r'\D'),
+                        '',
+                      );
+                      if (digits.length == 10) digits = '91$digits';
+                      if (digits.length < 11 || digits.length > 15) return;
+                      final uri = Uri.https('wa.me', '/$digits', {
+                        'text':
+                            'Hi ${row['name']}, your pickup for ${widget.departure} is ${group.key}. Please check your private booking link for the latest pickup details.',
+                      });
+                      try {
+                        if (await launchUrl(
+                          uri,
+                          mode: LaunchMode.externalApplication,
+                        ))
+                          return;
+                      } catch (_) {
+                        // The device may not have a browser configured.
+                      }
+                      if (mounted)
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Could not open WhatsApp.'),
+                          ),
+                        );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+    ];
+  }
 
   Widget _content() => Center(
     child: ConstrainedBox(
@@ -306,7 +387,9 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
                 ),
               ],
             ),
-          ] else ...[
+          ] else if (widget.pickupManifest)
+            ..._pickupList()
+          else ...[
             TextField(
               controller: search,
               enabled: !busy,

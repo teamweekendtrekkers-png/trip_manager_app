@@ -141,6 +141,40 @@ class _DepartureManagementScreenState extends State<DepartureManagementScreen> {
               ],
               if (liveDate != null)
                 TextButton.icon(
+                  icon: const Icon(Icons.groups_outlined),
+                  label: const Text('Open pickup list'),
+                  onPressed: () => Navigator.of(dialogContext).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => BookingReviewScreen(
+                        tripId: trip['id'].toString(),
+                        departure: range.key.split('/').first,
+                        pickupManifest: true,
+                      ),
+                    ),
+                  ),
+                ),
+              if (liveDate != null)
+                TextButton.icon(
+                  icon: const Icon(Icons.content_copy),
+                  label: const Text('Copy pickup message for WhatsApp'),
+                  onPressed: () async {
+                    await Clipboard.setData(
+                      ClipboardData(
+                        text:
+                            'Please confirm your pickup for ${trip['title']} ($label). '
+                            'Open https://www.teamweekendtrekkers.com/my-booking.html#pickupHeading '
+                            'and use your private booking link and booking phone number.',
+                      ),
+                    );
+                    if (dialogContext.mounted) {
+                      ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        const SnackBar(content: Text('Pickup message copied')),
+                      );
+                    }
+                  },
+                ),
+              if (liveDate != null)
+                TextButton.icon(
                   icon: const Icon(Icons.receipt_long_outlined),
                   label: const Text('Review bookings for this date'),
                   onPressed: () => Navigator.of(dialogContext).push(

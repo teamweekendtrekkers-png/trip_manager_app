@@ -106,6 +106,16 @@ class BookingReviewService {
         .toList();
   }
 
+  Future<List<Map<String, dynamic>>> pickupManifest(
+    String trip,
+    String date,
+  ) async {
+    final rows =
+        await _rpc('twt_pickup_manifest', {'p_trip': trip, 'p_departure': date})
+            as List;
+    return rows.map((row) => Map<String, dynamic>.from(row as Map)).toList();
+  }
+
   Future<({List<Map<String, dynamic>> rows, int? total})> queue({
     required String filter,
     required String search,
