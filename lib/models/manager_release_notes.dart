@@ -1,4 +1,8 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.45.1+60': [
+    'Review check-ins, party sizes, pickup stops and phone numbers inside Manager.',
+    'Open closed departure lists, copy the shared link, and call travellers from the list.',
+  ],
   '1.45.0+59': [
     'Create, find, and share departure pickup lists from the dedicated Check-in section.',
     'Open earlier lists or set up read-only access for a captain.',
