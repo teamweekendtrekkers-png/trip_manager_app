@@ -147,7 +147,7 @@ class PickupService {
     const pageSize = 200;
     for (var offset = 0; ; offset += pageSize) {
       final page = await _rows('pickup_checkins', {
-        'select': 'lead_name,phone,party_size,stop',
+        'select': 'lead_name,phone,party_size,stop,passenger_names',
         'departure': 'eq.$slug',
         'updated_at': 'not.is.null',
         'order': 'code',
