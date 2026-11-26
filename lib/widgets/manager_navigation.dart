@@ -15,6 +15,7 @@ enum ManagerDestination {
   bookingReview,
   analytics,
   departureManagement,
+  checkIn,
   sharedContent,
   health,
   deployment,
@@ -34,6 +35,7 @@ extension ManagerDestinationDetails on ManagerDestination {
     ManagerDestination.bookingReview => 'Booking review',
     ManagerDestination.analytics => 'Customer journey',
     ManagerDestination.departureManagement => 'Manage departures',
+    ManagerDestination.checkIn => 'Check-in',
     ManagerDestination.sharedContent => 'Shared trip content',
     ManagerDestination.health => 'Data health',
     ManagerDestination.deployment => 'Publishing status',
@@ -53,6 +55,7 @@ extension ManagerDestinationDetails on ManagerDestination {
     ManagerDestination.analytics => 'See booking steps and drop-offs',
     ManagerDestination.departureManagement =>
       'Close, reopen and duplicate dates',
+    ManagerDestination.checkIn => 'Create lists, share links and manage captain access',
     ManagerDestination.sharedContent => 'FAQs, policies and trip highlights',
     ManagerDestination.health => 'Check website data',
     ManagerDestination.deployment => 'Monitor publishing',
@@ -71,6 +74,7 @@ extension ManagerDestinationDetails on ManagerDestination {
     ManagerDestination.bookingReview => Icons.fact_check_outlined,
     ManagerDestination.analytics => Icons.insights_outlined,
     ManagerDestination.departureManagement => Icons.event_available_outlined,
+    ManagerDestination.checkIn => Icons.how_to_reg_outlined,
     ManagerDestination.sharedContent => Icons.article_outlined,
     ManagerDestination.health => Icons.health_and_safety_outlined,
     ManagerDestination.deployment => Icons.rocket_launch_outlined,
@@ -89,6 +93,7 @@ extension ManagerDestinationDetails on ManagerDestination {
     ManagerDestination.bookingReview => Icons.fact_check,
     ManagerDestination.analytics => Icons.insights,
     ManagerDestination.departureManagement => Icons.event_available,
+    ManagerDestination.checkIn => Icons.how_to_reg,
     ManagerDestination.sharedContent => Icons.article,
     ManagerDestination.health => Icons.health_and_safety,
     ManagerDestination.deployment => Icons.rocket_launch,
@@ -102,6 +107,7 @@ const managerNavigationGroups = <String, List<ManagerDestination>>{
     ManagerDestination.dashboard,
     ManagerDestination.trips,
     ManagerDestination.departureManagement,
+    ManagerDestination.checkIn,
     ManagerDestination.batches,
   ],
   'Bookings & payments': [
@@ -406,6 +412,7 @@ List<ManagerDestination> findManagerTools(String query) {
     ManagerDestination.batches: 'calendar upcoming dates preview',
     ManagerDestination.departureManagement:
         'availability sold out close reopen duplicate dates calendar',
+    ManagerDestination.checkIn: 'pickup captain passenger manifest weekly shared link check-in',
     ManagerDestination.payments: 'upi qr discount coupon promo payment money',
     ManagerDestination.bookingReview:
         'customers travellers travelers booking confirm verify payment pending',
@@ -585,6 +592,12 @@ class ManagerGuideButton extends StatelessWidget {
             'Trips → Edit trip → Packing & inclusions',
             ManagerDestination.trips,
             'guidance',
+          ),
+          (
+            'Create or review a pickup list',
+            'Check-in → Choose a task or pickup list',
+            ManagerDestination.checkIn,
+            null,
           ),
           (
             'Close or reopen a departure',

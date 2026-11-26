@@ -1,20 +1,11 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../services/trip_pricing.dart';
 import '../services/booking_review_filter.dart';
 import 'booking_review_screen.dart';
+import 'checkin_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/trips_provider.dart';
-import '../providers/settings_provider.dart';
-import '../services/carry_library.dart';
-import '../services/pickup_library.dart';
-import '../services/draft_store.dart';
-import '../services/reusable_library_store.dart';
-import '../widgets/carry_library_dialog.dart';
-import '../widgets/pickup_library_dialog.dart';
 import '../services/trip_date_utils.dart';
 import '../services/departure_status.dart';
 import '../widgets/departure_tools.dart';
@@ -65,65 +56,6 @@ class _DepartureManagementScreenState extends State<DepartureManagementScreen> {
     }
     provider.applyBulkDates({id}, TripDateUtils.formatCanonical(date));
     await provider.flushDraft();
-  }
-
-  Future<void> _openPickupOrganizer(
-    BuildContext context,
-    Map<String, String> parameters, {
-    String? librarySelection,
-  }) async {
-    final organizer = Uri.https(
-      'www.teamweekendtrekkers.com',
-      '/pickup/captain.html',
-      parameters,
-    ).replace(fragment: librarySelection);
-    try {
-      if (await launchUrl(organizer, mode: LaunchMode.externalApplication)) {
-        return;
-      }
-    } catch (_) {
-      // The device may have no browser configured.
-    }
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open Pickup.')),
-      );
-    }
-  }
-
-  Future<void> _openPickupWithLibrary() async {
-    final trips = context.read<TripsProvider>().trips;
-    final scope = DraftStore.scope(context.read<SettingsProvider>().settings);
-    final stops = await showDialog<List<Map<String, dynamic>>>(
-      context: context,
-      builder: (_) => PickupLibraryDialog(
-        entries: buildPickupLibrary(trips),
-        current: const [],
-        store: ReusableLibraryStore(kind: 'pickup', scope: scope),
-      ),
-    );
-    if (!mounted) return;
-    final packing = await showDialog<List<String>>(
-      context: context,
-      builder: (_) => CarryLibraryDialog(
-        entries: buildCarryLibrary(trips),
-        current: const [],
-        store: ReusableLibraryStore(kind: 'carry', scope: scope),
-      ),
-    );
-    if (!mounted || (stops == null && packing == null)) return;
-    final data = jsonEncode({'stops': stops ?? [], 'packing': packing ?? []});
-    if (data.length > 12000) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select fewer library items and try again.')),
-      );
-      return;
-    }
-    await _openPickupOrganizer(
-      context,
-      {'create': '1'},
-      librarySelection: Uri(queryParameters: {'library': data}).query,
-    );
   }
 
   Future<void> _openDeparture(
@@ -212,7 +144,7 @@ class _DepartureManagementScreenState extends State<DepartureManagementScreen> {
                 TextButton.icon(
                   icon: const Icon(Icons.open_in_new),
                   label: const Text('Manage pickup lists'),
-                  onPressed: () => _openPickupOrganizer(dialogContext, {
+                  onPressed: () => openPickupOrganizer(dialogContext, {
                     'trek': (published?['title'] ?? trip['title']).toString(),
                     'date': range.key.split('/').first,
                   }),
@@ -294,17 +226,6 @@ class _DepartureManagementScreenState extends State<DepartureManagementScreen> {
                 'Confirm a departure only when it will run. Marking sold out closes new bookings. Changes stay in your draft until you publish.',
               ),
               const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: () => _openPickupOrganizer(context, {'create': '1'}),
-                icon: const Icon(Icons.add),
-                label: const Text('Create pickup list'),
-              ),
-              OutlinedButton.icon(
-                onPressed: provider.isLoading ? null : _openPickupWithLibrary,
-                icon: const Icon(Icons.playlist_add_outlined),
-                label: const Text('Create from reusable libraries'),
-              ),
-              const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: provider.isLoading
                     ? null
