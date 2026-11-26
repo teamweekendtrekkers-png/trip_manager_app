@@ -58,6 +58,29 @@ class _DepartureManagementScreenState extends State<DepartureManagementScreen> {
     await provider.flushDraft();
   }
 
+  Future<void> _openPickupOrganizer(
+    BuildContext context,
+    Map<String, String> parameters,
+  ) async {
+    final organizer = Uri.https(
+      'www.teamweekendtrekkers.com',
+      '/pickup/captain.html',
+      parameters,
+    );
+    try {
+      if (await launchUrl(organizer, mode: LaunchMode.externalApplication)) {
+        return;
+      }
+    } catch (_) {
+      // The device may have no browser configured.
+    }
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open Pickup.')),
+      );
+    }
+  }
+
   Future<void> _openDeparture(
     Map<String, dynamic> trip,
     Map<String, dynamic>? published,
@@ -144,31 +167,10 @@ class _DepartureManagementScreenState extends State<DepartureManagementScreen> {
                 TextButton.icon(
                   icon: const Icon(Icons.open_in_new),
                   label: const Text('Manage pickup lists'),
-                  onPressed: () async {
-                    final organizer = Uri.https(
-                      'www.teamweekendtrekkers.com',
-                      '/pickup/captain.html',
-                      {
-                        'trek': (published?['title'] ?? trip['title']).toString(),
-                        'date': range.key.split('/').first,
-                      },
-                    );
-                    try {
-                      if (await launchUrl(
-                        organizer,
-                        mode: LaunchMode.externalApplication,
-                      )) {
-                        return;
-                      }
-                    } catch (_) {
-                      // The device may have no browser configured.
-                    }
-                    if (dialogContext.mounted) {
-                      ScaffoldMessenger.of(dialogContext).showSnackBar(
-                        const SnackBar(content: Text('Could not open Pickup.')),
-                      );
-                    }
-                  },
+                  onPressed: () => _openPickupOrganizer(dialogContext, {
+                    'trek': (published?['title'] ?? trip['title']).toString(),
+                    'date': range.key.split('/').first,
+                  }),
                 ),
               if (liveDate != null)
                 TextButton.icon(
@@ -247,6 +249,12 @@ class _DepartureManagementScreenState extends State<DepartureManagementScreen> {
                 'Confirm a departure only when it will run. Marking sold out closes new bookings. Changes stay in your draft until you publish.',
               ),
               const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: () => _openPickupOrganizer(context, {'create': '1'}),
+                icon: const Icon(Icons.add),
+                label: const Text('Create pickup list'),
+              ),
+              const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: provider.isLoading
                     ? null
