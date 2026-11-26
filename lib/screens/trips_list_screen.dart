@@ -13,6 +13,7 @@ import 'commerce_settings_screen.dart';
 import 'booking_review_screen.dart';
 import 'analytics_screen.dart';
 import 'departure_management_screen.dart';
+import 'checkin_screen.dart';
 import 'trip_content_settings_screen.dart';
 import '../widgets/quick_trip_editor.dart';
 import '../widgets/trip_editor_sections.dart';
@@ -293,6 +294,9 @@ class _TripsListScreenState extends State<TripsListScreen> {
       ),
       ManagerDestination.payments => MaterialPageRoute<void>(
         builder: (_) => const CommerceSettingsScreen(),
+      ),
+      ManagerDestination.checkIn => MaterialPageRoute<void>(
+        builder: (_) => const CheckInScreen(),
       ),
       ManagerDestination.departureManagement => MaterialPageRoute<void>(
         builder: (_) => const DepartureManagementScreen(),
