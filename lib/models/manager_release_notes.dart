@@ -1,4 +1,7 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.46.0+64': [
+    'The About screen lists three planned improvements for departure check-in.',
+  ],
   '1.45.4+63': [
     'Find separate sections for traveller check-ins, packing checklists, and captain access.',
     'Open the departure packing editor directly from Check-in.',

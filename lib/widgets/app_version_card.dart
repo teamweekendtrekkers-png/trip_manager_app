@@ -264,6 +264,17 @@ class _AppVersionCardState extends State<AppVersionCard> {
                       .join('\n') ??
                   'Release notes are unavailable for this build.',
             ),
+            const SizedBox(height: 16),
+            const Text(
+              'Planned check-in improvements',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 6),
+            const Text('1. Find and manage check-ins with search, pickup filters, and Undo.'),
+            const SizedBox(height: 4),
+            const Text('2. Track boarding by pickup stop and see who is still expected.'),
+            const SizedBox(height: 4),
+            const Text('3. Open sharing, pickup points, packing, and captain access from the selected departure.'),
             const SizedBox(height: 12),
             const Text(
               'Drafts stay on this device until you publish. Removing an editor draft never changes the live website.',
