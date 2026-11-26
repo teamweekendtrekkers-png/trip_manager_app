@@ -1,8 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/pickup_service.dart';
+import '../services/pickup_workbook.dart';
 
 class PickupManifestScreen extends StatefulWidget {
   const PickupManifestScreen({super.key, this.initialDeparture, this.service});
@@ -86,6 +92,38 @@ class _PickupManifestScreenState extends State<PickupManifestScreen> {
       }
       rows = checkIns;
     });
+  }
+
+  Future<void> _downloadExcel() async {
+    final departure = departures.where((trip) => trip.slug == selected).firstOrNull;
+    if (departure == null || rows.isEmpty) return;
+    final bytes = buildPickupWorkbook(departure, rows, stops);
+    final slug = departure.slug.replaceAll(RegExp(r'[^a-zA-Z0-9-]'), '-');
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    final filename = 'check-ins-$slug-$stamp.xlsx';
+    final directory = Platform.isWindows
+        ? await getDownloadsDirectory()
+        : await getTemporaryDirectory();
+    if (directory == null) throw StateError('Downloads folder is unavailable.');
+    await directory.create(recursive: true);
+    final file = File(path.join(directory.path, filename));
+    await file.writeAsBytes(bytes, flush: true);
+    if (!mounted) return;
+    if (Platform.isWindows) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Saved to Downloads: $filename'),
+          action: SnackBarAction(
+            label: 'Open folder',
+            onPressed: () => launchUrl(Uri.directory(directory.path)),
+          ),
+        ),
+      );
+    } else {
+      await Share.shareXFiles([
+        XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+      ]);
+    }
   }
 
   Future<void> _call(String value) async {
@@ -399,6 +437,11 @@ class _PickupManifestScreenState extends State<PickupManifestScreen> {
                       onPressed: busy ? null : () => _run(_loadDepartures),
                       icon: const Icon(Icons.refresh),
                       label: const Text('Refresh check-ins'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: busy || rows.isEmpty ? null : () => _run(_downloadExcel),
+                      icon: const Icon(Icons.download_outlined),
+                      label: const Text('Download Excel'),
                     ),
                     if (selected != null)
                       FilledButton.icon(
