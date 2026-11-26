@@ -1,4 +1,9 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.46.4+68': [
+    'Reorder trip highlights using drag handles or the move menu.',
+    'Itinerary rows display each saved Day label once.',
+    'See public URL conflicts while editing, before saving or publishing.',
+  ],
   '1.46.3+67': [
     'Download the selected departure’s check-in roster as an Excel workbook.',
   ],

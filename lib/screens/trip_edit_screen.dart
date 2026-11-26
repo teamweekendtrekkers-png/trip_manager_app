@@ -112,9 +112,33 @@ class _TripEditScreenState extends State<TripEditScreen>
     }
   }
 
+  String _itineraryDayLabel(Object? day, int index) {
+    final label = day?.toString().trim() ?? '';
+    if (label.isEmpty) return 'Day ${index + 1}';
+    return int.tryParse(label) == null ? label : 'Day $label';
+  }
+
   bool _validPublicSlug(String slug) =>
       RegExp(r'^[a-z0-9][a-z0-9_-]*$').hasMatch(slug) &&
       !const ['constructor', 'prototype', '__proto__'].contains(slug);
+
+  String? _publicSlugError(String value) {
+    final slug = value.trim();
+    if (!_validPublicSlug(slug)) {
+      return 'Use lowercase letters, numbers, hyphens or underscores.';
+    }
+    final currentId = widget.trip?['id']?.toString();
+    for (final trip in context.read<TripsProvider>().trips) {
+      if (trip['id']?.toString() == currentId) continue;
+      final aliases = trip['previousSlugs'];
+      if (trip['id'] == slug ||
+          trip['publicSlug'] == slug ||
+          (aliases is List && aliases.contains(slug))) {
+        return 'This URL is already used by ${trip['title'] ?? trip['id']}.';
+      }
+    }
+    return null;
+  }
 
   Future<void> _copyTripLink(String url) async {
     var message = 'Trip link copied';
@@ -550,19 +574,18 @@ class _TripEditScreenState extends State<TripEditScreen>
                                   decoration: const InputDecoration(
                                     labelText: 'Public URL slug',
                                     helperText:
-                                        'Lowercase words separated by hyphens; internal ID stays unchanged',
+                                        'The new URL goes live after you publish.',
                                     border: OutlineInputBorder(),
                                   ),
-                                  validator: (value) => _validPublicSlug(value ?? '') ? null : 'Enter a safe lowercase slug',
+                                  validator: (value) => _publicSlugError(value ?? ''),
                                 ),
                                 const SizedBox(height: 8),
                                 ValueListenableBuilder<TextEditingValue>(
                                   valueListenable: _slugController,
                                   builder: (context, value, _) {
-                                    final slug = value.text;
-                                    if (!_validPublicSlug(slug)) {
-                                      return const Text('Enter a valid slug to copy the trip link.');
-                                    }
+                                    final slug = value.text.trim();
+                                    final error = _publicSlugError(slug);
+                                    if (error != null) return Text(error);
                                     final url = Uri(
                                       scheme: 'https',
                                       host: 'www.teamweekendtrekkers.com',
@@ -945,6 +968,7 @@ class _TripEditScreenState extends State<TripEditScreen>
                               items: List<String>.from(
                                 _tripData['highlights'] ?? [],
                               ),
+                              reorderField: 'highlights',
                               onAdd: () => _addListItem('highlights'),
                               onRemove: (index) =>
                                   _removeListItem('highlights', index),
@@ -1657,7 +1681,7 @@ class _TripEditScreenState extends State<TripEditScreen>
                     color: Colors.grey[50],
                     child: ListTile(
                       title: Text(
-                        'Day ${day['day'] ?? index + 1}: ${day['title'] ?? ''}',
+                        '${_itineraryDayLabel(day['day'], index)}: ${day['title'] ?? ''}',
                       ),
                       subtitle: Text(
                         day['description'] ?? '',
@@ -3083,6 +3107,14 @@ class _TripEditScreenState extends State<TripEditScreen>
                 : 'Please check the highlighted fields',
           ),
         ),
+      );
+      return;
+    }
+
+    final slugError = _publicSlugError(_slugController.text);
+    if (slugError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(slugError)),
       );
       return;
     }
