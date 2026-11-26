@@ -147,7 +147,7 @@ class PickupService {
     const pageSize = 200;
     for (var offset = 0; ; offset += pageSize) {
       final page = await _rows('pickup_checkins', {
-        'select': 'lead_name,phone,party_size,stop,passenger_names',
+        'select': 'code,lead_name,phone,party_size,stop,passenger_names',
         'departure': 'eq.$slug',
         'updated_at': 'not.is.null',
         'order': 'code',
@@ -156,6 +156,88 @@ class PickupService {
       }, private: true);
       rows.addAll(page);
       if (page.length < pageSize) return rows;
+    }
+  }
+
+  Future<void> saveCheckIn(
+    String slug, {
+    String? code,
+    required String name,
+    required String phone,
+    required int people,
+    required String stop,
+    required List<String> passengers,
+  }) {
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    final phoneKey = digits.length == 12 && digits.startsWith('91')
+        ? digits.substring(2)
+        : digits;
+    final values = <String, dynamic>{
+      'lead_name': name,
+      'phone': phone,
+      'shared_phone_key': phoneKey,
+      'party_size': people,
+      'stop': stop,
+      'passenger_names': passengers,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    };
+    if (code == null) {
+      values['departure'] = slug;
+      values['booking_reference'] =
+          'organizer:$phoneKey:${DateTime.now().microsecondsSinceEpoch}';
+    }
+    return _writeCheckIn(slug, code, values);
+  }
+
+  Future<void> removeCheckIn(String slug, String code) =>
+      _writeCheckIn(slug, code, {
+        'updated_at': null,
+        'shared_phone_key': null,
+      });
+
+  Future<void> _writeCheckIn(
+    String slug,
+    String? code,
+    Map<String, dynamic> values,
+  ) async {
+    if (!signedIn) throw StateError('Sign in to manage check-ins.');
+    if (_expires!.isBefore(DateTime.now().add(const Duration(seconds: 45)))) {
+      await _exchange('refresh_token', {'refresh_token': _refreshToken!});
+    }
+    final request = http.Request(
+      code == null ? 'POST' : 'PATCH',
+      Uri.https(_project, '/rest/v1/pickup_checkins', {
+        if (code != null) ...{
+          'code': 'eq.$code',
+          'departure': 'eq.$slug',
+          'updated_at': 'not.is.null',
+        },
+        'select': 'code',
+      }),
+    );
+    request.headers.addAll({
+      'apikey': await _publicKey(),
+      'Authorization': 'Bearer $_accessToken',
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+    });
+    request.body = jsonEncode(values);
+    final response = await http.Response.fromStream(
+      await _client.send(request).timeout(const Duration(seconds: 12)),
+    );
+    if (response.statusCode == 409) {
+      throw StateError('That phone number is already checked in for this departure.');
+    }
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      _accessToken = _refreshToken = null;
+      _expires = null;
+      throw StateError('Pickup access expired. Sign in again.');
+    }
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw StateError('Could not save the roster change. Try again.');
+    }
+    if ((jsonDecode(response.body) as List).isEmpty) {
+      throw StateError('This check-in has changed. Refresh the list and try again.');
     }
   }
 }

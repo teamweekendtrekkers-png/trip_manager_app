@@ -69,7 +69,22 @@ void main() {
           }
           if (request.url.path == '/auth/v1/logout') return reply({});
           expect(request.url.path, '/rest/v1/pickup_checkins');
+          if (request.method == 'POST') {
+            final data = jsonDecode(request.body) as Map;
+            expect(data['departure'], 'closed-trip');
+            expect(data['shared_phone_key'], '9000000001');
+            expect(data['passenger_names'], ['Another traveller']);
+            return reply([{'code': 'fixture-code'}], 201);
+          }
           expect(request.url.queryParameters['departure'], 'eq.closed-trip');
+          if (request.method == 'PATCH') {
+            expect(request.url.queryParameters['code'], 'eq.fixture-code');
+            expect(request.url.queryParameters['updated_at'], 'not.is.null');
+            final data = jsonDecode(request.body) as Map;
+            expect(data['updated_at'], isNull);
+            expect(data['shared_phone_key'], isNull);
+            return reply([{'code': 'fixture-code'}]);
+          }
           expect(request.url.queryParameters['updated_at'], 'not.is.null');
           return reply([
             {
@@ -85,6 +100,15 @@ void main() {
       await service.signIn('organizer@example.test', 'fixture-password');
       expect((await service.departures()).single.open, isFalse);
       expect((await service.checkIns('closed-trip')).single['party_size'], 3);
+      await service.saveCheckIn(
+        'closed-trip',
+        name: 'Fixture traveller',
+        phone: '+91 9000000001',
+        people: 2,
+        stop: 'fixture',
+        passengers: ['Another traveller'],
+      );
+      await service.removeCheckIn('closed-trip', 'fixture-code');
       await service.signOut();
       expect(service.signedIn, isFalse);
       await expectLater(service.checkIns('closed-trip'), throwsStateError);

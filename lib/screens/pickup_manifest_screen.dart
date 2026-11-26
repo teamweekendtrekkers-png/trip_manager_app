@@ -96,6 +96,146 @@ class _PickupManifestScreenState extends State<PickupManifestScreen> {
     }
   }
 
+  Future<void> _editCheckIn([Map<String, dynamic>? party]) async {
+    final slug = selected;
+    if (slug == null || stops.isEmpty) return;
+    final form = GlobalKey<FormState>();
+    var name = party?['lead_name']?.toString() ?? '';
+    var phone = party?['phone']?.toString() ?? '';
+    var people = party?['party_size'] as int? ?? 1;
+    var passengers = ((party?['passenger_names'] as List?) ?? [])
+        .whereType<String>()
+        .join('\n');
+    var stop = party?['stop'] as String?;
+    if (!stops.any((item) => item['id'] == stop)) stop = null;
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: Text(party == null ? 'Add check-in' : 'Edit check-in'),
+        content: SizedBox(
+          width: 420,
+          child: SingleChildScrollView(
+            child: Form(
+              key: form,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    initialValue: name,
+                    maxLength: 100,
+                    decoration: const InputDecoration(labelText: 'Lead traveller'),
+                    validator: (value) => value!.trim().isEmpty
+                        ? 'Enter the lead traveller’s name'
+                        : null,
+                    onSaved: (value) => name = value!.trim(),
+                  ),
+                  TextFormField(
+                    initialValue: phone,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(labelText: 'Phone number'),
+                    validator: (value) {
+                      final input = value!.trim();
+                      final digits = input.replaceAll(RegExp(r'[^0-9]'), '');
+                      return RegExp(r'^\+?[0-9 ()-]{10,21}$').hasMatch(input) &&
+                              digits.length >= 10 && digits.length <= 15
+                          ? null
+                          : 'Enter a valid phone number';
+                    },
+                    onSaved: (value) => phone = value!.trim(),
+                  ),
+                  TextFormField(
+                    initialValue: people.toString(),
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Total travellers'),
+                    validator: (value) {
+                      final count = int.tryParse(value!.trim());
+                      return count != null && count >= 1 && count <= 50
+                          ? null
+                          : 'Enter a count between 1 and 50';
+                    },
+                    onSaved: (value) => people = int.parse(value!.trim()),
+                  ),
+                  DropdownButtonFormField<String>(
+                    initialValue: stop,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Pickup point'),
+                    items: [
+                      for (final item in stops)
+                        DropdownMenuItem(
+                          value: item['id'] as String,
+                          child: Text(item['name'] as String,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                    ],
+                    onChanged: (value) => stop = value,
+                    validator: (value) => value == null ? 'Select a pickup point' : null,
+                  ),
+                  TextFormField(
+                    initialValue: passengers,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Additional traveller names',
+                      helperText: 'Optional · one name per line',
+                    ),
+                    validator: (value) => value!.split('\n').any((line) => line.trim().length > 100)
+                        ? 'Keep each name within 100 characters'
+                        : null,
+                    onSaved: (value) => passengers = value!,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialog), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () {
+              if (!form.currentState!.validate()) return;
+              form.currentState!.save();
+              Navigator.pop(dialog, true);
+            },
+            child: const Text('Save check-in'),
+          ),
+        ],
+      ),
+    );
+    if (save != true || !mounted || selected != slug) return;
+    final names = passengers.split('\n').map((name) => name.trim()).toList();
+    while (names.isNotEmpty && names.last.isEmpty) {
+      names.removeLast();
+    }
+    await _run(() async {
+      if (names.length >= people) {
+        throw StateError('Enter no more than ${people - 1} additional traveller names.');
+      }
+      await service.saveCheckIn(slug, code: party?['code'] as String?,
+          name: name, phone: phone, people: people, stop: stop!, passengers: names);
+      await _loadList();
+    });
+  }
+
+  Future<void> _removeCheckIn(Map<String, dynamic> party) async {
+    final slug = selected;
+    if (slug == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('Remove check-in?'),
+        content: Text('Remove ${party['lead_name']} and their group from this departure’s roster?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialog), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Remove')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || selected != slug) return;
+    await _run(() async {
+      await service.removeCheckIn(slug, party['code'] as String);
+      await _loadList();
+    });
+  }
+
   int _total(Iterable<Map<String, dynamic>> parties) => parties.fold(
     0,
     (sum, row) => sum + ((row['party_size'] as num?)?.toInt() ?? 0),
@@ -236,6 +376,12 @@ class _PickupManifestScreenState extends State<PickupManifestScreen> {
                       label: const Text('Refresh check-ins'),
                     ),
                     if (selected != null)
+                      FilledButton.icon(
+                        onPressed: busy || stops.isEmpty ? null : () => _editCheckIn(),
+                        icon: const Icon(Icons.person_add_outlined),
+                        label: const Text('Add check-in'),
+                      ),
+                    if (selected != null)
                       OutlinedButton.icon(
                         onPressed: () async {
                           final url = Uri.https(
@@ -306,12 +452,39 @@ class _PickupManifestScreenState extends State<PickupManifestScreen> {
                                   if (name.isNotEmpty) Text(name),
                               ],
                             ),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.call_outlined),
-                              tooltip: 'Call ${party['lead_name']}',
-                              onPressed: party['phone'] == null
-                                  ? null
-                                  : () => _call(party['phone'].toString()),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.call_outlined),
+                                  tooltip: 'Call ${party['lead_name']}',
+                                  onPressed: party['phone'] == null
+                                      ? null
+                                      : () => _call(party['phone'].toString()),
+                                ),
+                                PopupMenuButton<String>(
+                                  enabled: !busy,
+                                  tooltip: 'Manage check-in',
+                                  onSelected: (action) {
+                                    if (action == 'edit') {
+                                      _editCheckIn(party);
+                                    } else {
+                                      _removeCheckIn(party);
+                                    }
+                                  },
+                                  itemBuilder: (_) => [
+                                    PopupMenuItem(
+                                      value: 'edit',
+                                      enabled: stops.isNotEmpty,
+                                      child: const Text('Edit check-in'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'remove',
+                                      child: Text('Remove check-in'),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
                       ],

@@ -1,4 +1,8 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.45.3+62': [
+    'Add, edit, and remove traveller check-ins from a departure roster.',
+    'Update contact details, party size, traveller names and pickup stops in Manager.',
+  ],
   '1.45.2+61': [
     'See additional traveller names under each lead traveller in Check-in.',
   ],
