@@ -960,6 +960,7 @@ class _TripEditScreenState extends State<TripEditScreen>
                             // Inclusions Card
                             _buildListSection(
                               title: 'Inclusions',
+                              reorderField: 'inclusions',
                               items: List<String>.from(
                                 _tripData['inclusions'] ?? [],
                               ),
@@ -974,6 +975,7 @@ class _TripEditScreenState extends State<TripEditScreen>
                             // Exclusions Card
                             _buildListSection(
                               title: 'Exclusions',
+                              reorderField: 'exclusions',
                               items: List<String>.from(
                                 _tripData['exclusions'] ?? [],
                               ),
@@ -1435,6 +1437,7 @@ class _TripEditScreenState extends State<TripEditScreen>
         children: [
           _buildListSection(
             title: title,
+            reorderField: field == 'thingsToCarry' ? field : null,
             items: List<String>.from(_tripData[field] ?? []),
             onAdd: () => _addListItem(field),
             onRemove: (index) => _removeListItem(field, index),
@@ -1502,6 +1505,7 @@ class _TripEditScreenState extends State<TripEditScreen>
 
   Widget _buildListSection({
     required String title,
+    String? reorderField,
     required List<String> items,
     required VoidCallback onAdd,
     required Function(int) onRemove,
@@ -1518,17 +1522,31 @@ class _TripEditScreenState extends State<TripEditScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                  Flexible(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.add_circle),
-                    onPressed: onAdd,
-                    color: Colors.green,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (reorderField != null && items.length > 1)
+                        IconButton(
+                          tooltip: 'Reorder $title',
+                          icon: const Icon(Icons.swap_vert),
+                          onPressed: () =>
+                              _reorderList(reorderField, title, items),
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.add_circle),
+                        onPressed: onAdd,
+                        color: Colors.green,
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -2456,6 +2474,76 @@ class _TripEditScreenState extends State<TripEditScreen>
       list.removeAt(index);
       _tripData[key] = list;
     });
+  }
+
+  Future<void> _reorderList(
+    String field,
+    String title,
+    List<String> items,
+  ) async {
+    final order = List<int>.generate(items.length, (index) => index);
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, update) => AlertDialog(
+          title: Text('Reorder $title'),
+          content: SizedBox(
+            width: 540,
+            height: 360,
+            child: ReorderableListView.builder(
+              buildDefaultDragHandles: false,
+              itemCount: order.length,
+              onReorder: (from, to) => update(() {
+                order.insert(to > from ? to - 1 : to, order.removeAt(from));
+              }),
+              itemBuilder: (context, index) => ListTile(
+                key: ValueKey(order[index]),
+                contentPadding: EdgeInsets.zero,
+                title: FormattedText(items[order[index]]),
+                leading: ReorderableDragStartListener(
+                  index: index,
+                  child: const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(Icons.drag_handle),
+                  ),
+                ),
+                trailing: PopupMenuButton<int>(
+                  tooltip: 'Move item ${index + 1}',
+                  onSelected: (to) => update(() {
+                    order.insert(to, order.removeAt(index));
+                  }),
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: index - 1,
+                      enabled: index > 0,
+                      child: const Text('Move up'),
+                    ),
+                    PopupMenuItem(
+                      value: index + 1,
+                      enabled: index < order.length - 1,
+                      child: const Text('Move down'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, [
+                for (final index in order) items[index],
+              ]),
+              child: const Text('Apply order'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (mounted && result != null) setState(() => _tripData[field] = result);
   }
 
   void _editListItem(String key, int index, String value) {
