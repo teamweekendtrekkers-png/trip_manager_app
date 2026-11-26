@@ -18,6 +18,8 @@ class _PickupManifestScreenState extends State<PickupManifestScreen> {
   late final service = widget.service ?? PickupService.organizer;
   final email = TextEditingController();
   final password = TextEditingController();
+  final rosterSearch = TextEditingController();
+  String? pickupFilter;
   List<PickupDeparture> departures = [];
   List<Map<String, dynamic>> stops = [], rows = [];
   String? selected, error;
@@ -37,6 +39,7 @@ class _PickupManifestScreenState extends State<PickupManifestScreen> {
   void dispose() {
     email.dispose();
     password.dispose();
+    rosterSearch.dispose();
     super.dispose();
   }
 
@@ -78,6 +81,9 @@ class _PickupManifestScreenState extends State<PickupManifestScreen> {
     if (!mounted || selected != slug) return;
     setState(() {
       stops = locations;
+      if (!stops.any((stop) => stop['id'] == pickupFilter)) {
+        pickupFilter = null;
+      }
       rows = checkIns;
     });
   }
@@ -243,9 +249,24 @@ class _PickupManifestScreenState extends State<PickupManifestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final query = rosterSearch.text.trim().toLowerCase();
+    final digits = query.replaceAll(RegExp(r'[^0-9]'), '');
+    final phoneSearch = digits.isNotEmpty && RegExp(r'^[+0-9 ()-]+$').hasMatch(query);
+    final filtering = query.isNotEmpty || pickupFilter != null;
+    final visibleRows = rows.where((row) {
+      if (pickupFilter != null && row['stop'] != pickupFilter) return false;
+      if (query.isEmpty) return true;
+      final names = [
+        row['lead_name'],
+        ...((row['passenger_names'] as List?) ?? const []),
+      ];
+      return names.whereType<String>().any((name) => name.toLowerCase().contains(query)) ||
+          (phoneSearch && (row['phone']?.toString() ?? '')
+              .replaceAll(RegExp(r'[^0-9]'), '').contains(digits));
+    }).toList();
     final byStop = <String, List<Map<String, dynamic>>>{};
     final stopLabels = {for (final stop in stops) stop['id']: stop};
-    for (final row in rows) {
+    for (final row in visibleRows) {
       final id = (row['stop'] as String?) ?? '';
       (byStop[id] ??= []).add(row);
     }
@@ -271,6 +292,8 @@ class _PickupManifestScreenState extends State<PickupManifestScreen> {
                           stops = [];
                           rows = [];
                           selected = null;
+                          pickupFilter = null;
+                          rosterSearch.clear();
                         });
                       }
                     }),
@@ -361,6 +384,8 @@ class _PickupManifestScreenState extends State<PickupManifestScreen> {
                         : (value) {
                             setState(() {
                               selected = value;
+                              pickupFilter = null;
+                              rosterSearch.clear();
                               rows = [];
                               stops = [];
                             });
@@ -405,6 +430,44 @@ class _PickupManifestScreenState extends State<PickupManifestScreen> {
                       ),
                   ],
                 ),
+                if (rows.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: rosterSearch,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      labelText: 'Search name or phone',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: rosterSearch.text.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'Clear search',
+                              onPressed: () => setState(rosterSearch.clear),
+                              icon: const Icon(Icons.clear),
+                            ),
+                    ),
+                  ),
+                  if (stops.isNotEmpty)
+                    DropdownButtonFormField<String>(
+                      key: ValueKey(pickupFilter),
+                      initialValue: pickupFilter ?? '',
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Pickup point'),
+                      items: [
+                        const DropdownMenuItem(value: '', child: Text('All pickup points')),
+                        for (final stop in stops)
+                          DropdownMenuItem(
+                            value: stop['id'] as String,
+                            child: Text(stop['name'] as String, overflow: TextOverflow.ellipsis),
+                          ),
+                      ],
+                      onChanged: (value) => setState(() {
+                        pickupFilter = value == '' ? null : value;
+                      }),
+                    ),
+                ],
+                if (filtering && visibleRows.isEmpty && rows.isNotEmpty)
+                  const ListTile(title: Text('No check-ins match your filters.')),
                 if (!busy && error == null && rows.isEmpty)
                   Text(
                     departures.isEmpty
@@ -414,7 +477,11 @@ class _PickupManifestScreenState extends State<PickupManifestScreen> {
                 if (rows.isNotEmpty)
                   ListTile(
                     title: Text('${_total(rows)} travellers checked in'),
-                    subtitle: Text('${rows.length} parties'),
+                    subtitle: Text(
+                      filtering
+                          ? 'Showing ${visibleRows.length} of ${rows.length} parties'
+                          : '${rows.length} parties',
+                    ),
                   ),
                 for (final id in groups)
                   Card(
@@ -465,6 +532,10 @@ class _PickupManifestScreenState extends State<PickupManifestScreen> {
                                 PopupMenuButton<String>(
                                   enabled: !busy,
                                   tooltip: 'Manage check-in',
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                                    child: Text('Manage'),
+                                  ),
                                   onSelected: (action) {
                                     if (action == 'edit') {
                                       _editCheckIn(party);

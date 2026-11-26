@@ -32,6 +32,15 @@ void main() {
     expect(find.text('9000000001'), findsOneWidget);
     expect(find.text('Second fixture traveller'), findsOneWidget);
     expect(find.byTooltip('Call Fixture traveller'), findsOneWidget);
+
+    final search = find.byType(TextField);
+    await tester.enterText(search, '9000 000001');
+    await tester.pumpAndSettle();
+    expect(find.text('Fixture traveller · 3 travelling'), findsOneWidget);
+
+    await tester.enterText(search, 'Missing traveller');
+    await tester.pumpAndSettle();
+    expect(find.text('No check-ins match your filters.'), findsOneWidget);
   });
   test(
     'signs in separately and loads the selected departure’s private list',

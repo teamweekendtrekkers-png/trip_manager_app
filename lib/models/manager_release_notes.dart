@@ -1,4 +1,8 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.46.2+66': [
+    'Search departure check-ins by traveller name or phone number.',
+    'Filter the roster by pickup point and use the labelled Manage menu to edit or remove a party.',
+  ],
   '1.46.1+65': [
     'Keep valid itinerary choices such as OR when scanning and repairing trip data.',
   ],
