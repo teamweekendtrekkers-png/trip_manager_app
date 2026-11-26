@@ -175,12 +175,7 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
           final list = entry.value as List;
           for (int i = 0; i < list.length; i++) {
             final item = list[i].toString();
-            // Detect fragment patterns: standalone ", " or single-char items like "s"
-            if (item == ', ' ||
-                item == ',' ||
-                (item.length <= 2 &&
-                    i > 0 &&
-                    !RegExp(r'^\d+$').hasMatch(item))) {
+            if (_isSplitApostrophe(list, i)) {
               issues.add(
                 HealthIssue(
                   severity: HealthSeverity.error,
@@ -207,11 +202,7 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
           final activities = day['activities'] as List<dynamic>? ?? [];
           for (int a = 0; a < activities.length; a++) {
             final item = activities[a].toString();
-            if (item == ', ' ||
-                item == ',' ||
-                (item.length <= 2 &&
-                    a > 0 &&
-                    !RegExp(r'^\d+$').hasMatch(item))) {
+            if (_isSplitApostrophe(activities, a)) {
               issues.add(
                 HealthIssue(
                   severity: HealthSeverity.error,
@@ -513,46 +504,24 @@ class _DataHealthScreenState extends State<DataHealthScreen> {
     _runHealthCheck();
   }
 
-  /// Merge string fragments that were split by apostrophe corruption
-  /// Pattern: ["Sim", ", ", "s Park"] → ["Sim's Park"]
+  bool _isSplitApostrophe(List<dynamic> items, int index) {
+    if (index == 0 || index + 1 >= items.length) return false;
+    if (items[index].toString().trim() != ',') return false;
+    final before = items[index - 1].toString().trim();
+    final after = items[index + 1].toString().trim();
+    return before.isNotEmpty && before != ',' && before.toLowerCase() != 'or' &&
+        after.isNotEmpty && after != ',' && after.toLowerCase() != 'or';
+  }
+
+  /// Merge explicit split strings such as ["Sim", ", ", "s Park"].
   List<String> _mergeFragments(List<String> items) {
-    if (items.length < 2) return items;
     final result = <String>[];
-    int i = 0;
-    while (i < items.length) {
-      // Check if next items form a fragment pattern
-      if (i + 2 < items.length && items[i + 1] == ', ') {
-        // Merge: current + apostrophe + next meaningful part
-        var merged = items[i];
-        int j = i + 1;
-        while (j < items.length &&
-            (items[j] == ', ' ||
-                (items[j].length <= 2 &&
-                    !RegExp(r'^\d+$').hasMatch(items[j])))) {
-          if (items[j] == ', ') {
-            merged += "'";
-          } else {
-            merged += items[j];
-          }
-          j++;
-        }
-        // If we consumed some fragments, check if there's a trailing part
-        if (j > i + 1 && j < items.length) {
-          // The next item might be the continuation (e.g., "s Park viewpoint")
-          merged += items[j];
-          j++;
-        }
-        result.add(merged);
-        i = j;
-      } else if (items[i] == ', ' ||
-          (items[i].length == 1 &&
-              i > 0 &&
-              !RegExp(r'^\d$').hasMatch(items[i]))) {
-        // Skip orphaned fragments (shouldn't happen after merge above)
-        i++;
+    for (var index = 0; index < items.length; index++) {
+      if (_isSplitApostrophe(items, index)) {
+        final before = result.removeLast().trimRight();
+        result.add("$before'${items[++index].trimLeft()}");
       } else {
-        result.add(items[i]);
-        i++;
+        result.add(items[index]);
       }
     }
     return result;

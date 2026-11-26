@@ -1,4 +1,7 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.46.1+65': [
+    'Keep valid itinerary choices such as OR when scanning and repairing trip data.',
+  ],
   '1.46.0+64': [
     'The About screen lists three planned improvements for departure check-in.',
   ],

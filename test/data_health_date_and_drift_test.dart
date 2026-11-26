@@ -72,6 +72,27 @@ void main() {
     expect(find.textContaining('Dec 27-29.2026'), findsNothing);
   });
 
+  testWidgets('keeps itinerary alternatives and detects an explicit split', (
+    tester,
+  ) async {
+    final provider = TripsProvider(AppSettings());
+    final trip = validTrip();
+    final day = (trip['itinerary'] as List).single as Map;
+    day['activities'] = <String>['Visit the temple', 'OR', 'Visit the museum'];
+    provider.addTrip(trip);
+    final broken = validTrip(id: 'broken-trip');
+    final brokenDay = (broken['itinerary'] as List).single as Map;
+    brokenDay['activities'] = <String>['Sim', ', ', 's Park', 'OR', 'Museum'];
+    provider.addTrip(broken);
+
+    await tester.pumpWidget(buildSubject(provider));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Corrupted Itinerary Fragment'), findsOneWidget);
+    expect(find.textContaining('Trip "broken-trip"'), findsOneWidget);
+    expect(find.textContaining('= "OR"'), findsNothing);
+  });
+
   testWidgets('allows an empty date list', (tester) async {
     final provider = TripsProvider(AppSettings());
     provider.addTrip(validTrip());
