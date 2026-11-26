@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -10,9 +9,11 @@ import '../providers/trips_provider.dart';
 import '../services/carry_library.dart';
 import '../services/draft_store.dart';
 import '../services/pickup_library.dart';
+import '../services/pickup_service.dart';
 import '../services/reusable_library_store.dart';
 import '../widgets/carry_library_dialog.dart';
 import '../widgets/pickup_library_dialog.dart';
+import 'pickup_manifest_screen.dart';
 
 Future<void> openPickupOrganizer(
   BuildContext context,
@@ -44,41 +45,18 @@ class CheckInScreen extends StatefulWidget {
 }
 
 class _CheckInScreenState extends State<CheckInScreen> {
-  late Future<List<({String slug, String title, String date})>> _lists =
-      _loadLists();
+  late Future<List<PickupDeparture>> _lists = _loadLists();
 
-  Future<List<({String slug, String title, String date})>> _loadLists() async {
-    final config = await http
-        .get(Uri.https('www.teamweekendtrekkers.com', '/pickup/config.json'))
-        .timeout(const Duration(seconds: 10));
-    if (config.statusCode != 200) throw StateError('Pickup is unavailable.');
-    final settings = jsonDecode(config.body) as Map;
-    const project = 'rllukahyjluwcsttpcdl.supabase.co';
-    final key = settings['key'];
-    if (settings['url'] != 'https://$project' ||
-        key is! String ||
-        !key.startsWith('sb_publishable_'))
-      throw StateError('Pickup is unavailable.');
-    final result = await http
-        .get(
-          Uri.https(project, '/rest/v1/pickup_departures', {
-            'select': 'slug,title,departure_date',
-            'order': 'departure_date.desc,slug.asc',
-          }),
-          headers: {'apikey': key},
-        )
-        .timeout(const Duration(seconds: 10));
-    if (result.statusCode != 200) throw StateError('Pickup is unavailable.');
-    final rows = jsonDecode(utf8.decode(result.bodyBytes)) as List;
-    return [
-      for (final row in rows.whereType<Map>())
-        (
-          slug: row['slug'] as String,
-          title: row['title'] as String,
-          date: row['departure_date'] as String,
-        ),
-    ];
-  }
+  Future<List<PickupDeparture>> _loadLists() async =>
+      (await PickupService.organizer.departures())
+          .where((trip) => trip.open)
+          .toList();
+
+  void _review([String? slug]) => Navigator.of(context).push<void>(
+    MaterialPageRoute(
+      builder: (_) => PickupManifestScreen(initialDeparture: slug),
+    ),
+  );
 
   Future<void> _reuseLibraries(BuildContext context) async {
     final trips = context.read<TripsProvider>().trips;
@@ -145,7 +123,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                 subtitle: const Text(
                   'See each departure’s stops and traveller totals',
                 ),
-                onTap: () => openPickupOrganizer(context, {'view': 'all'}),
+                onTap: _review,
               ),
               ListTile(
                 leading: const Icon(Icons.link),
@@ -153,7 +131,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                 subtitle: const Text(
                   'Copy one link for everyone on a departure',
                 ),
-                onTap: () => openPickupOrganizer(context, {'view': 'share'}),
+                onTap: _review,
               ),
               ListTile(
                 leading: const Icon(Icons.key_outlined),
@@ -184,19 +162,19 @@ class _CheckInScreenState extends State<CheckInScreen> {
                     );
                   }
                   final rows = snapshot.data ?? [];
-                  if (rows.isEmpty)
+                  if (rows.isEmpty) {
                     return const Text(
                       'No pickup lists have been published yet.',
                     );
+                  }
                   return Column(
                     children: [
                       for (final row in rows)
                         ListTile(
                           title: Text(row.title),
                           subtitle: Text(row.date),
-                          trailing: const Icon(Icons.open_in_new),
-                          onTap: () =>
-                              openPickupOrganizer(context, {'list': row.slug}),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => _review(row.slug),
                         ),
                     ],
                   );
