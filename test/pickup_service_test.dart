@@ -30,6 +30,7 @@ void main() {
     expect(find.text('3 travellers checked in'), findsOneWidget);
     expect(find.text('Fixture traveller · 3 travelling'), findsOneWidget);
     expect(find.text('9000000001'), findsOneWidget);
+    expect(find.text('Second fixture traveller'), findsOneWidget);
     expect(find.byTooltip('Call Fixture traveller'), findsOneWidget);
   });
   test(
@@ -118,6 +119,7 @@ class _FixturePickupService extends PickupService {
       {
         'lead_name': 'Fixture traveller',
         'phone': '9000000001',
+        'passenger_names': ['Second fixture traveller'],
         'party_size': 3,
         'stop': 'fixture',
       },

@@ -287,8 +287,24 @@ class _PickupManifestScreenState extends State<PickupManifestScreen> {
                             title: Text(
                               '${party['lead_name']} · ${party['party_size']} travelling',
                             ),
-                            subtitle: SelectableText(
-                              party['phone']?.toString() ?? '',
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SelectableText(
+                                  party['phone']?.toString() ?? '',
+                                ),
+                                for (final name
+                                    in ((party['passenger_names'] as List?) ??
+                                            [])
+                                        .whereType<String>()
+                                        .take(
+                                          ((party['party_size'] as num?)
+                                                      ?.toInt() ??
+                                                  1) -
+                                              1,
+                                        ))
+                                  if (name.isNotEmpty) Text(name),
+                              ],
                             ),
                             trailing: IconButton(
                               icon: const Icon(Icons.call_outlined),
