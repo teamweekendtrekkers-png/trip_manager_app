@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/trip_pricing.dart';
 import '../services/booking_review_filter.dart';
 import 'booking_review_screen.dart';
@@ -139,6 +140,36 @@ class _DepartureManagementScreenState extends State<DepartureManagementScreen> {
                   },
                 ),
               ],
+              if (liveDate != null)
+                TextButton.icon(
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text('Manage pickup lists'),
+                  onPressed: () async {
+                    final organizer = Uri.https(
+                      'www.teamweekendtrekkers.com',
+                      '/pickup/captain.html',
+                      {
+                        'trek': (published?['title'] ?? trip['title']).toString(),
+                        'date': range.key.split('/').first,
+                      },
+                    );
+                    try {
+                      if (await launchUrl(
+                        organizer,
+                        mode: LaunchMode.externalApplication,
+                      )) {
+                        return;
+                      }
+                    } catch (_) {
+                      // The device may have no browser configured.
+                    }
+                    if (dialogContext.mounted) {
+                      ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        const SnackBar(content: Text('Could not open Pickup.')),
+                      );
+                    }
+                  },
+                ),
               if (liveDate != null)
                 TextButton.icon(
                   icon: const Icon(Icons.groups_outlined),
