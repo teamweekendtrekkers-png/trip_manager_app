@@ -49,6 +49,40 @@ void main() {
     matching: find.byIcon(Icons.save),
   );
 
+  testWidgets('reorders each trip list and saves the chosen draft order', (
+    tester,
+  ) async {
+    final trip = tripWithDates(['Jan 1-2, 2099'])
+      ..['inclusions'] = ['Meals', 'Travel', 'Meals']
+      ..['exclusions'] = ['Tickets', 'Insurance']
+      ..['thingsToCarry'] = ['Torch', 'Water'];
+    final provider = TripsProvider(AppSettings())..addTrip(trip);
+    await tester.pumpWidget(buildSubject(provider, trip));
+    for (final section in ['Inclusions', 'Exclusions', 'Things to Carry']) {
+      final reorder = find.byTooltip('Reorder $section');
+      await tester.scrollUntilVisible(
+        reorder,
+        250,
+        maxScrolls: 40,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(reorder);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Move item 1'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Move down'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Apply order'));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.byKey(const Key('editor-save-draft')));
+    await tester.pumpAndSettle();
+    final saved = provider.trips.single;
+    expect(saved['inclusions'], ['Travel', 'Meals', 'Meals']);
+    expect(saved['exclusions'], ['Insurance', 'Tickets']);
+    expect(saved['thingsToCarry'], ['Water', 'Torch']);
+  });
+
   testWidgets('reuse pickup points saves only the target trip draft', (tester) async {
     tester.view.physicalSize = const Size(1080, 1600);
     tester.view.devicePixelRatio = 1;
