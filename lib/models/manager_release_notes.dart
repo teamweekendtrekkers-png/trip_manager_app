@@ -1,4 +1,7 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.44.2+56': [
+    'Open Manage pickup lists from a departure to share check-in links and generate captain access.',
+  ],
   '1.44.1+55': [
     'Reorder Inclusions, Exclusions and Things to Carry in the trip editor.',
   ],
