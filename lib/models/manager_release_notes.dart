@@ -1,4 +1,8 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.45.4+63': [
+    'Find separate sections for traveller check-ins, packing checklists, and captain access.',
+    'Open the departure packing editor directly from Check-in.',
+  ],
   '1.45.3+62': [
     'Add, edit, and remove traveller check-ins from a departure roster.',
     'Update contact details, party size, traveller names and pickup stops in Manager.',

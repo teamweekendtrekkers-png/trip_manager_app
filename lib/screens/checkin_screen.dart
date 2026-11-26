@@ -104,6 +104,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              Text('Departure lists', style: Theme.of(context).textTheme.titleLarge),
               FilledButton.icon(
                 onPressed: () => openPickupOrganizer(context, {'create': '1'}),
                 icon: const Icon(Icons.add),
@@ -119,9 +120,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.history),
-                title: const Text('Review current and previous lists'),
+                title: const Text('Manage traveller check-ins'),
                 subtitle: const Text(
-                  'See each departure’s stops and traveller totals',
+                  'Add, edit or remove check-ins for any departure',
                 ),
                 onTap: _review,
               ),
@@ -133,11 +134,21 @@ class _CheckInScreenState extends State<CheckInScreen> {
                 ),
                 onTap: _review,
               ),
+              const Divider(),
+              Text('Packing checklist', style: Theme.of(context).textTheme.titleLarge),
+              ListTile(
+                leading: const Icon(Icons.checklist),
+                title: const Text('Edit a departure packing checklist'),
+                subtitle: const Text('Add or remove the items travellers can tick off'),
+                onTap: () => openPickupOrganizer(context, {'view': 'packing'}),
+              ),
+              const Divider(),
+              Text('Captain access', style: Theme.of(context).textTheme.titleLarge),
               ListTile(
                 leading: const Icon(Icons.key_outlined),
-                title: const Text('Generate captain access'),
+                title: const Text('Set captain access'),
                 subtitle: const Text(
-                  'Create a username and password for one list',
+                  'Generate credentials or set them manually for one departure',
                 ),
                 onTap: () => openPickupOrganizer(context, {'view': 'access'}),
               ),
