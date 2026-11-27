@@ -239,6 +239,17 @@ class _AppVersionCardState extends State<AppVersionCard> {
       setState(() => status = 'Could not open downloads. Try again.');
   }
 
+  String _displayVersion(String version) {
+    final parts = version.split('.');
+    if (parts.length == 3 &&
+        parts[0] == '1' &&
+        (int.tryParse(parts[1]) ?? 0) >= 47 &&
+        parts[2] == '0') {
+      return parts.take(2).join('.');
+    }
+    return version;
+  }
+
   void details() => showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -251,7 +262,7 @@ class _AppVersionCardState extends State<AppVersionCard> {
             Text(
               info == null
                   ? 'Installed version unavailable'
-                  : 'Version ${info!.version} · Build ${info!.buildNumber}',
+                  : 'Version ${_displayVersion(info!.version)} · Build ${info!.buildNumber}',
             ),
             const SizedBox(height: 16),
             const Text(
@@ -316,7 +327,7 @@ class _AppVersionCardState extends State<AppVersionCard> {
   Widget build(BuildContext context) {
     final label = info == null
         ? 'App version'
-        : 'v${info!.version} · Build ${info!.buildNumber}';
+        : 'v${_displayVersion(info!.version)} · Build ${info!.buildNumber}';
     if (widget.compact)
       return ListTile(
         dense: true,

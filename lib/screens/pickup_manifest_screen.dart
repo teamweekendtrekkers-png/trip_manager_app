@@ -259,6 +259,96 @@ class _PickupManifestScreenState extends State<PickupManifestScreen> {
     });
   }
 
+  Future<void> _editCaptainDetails(Map<String, dynamic> party) async {
+    final slug = selected;
+    if (slug == null) return;
+    final form = GlobalKey<FormState>();
+    final savedBalance = party['captain_balance_paise'] as int?;
+    int? balance = savedBalance;
+    var room = party['captain_room'] as String? ?? '';
+    var request = party['captain_request'] as String? ?? '';
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('Captain details'),
+        content: SizedBox(
+          width: 420,
+          child: SingleChildScrollView(
+            child: Form(
+              key: form,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(party['lead_name']?.toString() ?? ''),
+                  TextFormField(
+                    initialValue: savedBalance == null
+                        ? ''
+                        : (savedBalance / 100).toStringAsFixed(2),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Balance to collect (₹)',
+                      helperText: 'Total for this party. Leave blank if unknown.',
+                    ),
+                    validator: (value) {
+                      final text = (value ?? '').trim();
+                      return text.isEmpty || RegExp(r'^[0-9]{1,7}(\.[0-9]{1,2})?$').hasMatch(text)
+                          ? null : 'Enter an amount such as 1500 or 1500.50';
+                    },
+                    onSaved: (value) {
+                      final text = (value ?? '').trim();
+                      if (text.isEmpty) {
+                        balance = null;
+                        return;
+                      }
+                      final parts = text.split('.');
+                      balance = int.parse(parts.first) * 100 +
+                          (parts.length == 1 ? 0 : int.parse(parts.last.padRight(2, '0')));
+                    },
+                  ),
+                  TextFormField(
+                    initialValue: room,
+                    maxLength: 120,
+                    decoration: const InputDecoration(labelText: 'Room allocation'),
+                    onSaved: (value) => room = (value ?? '').trim(),
+                  ),
+                  TextFormField(
+                    initialValue: request,
+                    maxLength: 500,
+                    maxLines: 3,
+                    decoration: const InputDecoration(labelText: 'Special requests'),
+                    onSaved: (value) => request = (value ?? '').trim(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (!form.currentState!.validate()) return;
+              form.currentState!.save();
+              Navigator.pop(dialog, true);
+            },
+            child: const Text('Save captain details'),
+          ),
+        ],
+      ),
+    );
+    if (saved != true || !mounted || selected != slug) return;
+    await _run(() async {
+      await service.saveCaptainDetails(
+        slug, party['code'] as String,
+        balancePaise: balance, room: room, request: request,
+      );
+      await _loadList();
+    });
+  }
+
   Future<void> _removeCheckIn(Map<String, dynamic> party) async {
     final slug = selected;
     if (slug == null) return;
@@ -582,6 +672,8 @@ class _PickupManifestScreenState extends State<PickupManifestScreen> {
                                   onSelected: (action) {
                                     if (action == 'edit') {
                                       _editCheckIn(party);
+                                    } else if (action == 'captain') {
+                                      _editCaptainDetails(party);
                                     } else {
                                       _removeCheckIn(party);
                                     }
@@ -591,6 +683,10 @@ class _PickupManifestScreenState extends State<PickupManifestScreen> {
                                       value: 'edit',
                                       enabled: stops.isNotEmpty,
                                       child: const Text('Edit check-in'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'captain',
+                                      child: Text('Captain details'),
                                     ),
                                     const PopupMenuItem(
                                       value: 'remove',

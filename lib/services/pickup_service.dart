@@ -147,7 +147,7 @@ class PickupService {
     const pageSize = 200;
     for (var offset = 0; ; offset += pageSize) {
       final page = await _rows('pickup_checkins', {
-        'select': 'code,lead_name,phone,party_size,stop,passenger_names',
+        'select': 'code,lead_name,phone,party_size,stop,passenger_names,captain_balance_paise,captain_room,captain_request',
         'departure': 'eq.$slug',
         'updated_at': 'not.is.null',
         'order': 'code',
@@ -188,6 +188,18 @@ class PickupService {
     }
     return _writeCheckIn(slug, code, values);
   }
+
+  Future<void> saveCaptainDetails(
+    String slug,
+    String code, {
+    required int? balancePaise,
+    required String room,
+    required String request,
+  }) => _writeCheckIn(slug, code, {
+    'captain_balance_paise': balancePaise,
+    'captain_room': room.isEmpty ? null : room,
+    'captain_request': request.isEmpty ? null : request,
+  });
 
   Future<void> removeCheckIn(String slug, String code) =>
       _writeCheckIn(slug, code, {

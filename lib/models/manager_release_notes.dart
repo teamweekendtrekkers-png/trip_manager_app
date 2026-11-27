@@ -1,4 +1,7 @@
 const managerReleaseNotes = <String, List<String>>{
+  '1.47.0+69': [
+    'Set balances to collect, room allocations, and special requests for the captain roster.',
+  ],
   '1.46.4+68': [
     'Reorder trip highlights using drag handles or the move menu.',
     'Itinerary rows display each saved Day label once.',
